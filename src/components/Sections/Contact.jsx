@@ -1,8 +1,8 @@
 import React from "react";
 import styled from "styled-components";
 // Assets
-import ContactImg1 from "../../assets/img/contact-1.png";
-import ContactImg2 from "../../assets/img/contact-2.png";
+import ContactImg1 from "../../assets/img/contact-1.jpg";
+import ContactImg2 from "../../assets/img/contact-2.jpg";
 import ContactImg3 from "../../assets/img/contact-3.png";
 
 export default function Contact() {
@@ -34,17 +34,17 @@ export default function Contact() {
               </SumbitWrapper>
             </div>
             <div className="col-xs-12 col-sm-12 col-md-6 col-lg-6 flex">
-              <div style={{ width: "50%" }} className="flexNullCenter flexColumn">
+              <div style={{ width: "40%" }} className="flexNullCenter flexColumn">
                 <ContactImgBox>
-                  <img src={ContactImg1} alt="office" className="radius6" />
+                  <Img src={ContactImg1} alt="office" className="radius6" />
                 </ContactImgBox>
                 <ContactImgBox>
-                  <img src={ContactImg2} alt="office" className="radius6" />
+                  <Img src={ContactImg2} alt="office" className="radius6" />
                 </ContactImgBox>
               </div>
               <div style={{ width: "50%" }}>
                 <div style={{ marginTop: "100px" }}>
-                  <img src={ContactImg3} alt="office" className="radius6" />
+                  <Img src={ContactImg3} alt="office" className="radius6" />
                 </div>
               </div>
             </div>
@@ -105,6 +105,14 @@ const ContactImgBox = styled.div`
   align-self: flex-end; 
   margin: 10px 30px 10px 0;
 `;
+const Img = styled.img`
+    width: 100%;
+  @media (max-width: 560px) {
+    width: 80%;
+    height: auto;
+  }
+`;
+
 const SumbitWrapper = styled.div`
   @media (max-width: 991px) {
     width: 100%;

@@ -29,7 +29,7 @@ export default function Projects() {
           <motion.div 
           initial={{ opacity: 0, y: 100 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, ease: "easeOut" }}
+          transition={{ duration: .8, ease: "easeOut" }}
           viewport={{ once: false, amount: 0.2 }}
           className="row w-full p-10 bg-blue-500 text-white text-center rounded-lg"
           >
@@ -61,7 +61,7 @@ export default function Projects() {
           <motion.div 
           initial={{ opacity: 0, y: 100 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, ease: "easeOut" }}
+          transition={{ duration: .8, ease: "easeOut" }}
           viewport={{ once: false, amount: 0.2 }}
           className="row w-full p-10 bg-blue-500 text-white text-center rounded-lg"
           >
