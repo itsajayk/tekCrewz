@@ -3,14 +3,15 @@ import styled from "styled-components";
 // Components
 import ProjectBox from "../Elements/ProjectBox";
 import FullButton from "../Buttons/FullButton";
+import { motion } from "framer-motion";
 // Assets
-import ProjectImg1 from "../../assets/img/projects/1.png";
-import ProjectImg2 from "../../assets/img/projects/2.png";
-import ProjectImg3 from "../../assets/img/projects/3.png";
-import ProjectImg4 from "../../assets/img/projects/4.png";
-import ProjectImg5 from "../../assets/img/projects/5.png";
-import ProjectImg6 from "../../assets/img/projects/6.png";
-import AddImage2 from "../../assets/img/add/add2.png";
+import ProjectImg1 from "../../assets/img/projects/1.webp";
+import ProjectImg2 from "../../assets/img/projects/2.webp";
+import ProjectImg3 from "../../assets/img/projects/3.webp";
+import ProjectImg4 from "../../assets/img/projects/4.webp";
+import ProjectImg5 from "../../assets/img/projects/5.webp";
+import ProjectImg6 from "../../assets/img/projects/6.webp";
+import AddImage2 from "../../assets/img/add/add2.jpg";
 
 export default function Projects() {
   return (
@@ -18,65 +19,77 @@ export default function Projects() {
       <div className="whiteBg">
         <div className="container">
           <HeaderInfo>
-            <h1 className="font40 extraBold">Our Awesome Projects</h1>
+            <h1 className="font40 extraBold">Courses listing</h1>
             <p className="font13">
-              Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut
+            "Unlock your potential with expert-led courses, designed to elevate your skills and career.
               <br />
-              labore et dolore magna aliquyam erat, sed diam voluptua.
+              Learn, grow, and achieve success in the ever-evolving world of technology and innovation."
             </p>
           </HeaderInfo>
-          <div className="row textCenter">
+          <motion.div 
+          initial={{ opacity: 0, y: 100 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1, ease: "easeOut" }}
+          viewport={{ once: false, amount: 0.2 }}
+          className="row w-full p-10 bg-blue-500 text-white text-center rounded-lg"
+          >
             <div className="col-xs-12 col-sm-4 col-md-4 col-lg-4">
               <ProjectBox
                 img={ProjectImg1}
-                title="Awesome Project"
-                text="Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor."
+                title="Full-Stack Development"
+                text="Develop modern web applications using the latest technologies, mastering both front-end & back-end skills for real-world applications."
                 action={() => alert("clicked")}
               />
             </div>
             <div className="col-xs-12 col-sm-4 col-md-4 col-lg-4">
               <ProjectBox
                 img={ProjectImg2}
-                title="Awesome Project"
-                text="Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor."
+                title="Digital Marketing"
+                text="Explore SEO, social media, and content strategies to enhance online presence, drive engagement, and grow business visibility effectively."
                 action={() => alert("clicked")}
               />
             </div>
             <div className="col-xs-12 col-sm-4 col-md-4 col-lg-4">
               <ProjectBox
                 img={ProjectImg3}
-                title="Awesome Project"
-                text="Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor."
+                title="PHP"
+                text="Learn to build scalable web applications using PHP, handling databases, security, and backend development with best coding practices."
                 action={() => alert("clicked")}
               />
             </div>
-          </div>
-          <div className="row textCenter">
+          </motion.div>
+          <motion.div 
+          initial={{ opacity: 0, y: 100 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1, ease: "easeOut" }}
+          viewport={{ once: false, amount: 0.2 }}
+          className="row w-full p-10 bg-blue-500 text-white text-center rounded-lg"
+          >
             <div className="col-xs-12 col-sm-4 col-md-4 col-lg-4">
               <ProjectBox
                 img={ProjectImg4}
-                title="Awesome Project"
-                text="Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor."
+                title="Business Analyst"
+                text="Analyze business trends, interpret data, and optimize processes to drive strategic decision-making and organizational success."
                 action={() => alert("clicked")}
               />
             </div>
             <div className="col-xs-12 col-sm-4 col-md-4 col-lg-4">
               <ProjectBox
                 img={ProjectImg5}
-                title="Awesome Project"
-                text="Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor."
+                title="Graphic Designing"
+                text="Create visually compelling designs, master typography, and enhance branding with creative tools for impactful digital experiences."
                 action={() => alert("clicked")}
               />
             </div>
             <div className="col-xs-12 col-sm-4 col-md-4 col-lg-4">
               <ProjectBox
                 img={ProjectImg6}
-                title="Awesome Project"
-                text="Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor."
+                title="Python"
+                text="Develop efficient applications, automate tasks, and explore data science concepts using Python’s powerful and versatile ecosystem."
                 action={() => alert("clicked")}
               />
             </div>
-          </div>
+          </motion.div>
           <div className="row flexCenter">
             <div style={{ margin: "50px 0", width: "200px" }}>
               <FullButton title="Load More" action={() => alert("clicked")} />
@@ -96,10 +109,9 @@ export default function Projects() {
             </AddLeft>
             <AddRight>
               <h4 className="font15 semiBold">A few words about company</h4>
-              <h2 className="font40 extraBold">A Study of Creativity</h2>
+              <h2 className="font40 extraBold">“Market-Ready Leads”</h2>
               <p className="font12">
-                Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed
-                diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.
+              Unlock high-impact lead growth with our innovative strategies and data-driven approach.
               </p>
               <ButtonsRow className="flexNullCenter" style={{ margin: "30px 0" }}>
                 <div style={{ width: "190px" }}>
@@ -121,6 +133,7 @@ const Wrapper = styled.section`
   width: 100%;
 `;
 const HeaderInfo = styled.div`
+    text-align: center;
   @media (max-width: 860px) {
     text-align: center;
   }
@@ -188,11 +201,11 @@ const AddLeftInner = styled.div`
   }
 `;
 const ImgWrapper = styled.div`
-  width: 100%;
+  width: 80%;
   padding: 0 15%;
   img {
-    width: 100%;
-    height: auto;
+    width: 80%;
+    height: 50%;
   }
   @media (max-width: 400px) {
     padding: 0;

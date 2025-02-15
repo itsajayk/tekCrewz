@@ -23,6 +23,7 @@ const Wrapper = styled.div`
   width: 100%;
   padding: 20px 30px;
   margin-top: 30px;
+  text-align: center;
 `;
 const QuoteWrapper = styled.div`
   position: relative;

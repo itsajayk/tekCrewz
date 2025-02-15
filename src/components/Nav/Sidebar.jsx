@@ -74,10 +74,10 @@ export default function Sidebar({ sidebarOpen, toggleSidebar }) {
             smooth={true}
             offset={-60}
           >
-            Blog
+            Testimonials
           </Link>
         </li>
-        <li className="semiBold font15 pointer">
+        {/* <li className="semiBold font15 pointer">
           <Link
             onClick={toggleSidebar}
             activeClass="active"
@@ -90,7 +90,7 @@ export default function Sidebar({ sidebarOpen, toggleSidebar }) {
           >
             Pricing
           </Link>
-        </li>
+        </li> */}
         <li className="semiBold font15 pointer">
           <Link
             onClick={toggleSidebar}
@@ -132,7 +132,7 @@ const Wrapper = styled.nav`
   z-index: 9999;
   transition: right 1s ease-in-out;
 
-  @media (max-width: 400px) {
+  @media (max-width: 760px) {
     // width: 100%;
     right: ${({ sidebarOpen }) => (sidebarOpen ? "0px" : "-400px")};
   }

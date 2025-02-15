@@ -33,20 +33,26 @@ export default function TestimonialSlider() {
       <Slider {...settings}>
         <LogoWrapper className="flexCenter">
           <TestimonialBox
-            text="Friends, such as we desire, are dreams and fables. Friendship demands the ability to do without it."
-            author="Ralph Waldo Emerson"
+            text="We partnered with TekCrewz to modernize our systems, and the results have been outstanding. 
+            Their OFFICE AUTOMATION TOOL was excellent hub to manage all my works under one portal. 
+            They transformed our challenges into opportunities, and their solutions have significantly improved my business. 
+            We couldn’t be happier with the collaboration!"
+            author="Sathish Kumar [Aruvi Water Plant]"
           />
         </LogoWrapper>
         <LogoWrapper className="flexCenter">
           <TestimonialBox
-            text="Friends, such as we desire, are dreams and fables. Friendship demands the ability to do without it."
-            author="Ralph Waldo Emerson"
+            text="TekCrewz has been a game-changer for my business. Their innovative LEAD GENERATION IDEA by Their expert team have streamlined our processes and boosted my business growth. 
+            They’re not just a service provider; they’re a true partner in our growth. Highly recommend to all others for their Business Promotions!"
+            author="R S GopiKrishna [Murugan E-Seva Centre]"
           />
         </LogoWrapper>
         <LogoWrapper className="flexCenter">
           <TestimonialBox
-            text="Friends, such as we desire, are dreams and fables. Friendship demands the ability to do without it."
-            author="Ralph Waldo Emerson"
+            text="Choosing TekCrewz was the best decision we made for our business. Their expertise, responsiveness, and innovative approach exceeded our expectations. 
+            They delivered scalable solutions tailored perfectly to our needs, and their support throughout the project was exceptional. 
+            A reliable partner we highly recommend to any business seeking IT excellence!"
+            author=" Arumugam [Subha Traders]"
           />
         </LogoWrapper>
         <LogoWrapper className="flexCenter">

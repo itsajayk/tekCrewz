@@ -8,7 +8,7 @@ import TestimonialSlider from "../Elements/TestimonialSlider";
 export default function Blog() {
   return (
     <Wrapper id="blog">
-      <div className="whiteBg">
+      {/* <div className="whiteBg">
         <div className="container">
           <HeaderInfo>
             <h1 className="font40 extraBold">Our Blog Stories</h1>
@@ -82,15 +82,15 @@ export default function Blog() {
             </div>
           </div>
         </div>
-      </div>
+      </div> */}
       <div className="lightBg" style={{padding: '50px 0'}}>
         <div className="container">
           <HeaderInfo>
-            <h1 className="font40 extraBold">What They Say?</h1>
+            <h1 className="font40 extraBold">“Clients Testimonial”</h1>
             <p className="font13">
-              Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut
+            We take pride in the relationships we build. Here's how we have made an impact for our clients. Behind every testimonial is a story of collaboration and achievement.
               <br />
-              labore et dolore magna aliquyam erat, sed diam voluptua.
+            Here's a glimpse into what we’ve accomplished together so far, Yet We have Miles to GO!!
             </p>
           </HeaderInfo>
           <TestimonialSlider />
@@ -106,6 +106,7 @@ const Wrapper = styled.section`
 `;
 const HeaderInfo = styled.div`
   margin-bottom: 30px;
+  text-align: center;
   @media (max-width: 860px) {
     text-align: center;
   }

@@ -1,26 +1,35 @@
 import React from "react";
 import styled from "styled-components";
+import { motion } from "framer-motion";
 // Components
 import FullButton from "../Buttons/FullButton";
 // Assets
-import HeaderImage from "../../assets/img/header-img.png";
+import HeaderImage from "../../assets/img/header-img.webp";
 import QuotesIcon from "../../assets/svg/Quotes";
 import Dots from "../../assets/svg/Dots";
+
 
 export default function Header() {
   return (
     <Wrapper id="home" className="container flexSpaceCenter">
       <LeftSide className="flexCenter">
-        <div>
-          <h1 className="extraBold font60">We are a Web Development Company.</h1>
+        <motion.div
+        initial={{ opacity: 0, y: 100 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 1, ease: "easeOut" }}
+        viewport={{ once: false, amount: 0.2 }}
+        className="w-full p-10 bg-blue-500 text-white text-center rounded-lg"
+        >
+          <h1 className="extraBold font60">We are shaping the future of technology</h1>
           <HeaderP className="font13 semiBold">
-            Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam
-            voluptua. At vero eos et accusam et justo duo dolores et ea rebum.
+          we are redefining the IT landscape with cutting-edge solutions, visionary strategies, 
+          and a commitment to excellence. As an emerging leader in technology, we specialize in software development, 
+          IT consulting, and skill development, empowering businesses and individuals to thrive in the digital age.
           </HeaderP>
           <BtnWrapper>
             <FullButton title="Get Started" />
           </BtnWrapper>
-        </div>
+        </motion.div>
       </LeftSide>
       <RightSide>
         <ImageWrapper>
@@ -115,6 +124,7 @@ const ImageWrapper = styled.div`
   }
 `;
 const Img = styled.img`
+    width: 70%;
   @media (max-width: 560px) {
     width: 80%;
     height: auto;

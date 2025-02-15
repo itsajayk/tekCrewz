@@ -4,6 +4,8 @@ import styled from "styled-components";
 import ClientSlider from "../Elements/ClientSlider";
 import ServiceBox from "../Elements/ServiceBox";
 import FullButton from "../Buttons/FullButton";
+import { motion } from "framer-motion";
+
 // Assets
 import AddImage1 from "../../assets/img/add/1.png";
 import AddImage2 from "../../assets/img/add/2.png";
@@ -19,13 +21,19 @@ export default function Services() {
         </div>
       </div>
       <div className="whiteBg" style={{ padding: "60px 0" }}>
-        <div className="container">
+        <motion.div 
+        initial={{ opacity: 0, y: 100 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 1, ease: "easeOut" }}
+        viewport={{ once: false, amount: 0.2 }}
+        className="container w-full p-10 bg-blue-500 text-white text-center rounded-lg"
+        >
           <HeaderInfo>
             <h1 className="font40 extraBold">Our Awesome Services</h1>
             <p className="font13">
-              Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut
+            TekCrewz is specialized in Software Development, Skill development courses with Placement support, 
               <br />
-              labore et dolore magna aliquyam erat, sed diam voluptua.
+              Business consulting, and EPFO consulting to empower businesses and individuals with revolutionary technology.
             </p>
           </HeaderInfo>
           <ServiceBoxRow className="flex">
@@ -51,11 +59,14 @@ export default function Services() {
               />
             </ServiceBoxWrapper>
             <ServiceBoxWrapper>
-              <ServiceBox icon="stocks" title="Business Growth" subtitle="Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor." />
+              <ServiceBox 
+              icon="stocks" 
+              title="Business Growth" 
+              subtitle="Business Strategy and Investment Planning Growth Consulting." />
             </ServiceBoxWrapper>
           </ServiceBoxRow>
-        </div>
-        <div className="lightBg">
+        </motion.div>
+        {/* <div className="lightBg">
           <div className="container">
             <Advertising className="flexSpaceCenter">
               <AddLeft>
@@ -98,7 +109,7 @@ export default function Services() {
               </AddRight>
             </Advertising>
           </div>
-        </div>
+        </div> */}
       </div>
     </Wrapper>
   );
@@ -114,7 +125,7 @@ const ServiceBoxRow = styled.div`
 `;
 const ServiceBoxWrapper = styled.div`
   width: 20%;
-  margin-right: 5%;
+  margin:0 5%;
   padding: 80px 0;
   @media (max-width: 860px) {
     width: 100%;
@@ -123,6 +134,7 @@ const ServiceBoxWrapper = styled.div`
   }
 `;
 const HeaderInfo = styled.div`
+    text-align: center;
   @media (max-width: 860px) {
     text-align: center;
   }
