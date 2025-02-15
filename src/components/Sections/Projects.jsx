@@ -11,13 +11,19 @@ import ProjectImg3 from "../../assets/img/projects/3.webp";
 import ProjectImg4 from "../../assets/img/projects/4.webp";
 import ProjectImg5 from "../../assets/img/projects/5.webp";
 import ProjectImg6 from "../../assets/img/projects/6.webp";
-import AddImage2 from "../../assets/img/add/add2.jpg";
+import AddImage2 from "../../assets/img/add/add2.webp";
 
 export default function Projects() {
   return (
     <Wrapper id="projects">
       <div className="whiteBg">
-        <div className="container">
+        <motion.div 
+        initial={{ opacity: 0, y: 100 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 1, ease: "easeOut" }}
+        viewport={{ once: false, amount: 0.2 }}
+        className="container w-full p-10 bg-blue-500 text-white text-center rounded-lg"
+        >
           <HeaderInfo>
             <h1 className="font40 extraBold">Courses listing</h1>
             <p className="font13">
@@ -26,12 +32,8 @@ export default function Projects() {
               Learn, grow, and achieve success in the ever-evolving world of technology and innovation."
             </p>
           </HeaderInfo>
-          <motion.div 
-          initial={{ opacity: 0, y: 100 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: .8, ease: "easeOut" }}
-          viewport={{ once: false, amount: 0.2 }}
-          className="row w-full p-10 bg-blue-500 text-white text-center rounded-lg"
+          <div 
+          className="row"
           >
             <div className="col-xs-12 col-sm-4 col-md-4 col-lg-4">
               <ProjectBox
@@ -57,13 +59,9 @@ export default function Projects() {
                 action={() => alert("clicked")}
               />
             </div>
-          </motion.div>
-          <motion.div 
-          initial={{ opacity: 0, y: 100 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: .8, ease: "easeOut" }}
-          viewport={{ once: false, amount: 0.2 }}
-          className="row w-full p-10 bg-blue-500 text-white text-center rounded-lg"
+          </div>
+          <div 
+          className="row"
           >
             <div className="col-xs-12 col-sm-4 col-md-4 col-lg-4">
               <ProjectBox
@@ -89,13 +87,13 @@ export default function Projects() {
                 action={() => alert("clicked")}
               />
             </div>
-          </motion.div>
+          </div>
           <div className="row flexCenter">
             <div style={{ margin: "50px 0", width: "200px" }}>
               <FullButton title="Load More" action={() => alert("clicked")} />
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
       <div className="lightBg">
         <div className="container">
