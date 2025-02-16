@@ -1,11 +1,47 @@
-import React from "react";
+import React, { useState, useRef } from "react";
 import styled from "styled-components";
 // Assets
 import ContactImg1 from "../../assets/img/contact-1.jpg";
 import ContactImg2 from "../../assets/img/contact-2.jpg";
 import ContactImg3 from "../../assets/img/contact-3.jpg";
+import emailjs from "emailjs-com";
+
+const initialState = {
+  name: "",
+  phone: "",
+  subject: "",
+  message: "",
+};
 
 export default function Contact() {
+  const [{ name, phone, subject, message }, setState] = useState(initialState);
+  const formRef = useRef(null);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setState((prevState) => ({ ...prevState, [name]: value }));
+  };
+
+  const clearState = () => setState({ ...initialState });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    console.log(name, phone, subject, message);
+
+    // Replace with your own Service ID, Template ID, and Public Key from your EmailJS account
+    emailjs
+      .sendForm("YOUR_SERVICE_ID", "YOUR_TEMPLATE_ID", formRef.current, "YOUR_PUBLIC_KEY")
+      .then(
+        (result) => {
+          console.log(result.text);
+          clearState();
+        },
+        (error) => {
+          console.log(error.text);
+        }
+      );
+  };
+
   return (
     <Wrapper id="contact">
       <div className="lightBg">
@@ -13,25 +49,59 @@ export default function Contact() {
           <HeaderInfo>
             <h1 className="font40 extraBold">Let's get in touch</h1>
             <p className="font13">
-              Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut
+              {/* Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut
               <br />
-              labore et dolore magna aliquyam erat, sed diam voluptua.
+              labore et dolore magna aliquyam erat, sed diam voluptua. */}
             </p>
           </HeaderInfo>
           <div className="row" style={{ paddingBottom: "30px" }}>
             <div className="col-xs-12 col-sm-12 col-md-6 col-lg-6">
-              <Form>
+              <Form ref={formRef} onSubmit={handleSubmit}>
                 <label className="font13">First name:</label>
-                <input type="text" id="fname" name="fname" className="font20 extraBold" />
-                <label className="font13">Email:</label>
-                <input type="text" id="email" name="email" className="font20 extraBold" />
+                <input
+                  type="text"
+                  name="name"
+                  className="font20 extraBold"
+                  onChange={handleChange}
+                  value={name}
+                />
+
+                <label className="font13">Phone:</label>
+                <input
+                  type="tel"
+                  name="phone"
+                  className="font20 extraBold"
+                  onChange={handleChange}
+                  value={phone}
+                />
+
                 <label className="font13">Subject:</label>
-                <input type="text" id="subject" name="subject" className="font20 extraBold" />
-                <textarea rows="4" cols="50" type="text" id="message" name="message" className="font20 extraBold" />
+                <input
+                  type="text"
+                  name="subject"
+                  className="font20 extraBold"
+                  onChange={handleChange}
+                  value={subject}
+                />
+
+                <label className="font13">Message:</label>
+                <textarea
+                  rows="4"
+                  name="message"
+                  className="font20 extraBold"
+                  onChange={handleChange}
+                  value={message}
+                />
+
+                <SubmitWrapper className="flex">
+                  <ButtonInput
+                    type="submit"
+                    value="Send Message"
+                    className="pointer animate radius8"
+                    style={{ maxWidth: "220px" }}
+                  />
+                </SubmitWrapper>
               </Form>
-              <SumbitWrapper className="flex">
-                <ButtonInput type="submit" value="Send Message" className="pointer animate radius8" style={{ maxWidth: "220px" }} />
-              </SumbitWrapper>
             </div>
             <div className="col-xs-12 col-sm-12 col-md-6 col-lg-6 flex">
               <div style={{ width: "40%" }} className="flexNullCenter flexColumn">
@@ -58,32 +128,51 @@ export default function Contact() {
 const Wrapper = styled.section`
   width: 100%;
 `;
+
 const HeaderInfo = styled.div`
   padding: 70px 0 30px 0;
   @media (max-width: 860px) {
     text-align: center;
   }
 `;
+
 const Form = styled.form`
   padding: 70px 0 30px 0;
-  input,
+
+  input:not([type="submit"]),
   textarea {
     width: 100%;
     background-color: transparent;
-    border: 0px;
+    border: 0;
     outline: none;
     box-shadow: none;
     border-bottom: 1px solid #707070;
     height: 30px;
     margin-bottom: 30px;
+    color: black; /* Ensure normal input text is black */
   }
+
+  /* Fix autofill text color */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus {
+    -webkit-text-fill-color: black !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
   textarea {
     min-height: 100px;
   }
+
   @media (max-width: 860px) {
     padding: 30px 0;
   }
 `;
+
+
 const ButtonInput = styled.input`
   border: 1px solid #7620ff;
   background-color: #7620ff;
@@ -100,31 +189,24 @@ const ButtonInput = styled.input`
     margin: 0 auto;
   }
 `;
+
 const ContactImgBox = styled.div`
-  max-width: 180px; 
-  align-self: flex-end; 
+  max-width: 180px;
+  align-self: flex-end;
   margin: 10px 30px 10px 0;
 `;
+
 const Img = styled.img`
-    width: 100%;
+  width: 100%;
   @media (max-width: 560px) {
     width: 80%;
     height: auto;
   }
 `;
 
-const SumbitWrapper = styled.div`
+const SubmitWrapper = styled.div`
   @media (max-width: 991px) {
     width: 100%;
     margin-bottom: 50px;
   }
 `;
-
-
-
-
-
-
-
-
-
