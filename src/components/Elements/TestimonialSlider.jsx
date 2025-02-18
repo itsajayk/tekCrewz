@@ -55,7 +55,7 @@ export default function TestimonialSlider() {
             author=" Arumugam [Subha Traders]"
           />
         </LogoWrapper>
-        <LogoWrapper className="flexCenter">
+        {/* <LogoWrapper className="flexCenter">
           <TestimonialBox
             text="Friends, such as we desire, are dreams and fables. Friendship demands the ability to do without it."
             author="Ralph Waldo Emerson"
@@ -72,7 +72,7 @@ export default function TestimonialSlider() {
             text="Friends, such as we desire, are dreams and fables. Friendship demands the ability to do without it."
             author="Ralph Waldo Emerson"
           />
-        </LogoWrapper>
+        </LogoWrapper> */}
       </Slider>
     </div>
   );

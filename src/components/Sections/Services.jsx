@@ -15,11 +15,11 @@ import AddImage4 from "../../assets/img/add/4.png";
 export default function Services() {
   return (
     <Wrapper id="services">
-      <div className="lightBg" style={{ padding: "50px 0" }}>
+      {/* <div className="lightBg" style={{ padding: "50px 0" }}>
         <div className="container">
           <ClientSlider />
         </div>
-      </div>
+      </div> */}
       <div className="whiteBg" style={{ padding: "60px 0" }}>
         <motion.div 
         initial={{ opacity: 0, y: 100 }}
@@ -30,7 +30,7 @@ export default function Services() {
         >
           <HeaderInfo>
             <h1 className="font40 extraBold">Our Awesome Services</h1>
-            <p className="font13">
+            <p className="font15">
             TekCrewz is specialized in Software Development, Skill development courses with Placement support, 
               <br />
               Business consulting, and EPFO consulting to empower businesses and individuals with revolutionary technology.
@@ -54,7 +54,7 @@ export default function Services() {
             <ServiceBoxWrapper>
               <ServiceBox
                 icon="browser"
-                title="Development"
+                title="Web Development"
                 subtitle="One platform to Streamline your entire company's workflow."
               />
             </ServiceBoxWrapper>
@@ -131,10 +131,12 @@ const ServiceBoxWrapper = styled.div`
     width: 100%;
     text-align: center;
     padding: 40px 0;
+      margin:0;
   }
 `;
 const HeaderInfo = styled.div`
     text-align: center;
+    text-transform: uppercase;
   @media (max-width: 860px) {
     text-align: center;
   }

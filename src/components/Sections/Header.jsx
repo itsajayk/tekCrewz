@@ -21,7 +21,7 @@ export default function Header() {
         className="w-full p-10 bg-blue-500 text-white text-center rounded-lg"
         >
           <h1 className="extraBold font60">We are shaping the future of technology</h1>
-          <HeaderP className="font13 semiBold">
+          <HeaderP className="font14 semiBold">
           we are redefining the IT landscape with cutting-edge solutions, visionary strategies, 
           and a commitment to excellence. As an emerging leader in technology, we specialize in software development, 
           IT consulting, and skill development, empowering businesses and individuals to thrive in the digital age.
@@ -39,10 +39,10 @@ export default function Header() {
               <QuotesIcon />
             </QuotesWrapper>
             <div>
-              <p className="font15 whiteColor">
-                <em>Friends, such as we desire, are dreams and fables. Friendship demands the ability to do without it.</em>
+              <p className="font16 whiteColor">
+                <em>Coming together is a beginning, staying together is progress, and working together is success. </em>
               </p>
-              <p className="font13 orangeColor textRight" style={{marginTop: '10px'}}>Ralph Waldo Emerson</p>
+              <p className="font14 orangeColor textRight" style={{marginTop: '10px'}}>Ralph Waldo Emerson</p>
             </div>
           </QuoteWrapper>
           <DotsWrapper>

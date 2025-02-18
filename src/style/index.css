@@ -40,6 +40,7 @@
   a {
     text-decoration: none!important;
     color: #0B093B;
+    transition: .7s;
   }
   a:hover {
     color: #7620FF;
@@ -70,9 +71,9 @@
     padding: 0px 30px;
   }
   @media only screen and (max-width: 859px) {
-    .container {
+    /* .container {
       padding: 0 15px;
-    }
+    } */
   }
   .regular {
     font-weight: 400!important;
@@ -170,6 +171,9 @@
   .font20 {
     font-size: 1.25rem;
   }
+  .font22 {
+    font-size: 1.35rem;
+  }
   .font25 {
     font-size: 1.563rem;
   }
@@ -178,6 +182,9 @@
   }
   .font40 {
     font-size: 2.5rem;
+  }
+  .font45 {
+    font-size: 3rem;
   }
   .font60 {
     font-size: 3.75rem;
@@ -219,6 +226,9 @@
     }
   }
   /* BORDER RADIUS */
+  .radius9 {
+    border-radius: 1.2rem;
+  }
   .radius8 {
     border-radius: 1rem;
   }

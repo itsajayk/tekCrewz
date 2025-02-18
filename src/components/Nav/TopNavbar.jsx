@@ -31,29 +31,29 @@ export default function TopNavbar() {
           <Link className="pointer flexNullCenter" to="home" smooth={true}>
             <LogoIcon />
             <h1 style={{ marginLeft: "15px" }} className="font20 extraBold">
-              TekCrewz
+              TEKCREWZ
             </h1>
           </Link>
           <BurderWrapper className="pointer" onClick={() => setSidebarOpen(!sidebarOpen)}>
           <BurgerIcon />
           </BurderWrapper>
           <UlWrapper className="flexNullCenter">
-            <li className="semiBold font15 pointer">
+            <li className="semiBold font18 pointer">
               <Link activeClass="active" style={{ padding: "10px 15px" }} to="home" spy={true} smooth={true} offset={-80}>
                 Home
               </Link>
             </li>
-            <li className="semiBold font15 pointer">
+            <li className="semiBold font18 pointer">
               <Link activeClass="active" style={{ padding: "10px 15px" }} to="services" spy={true} smooth={true} offset={-80}>
                 Services
               </Link>
             </li>
-            <li className="semiBold font15 pointer">
+            <li className="semiBold font18 pointer">
               <Link activeClass="active" style={{ padding: "10px 15px" }} to="projects" spy={true} smooth={true} offset={-80}>
                 Courses
               </Link>
             </li>
-            <li className="semiBold font15 pointer">
+            <li className="semiBold font18 pointer">
               <Link activeClass="active" style={{ padding: "10px 15px" }} to="blog" spy={true} smooth={true} offset={-80}>
                 Testimonials
               </Link>
@@ -63,21 +63,21 @@ export default function TopNavbar() {
                 Pricing
               </Link>
             </li> */}
-            <li className="semiBold font15 pointer">
+            <li className="semiBold font18 pointer">
               <Link activeClass="active" style={{ padding: "10px 15px" }} to="contact" spy={true} smooth={true} offset={-80}>
                 Contact
               </Link>
             </li>
           </UlWrapper>
           <UlWrapperRight className="flexNullCenter">
-            <li className="semiBold font15 pointer">
+            {/* <li className="semiBold font18 pointer">
               <a href="/" style={{ padding: "10px 30px 10px 0" }}>
                 Log in
               </a>
-            </li>
-            <li className="semiBold font15 pointer flexCenter">
-              <a href="/" className="radius8 lightBg" style={{ padding: "10px 15px" }}>
-                Get Started
+            </li> */}
+            <li className="semiBold font18 pointer flexCenter">
+              <a href="/" className="radius9 lightBg" style={{ padding: "10px 15px" }}>
+              Log in
               </a>
             </li>
           </UlWrapperRight>

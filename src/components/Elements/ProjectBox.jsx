@@ -7,8 +7,8 @@ export default function ProjectBox({ img, title, text, action}) {
       <ImgBtn className="aniamte pointer" onClick={action ? () => action() : null}>
         <img className="radius8" src={img} alt="project"></img>
       </ImgBtn>
-      <h3 className="font20 extraBold">{title}</h3>
-      <p className="font13">{text}</p>
+      <h3 className="font22 extraBold">{title}</h3>
+      <p className="font14">{text}</p>
     </Wrapper>
   );
 }
@@ -32,6 +32,7 @@ const ImgBtn = styled.button`
   padding: 0px;
   margin: 0px;
   :hover > img {
-    opacity: 0.5;
+    opacity: 0.7;
+    transition: .5s;
   }
 `;

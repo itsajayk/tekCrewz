@@ -21,7 +21,7 @@ const Wrapper = styled.div`
   height: 100%;
   padding: 20px 30px;
   margin-top: 30px;
-  text-align: center;
+  text-align: justify;
   display: flex;
   flex-direction: column;
   justify-content: space-between;  /* Aligns items */
@@ -40,6 +40,7 @@ const Text = styled.p`
   flex-grow: 1;  /* Allows content to fill space equally */
   word-wrap: break-word; /* Prevents long words from breaking layout */
   padding-bottom: 10px;
+  text-transform: uppercase;
 `;
 
 const Author = styled.p`

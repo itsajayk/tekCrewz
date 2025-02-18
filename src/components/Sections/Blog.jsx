@@ -4,6 +4,7 @@ import styled from "styled-components";
 import BlogBox from "../Elements/BlogBox";
 import FullButton from "../Buttons/FullButton";
 import TestimonialSlider from "../Elements/TestimonialSlider";
+import { motion } from "framer-motion";
 
 export default function Blog() {
   return (
@@ -84,17 +85,23 @@ export default function Blog() {
         </div>
       </div> */}
       <div className="lightBg" style={{padding: '50px 0'}}>
-        <div className="container">
+        <motion.div
+        initial={{ opacity: 0, y: 100 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 1, ease: "easeOut" }}
+        viewport={{ once: false, amount: 0.2 }}
+        className="container w-full p-10 bg-blue-500 text-white text-center rounded-lg"
+        >
           <HeaderInfo>
             <h1 className="font40 extraBold">“Clients Testimonial”</h1>
-            <p className="font13">
+            <p className="font15">
             We take pride in the relationships we build. Here's how we have made an impact for our clients. Behind every testimonial is a story of collaboration and achievement.
               <br />
             Here's a glimpse into what we’ve accomplished together so far, Yet We have Miles to GO!!
             </p>
           </HeaderInfo>
           <TestimonialSlider />
-        </div>
+        </motion.div>
       </div>
     </Wrapper>
   );

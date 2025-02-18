@@ -5,6 +5,8 @@ import ContactImg1 from "../../assets/img/contact-1.jpg";
 import ContactImg2 from "../../assets/img/contact-2.jpg";
 import ContactImg3 from "../../assets/img/contact-3.jpg";
 import emailjs from "emailjs-com";
+import { motion } from "framer-motion";
+
 
 const initialState = {
   name: "",
@@ -30,10 +32,11 @@ export default function Contact() {
 
     // Replace with your own Service ID, Template ID, and Public Key from your EmailJS account
     emailjs
-      .sendForm("YOUR_SERVICE_ID", "YOUR_TEMPLATE_ID", formRef.current, "YOUR_PUBLIC_KEY")
+      .sendForm("service_hyxy9rv", "template_tfo8h74", formRef.current, "t3fbhvx8myxJiqSOC")
       .then(
         (result) => {
-          console.log(result.text);
+          // console.log(result.text);
+          alert("Message Sent" + " ✔️")
           clearState();
         },
         (error) => {
@@ -45,7 +48,12 @@ export default function Contact() {
   return (
     <Wrapper id="contact">
       <div className="lightBg">
-        <div className="container">
+        <motion.div
+        initial={{ opacity: 0, y: 100 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 1, ease: "easeOut" }}
+        viewport={{ once: false, amount: 0.2 }}
+        className="container w-full p-10 bg-blue-500 text-white text-center rounded-lg">
           <HeaderInfo>
             <h1 className="font40 extraBold">Let's get in touch</h1>
             <p className="font13">
@@ -119,7 +127,7 @@ export default function Contact() {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
     </Wrapper>
   );
@@ -198,9 +206,8 @@ const ContactImgBox = styled.div`
 
 const Img = styled.img`
   width: 100%;
-  @media (max-width: 560px) {
-    width: 80%;
-    height: auto;
+  @media (max-width: 760px) {
+    display: none;
   }
 `;
 
