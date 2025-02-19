@@ -16,6 +16,12 @@ export default function ProjectBox({ img, title, text, action}) {
 const Wrapper = styled.div`
   width: 100%;
   margin-top: 30px;
+  p{
+    text-transform: lowercase;
+  }
+    p::first-letter {
+    text-transform: uppercase;
+  }
   img {
     width: 100%;
     height: auto;

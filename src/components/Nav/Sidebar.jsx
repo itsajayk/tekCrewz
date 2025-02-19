@@ -127,14 +127,14 @@ const Wrapper = styled.nav`
   height: 100vh;
   position: fixed;
   top: 0;
-  right: ${({ sidebarOpen }) => (sidebarOpen ? "0px" : "-400px")};
+  right: ${({ sidebarOpen }) => (sidebarOpen ? "0px" : "-430px")};
   padding: 0 20px;
   z-index: 9999;
   transition: right 1.3s ease-in-out;
 
   @media (max-width: 760px) {
     width: 100%;
-    right: ${({ sidebarOpen }) => (sidebarOpen ? "0px" : "-400px")};
+    right: ${({ sidebarOpen }) => (sidebarOpen ? "0px" : "-430px")};
   }
 `;
 

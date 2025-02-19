@@ -47,7 +47,7 @@ export default function Contact() {
 
   return (
     <Wrapper id="contact">
-      <div className="lightBg">
+      <div className="lightBg" id="contact-form">
         <motion.div
         initial={{ opacity: 0, y: 100 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -104,7 +104,7 @@ export default function Contact() {
                 <SubmitWrapper className="flex">
                   <ButtonInput
                     type="submit"
-                    value="Send Message"
+                    value="SEND MESSAGE"
                     className="pointer animate radius8"
                     style={{ maxWidth: "220px" }}
                   />

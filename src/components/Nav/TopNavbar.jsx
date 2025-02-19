@@ -40,22 +40,22 @@ export default function TopNavbar() {
           <UlWrapper className="flexNullCenter">
             <li className="semiBold font18 pointer">
               <Link activeClass="active" style={{ padding: "10px 15px" }} to="home" spy={true} smooth={true} offset={-80}>
-                Home
+                HOME
               </Link>
             </li>
             <li className="semiBold font18 pointer">
               <Link activeClass="active" style={{ padding: "10px 15px" }} to="services" spy={true} smooth={true} offset={-80}>
-                Services
+                SERVICES
               </Link>
             </li>
             <li className="semiBold font18 pointer">
               <Link activeClass="active" style={{ padding: "10px 15px" }} to="projects" spy={true} smooth={true} offset={-80}>
-                Courses
+                COURSES
               </Link>
             </li>
             <li className="semiBold font18 pointer">
               <Link activeClass="active" style={{ padding: "10px 15px" }} to="blog" spy={true} smooth={true} offset={-80}>
-                Testimonials
+                TESTIMONIALS
               </Link>
             </li>
             {/* <li className="semiBold font15 pointer">
@@ -65,7 +65,7 @@ export default function TopNavbar() {
             </li> */}
             <li className="semiBold font18 pointer">
               <Link activeClass="active" style={{ padding: "10px 15px" }} to="contact" spy={true} smooth={true} offset={-80}>
-                Contact
+                CONTACT
               </Link>
             </li>
           </UlWrapper>
@@ -77,7 +77,7 @@ export default function TopNavbar() {
             </li> */}
             <li className="semiBold font18 pointer flexCenter">
               <a href="/" className="radius9 lightBg" style={{ padding: "10px 15px" }}>
-              Log in
+              LOG IN
               </a>
             </li>
           </UlWrapperRight>
