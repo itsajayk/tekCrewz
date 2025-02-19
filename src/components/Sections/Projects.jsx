@@ -313,7 +313,7 @@ export default function Projects() {
       {successModal && (
         <ModalOverlay>
           <ModalContent>
-            <h2>Registration Successful ! <i className="fa-solid fa-circle-check" style={{ color: "#63E6BE" }}></i></h2>
+            <h2>Registration Successful ! </h2>
             <p>Our team will contact you shortly.</p>
             <Button type="primary" onClick={closeSuccessModal}>
               OK
@@ -360,7 +360,7 @@ const ModalContent = styled.div`
   position: relative;
 
   @media (max-width: 860px) {
-    max-width: 350px;
+    max-width: 320px;
   }
 
   h2 {

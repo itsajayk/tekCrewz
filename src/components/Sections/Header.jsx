@@ -139,6 +139,7 @@ const QuoteWrapper = styled.div`
   z-index: 99;
   @media (max-width: 960px) {
     left: 20px;
+    font-size: 12px;
   }
   @media (max-width: 560px) {
     bottom: -50px;
