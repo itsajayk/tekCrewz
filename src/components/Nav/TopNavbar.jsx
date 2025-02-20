@@ -38,22 +38,22 @@ export default function TopNavbar() {
           <BurgerIcon />
           </BurderWrapper>
           <UlWrapper className="flexNullCenter">
-            <li className="semiBold font18 pointer">
+            <li className="font18 pointer">
               <Link activeClass="active" style={{ padding: "10px 15px" }} to="home" spy={true} smooth={true} offset={-80}>
                 HOME
               </Link>
             </li>
-            <li className="semiBold font18 pointer">
+            <li className="font18 pointer">
               <Link activeClass="active" style={{ padding: "10px 15px" }} to="services" spy={true} smooth={true} offset={-80}>
                 SERVICES
               </Link>
             </li>
-            <li className="semiBold font18 pointer">
+            <li className="font18 pointer">
               <Link activeClass="active" style={{ padding: "10px 15px" }} to="projects" spy={true} smooth={true} offset={-80}>
                 COURSES
               </Link>
             </li>
-            <li className="semiBold font18 pointer">
+            <li className="font18 pointer">
               <Link activeClass="active" style={{ padding: "10px 15px" }} to="blog" spy={true} smooth={true} offset={-80}>
                 TESTIMONIALS
               </Link>
@@ -63,7 +63,7 @@ export default function TopNavbar() {
                 Pricing
               </Link>
             </li> */}
-            <li className="semiBold font18 pointer">
+            <li className="font18 pointer">
               <Link activeClass="active" style={{ padding: "10px 15px" }} to="contact" spy={true} smooth={true} offset={-80}>
                 CONTACT
               </Link>
@@ -75,7 +75,7 @@ export default function TopNavbar() {
                 Log in
               </a>
             </li> */}
-            <li className="semiBold font18 pointer flexCenter">
+            <li className="font15 pointer flexCenter">
               <a href="/" className="radius9 lightBg" style={{ padding: "10px 15px" }}>
               LOG IN
               </a>

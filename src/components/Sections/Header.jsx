@@ -21,7 +21,7 @@ export default function Header() {
         className="w-full p-10 bg-blue-500 text-white text-center rounded-lg"
         >
           <h1 className="extraBold font60">We are shaping the future of technology</h1>
-          <HeaderP className="font14 semiBold">
+          <HeaderP className="font14">
           we are redefining the IT landscape with cutting-edge solutions, visionary strategies, 
           and a commitment to excellence. As an emerging leader in technology, we specialize in software development, 
           IT consulting, and skill development, empowering businesses and individuals to thrive in the digital age.

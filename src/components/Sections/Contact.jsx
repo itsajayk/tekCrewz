@@ -215,5 +215,7 @@ const SubmitWrapper = styled.div`
   @media (max-width: 991px) {
     width: 100%;
     margin-bottom: 50px;
+    display: flex;
+    
   }
 `;

@@ -7,7 +7,7 @@ import ProjectImg1 from "../../assets/img/projects/1.webp";
 import ProjectImg2 from "../../assets/img/projects/2.webp";
 import ProjectImg3 from "../../assets/img/projects/3.webp";
 import ProjectImg4 from "../../assets/img/projects/4.webp";
-import ProjectImg5 from "../../assets/img/projects/5.webp";
+import ProjectImg5 from "../../assets/img/projects/5.jpg";
 import ProjectImg6 from "../../assets/img/projects/6.webp";
 import { Modal, Button, Select, Input } from "antd";
 import { CloseOutlined } from "@ant-design/icons";
@@ -184,17 +184,17 @@ export default function Projects() {
               <div className="col-xs-12 col-sm-4 col-md-4 col-lg-4">
                 <ProjectBox
                   img={ProjectImg2}
-                  title="Digital Marketing"
+                  title="SEO - Digital Marketing"
                   text="explore seo, social media, and content strategies to enhance online presence, drive engagement, and grow business visibility effectively."
-                  action={() => openModal("Digital Marketing")}
+                  action={() => openModal("SEO - Digital Marketing")}
                 />
               </div>
               <div className="col-xs-12 col-sm-4 col-md-4 col-lg-4">
                 <ProjectBox
                   img={ProjectImg5}
-                  title="Graphic Designing"
-                  text="create visually compelling designs, master typography, and enhance branding with creative tools for impactful digital experiences."
-                  action={() => openModal("Graphic Designing")}
+                  title="Software Testing"
+                  text="Ensure software quality, master testing strategies, & enhance reliability with cutting-edge tools for flawless digital experiences."
+                  action={() => openModal("Software Testing")}
                 />
               </div>
             </motion.div>
