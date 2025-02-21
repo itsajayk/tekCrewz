@@ -195,7 +195,13 @@ const FixedWhatsapp = styled.a`
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: linear-gradient(45deg ,rgba(53, 173, 97, 0.1), #22c55e, #00d757, rgb(0, 255, 42));
+  background: linear-gradient(
+    45deg,
+    rgba(53, 173, 97, 0.1),
+    #22c55e,
+    #00d757,
+    rgb(0, 255, 42)
+  );
   display: flex;
   justify-content: center;
   align-items: center;
@@ -209,7 +215,15 @@ const FixedWhatsapp = styled.a`
   }
 
   @media (max-width: 860px) {
-    display: none;
+    bottom: 28px;
+    right: 28px;
+    width: 55px;
+    height: 55px;
+
+    /* Adjust the icon size inside the container */
+    svg {
+      font-size: 24px;
+    }
   }
 
   @keyframes pulse {
@@ -227,3 +241,4 @@ const FixedWhatsapp = styled.a`
     }
   }
 `;
+

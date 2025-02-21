@@ -126,12 +126,15 @@ const ServiceBoxRow = styled.div`
 const ServiceBoxWrapper = styled.div`
   width: 20%;
   margin:0 3%;
-  padding: 80px 0;
+  padding: 80px 0;  
   @media (max-width: 760px) {
     width: 100%;
     text-align: center;
-    padding: 52px;
-      // margin:0;
+    padding: 20px 0;
+      margin:0;
+    display: flex;
+    align-items:center;
+    justify-content: center;
   }
 `;
 const HeaderInfo = styled.div`
