@@ -36,7 +36,7 @@ export default function Services() {
               Business consulting, and EPFO consulting to empower businesses and individuals with revolutionary technology.
             </p>
           </HeaderInfo>
-          <ServiceBoxRow className="flex">
+          <ServiceBoxRow className="flex col-xs-12">
             <ServiceBoxWrapper>
               <ServiceBox
                 icon="roller"
@@ -60,7 +60,7 @@ export default function Services() {
             </ServiceBoxWrapper>
             <ServiceBoxWrapper>
               <ServiceBox 
-              icon="stocks" 
+              icon="graph" 
               title="Business Growth" 
               subtitle="Business Strategy and Investment Planning Growth Consulting." />
             </ServiceBoxWrapper>
@@ -125,13 +125,13 @@ const ServiceBoxRow = styled.div`
 `;
 const ServiceBoxWrapper = styled.div`
   width: 20%;
-  margin:0 5%;
+  margin:0 3%;
   padding: 80px 0;
-  @media (max-width: 860px) {
+  @media (max-width: 760px) {
     width: 100%;
     text-align: center;
-    padding: 40px 0;
-      margin:0;
+    padding: 52px;
+      // margin:0;
   }
 `;
 const HeaderInfo = styled.div`

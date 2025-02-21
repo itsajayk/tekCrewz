@@ -452,13 +452,12 @@ const ModalContent = styled.div`
 const ErrorText = styled.div`
   color: red;
   font-size: 12px;
-  margin-bottom: 2px; /* Reduced margin to save vertical space */
+  margin-bottom: 2px;
   text-align: left;
 `;
 
-/* New container to restrict the height of the form fields */
 const FormContainer = styled.div`
-  max-height: 450px; /* Limit the height */
+  max-height: 450px;
   overflow-y: auto;
 `;
 

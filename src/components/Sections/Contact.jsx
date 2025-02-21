@@ -7,7 +7,6 @@ import ContactImg3 from "../../assets/img/contact-3.jpg";
 import emailjs from "emailjs-com";
 import { motion } from "framer-motion";
 
-
 const initialState = {
   name: "",
   phone: "",
@@ -17,6 +16,7 @@ const initialState = {
 
 export default function Contact() {
   const [{ name, phone, subject, message }, setState] = useState(initialState);
+  const [errors, setErrors] = useState({});
   const formRef = useRef(null);
 
   const handleChange = (e) => {
@@ -26,8 +26,27 @@ export default function Contact() {
 
   const clearState = () => setState({ ...initialState });
 
+  const validateForm = () => {
+    const newErrors = {};
+    const mobileRegex = /^[0-9]{10}$/;
+    if (!name.trim()) newErrors.name = "Name is required";
+    if (!phone.trim()) newErrors.phone = "Phone is required";
+    if (!phone.trim()) {
+      newErrors.phone = "Mobile number is required.";
+    } else if (!mobileRegex.test(phone)) {
+      newErrors.phone = "Mobile number must be exactly 10 digits.";
+    }
+    if (!subject.trim()) newErrors.subject = "Subject is required";
+    if (!message.trim()) newErrors.message = "Message is required";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!validateForm()) {
+      return;
+    }
     console.log(name, phone, subject, message);
 
     // Replace with your own Service ID, Template ID, and Public Key from your EmailJS account
@@ -35,9 +54,9 @@ export default function Contact() {
       .sendForm("service_hyxy9rv", "template_tfo8h74", formRef.current, "t3fbhvx8myxJiqSOC")
       .then(
         (result) => {
-          // console.log(result.text);
-          alert("Message Sent" + " ✔️")
+          alert("Message Sent ✔️");
           clearState();
+          setErrors({});
         },
         (error) => {
           console.log(error.text);
@@ -49,22 +68,22 @@ export default function Contact() {
     <Wrapper id="contact">
       <div className="lightBg" id="contact-form">
         <motion.div
-        initial={{ opacity: 0, y: 100 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1, ease: "easeOut" }}
-        viewport={{ once: false, amount: 0.2 }}
-        className="container w-full p-10 bg-blue-500 text-white text-center rounded-lg">
+          initial={{ opacity: 0, y: 100 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1, ease: "easeOut" }}
+          viewport={{ once: false, amount: 0.2 }}
+          className="container w-full p-10 bg-blue-500 text-white text-center rounded-lg"
+        >
           <HeaderInfo>
             <h1 className="font40 extraBold">Let's get in touch</h1>
             <p className="font13">
-              {/* Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut
-              <br />
-              labore et dolore magna aliquyam erat, sed diam voluptua. */}
+              {/* Your text here */}
             </p>
           </HeaderInfo>
           <div className="row" style={{ paddingBottom: "30px" }}>
             <div className="col-xs-12 col-sm-12 col-md-6 col-lg-6">
               <Form ref={formRef} onSubmit={handleSubmit}>
+                {errors.name && <ErrorMessage>{errors.name}</ErrorMessage>}
                 <label className="font13">First name:</label>
                 <input
                   type="text"
@@ -74,6 +93,7 @@ export default function Contact() {
                   value={name}
                 />
 
+                {errors.phone && <ErrorMessage>{errors.phone}</ErrorMessage>}
                 <label className="font13">Phone:</label>
                 <input
                   type="tel"
@@ -83,6 +103,7 @@ export default function Contact() {
                   value={phone}
                 />
 
+                {errors.subject && <ErrorMessage>{errors.subject}</ErrorMessage>}
                 <label className="font13">Subject:</label>
                 <input
                   type="text"
@@ -92,6 +113,7 @@ export default function Contact() {
                   value={subject}
                 />
 
+                {errors.message && <ErrorMessage>{errors.message}</ErrorMessage>}
                 <label className="font13">Message:</label>
                 <textarea
                   rows="4"
@@ -157,7 +179,7 @@ const Form = styled.form`
     border-bottom: 1px solid #707070;
     height: 30px;
     margin-bottom: 30px;
-    color: black; /* Ensure normal input text is black */
+    color: black;
   }
 
   /* Fix autofill text color */
@@ -180,6 +202,12 @@ const Form = styled.form`
   }
 `;
 
+const ErrorMessage = styled.label`
+  color: red;
+  font-size: 12px;
+  margin-bottom: 5px;
+  display: block;
+`;
 
 const ButtonInput = styled.input`
   border: 1px solid #7620ff;
@@ -216,6 +244,5 @@ const SubmitWrapper = styled.div`
     width: 100%;
     margin-bottom: 50px;
     display: flex;
-    
   }
 `;
