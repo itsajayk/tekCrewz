@@ -331,6 +331,9 @@ const Wrapper = styled.section`
 
 const HeaderInfo = styled.div`
   text-align: center;
+    p {
+      color: orange;
+    }
   @media (max-width: 860px) {
     text-align: center;
   }
@@ -465,6 +468,9 @@ const Advertising = styled.div`
   padding: 100px 0;
   margin: 100px 0;
   position: relative;
+    h4{
+      color: orange;
+    }
   @media (max-width: 1160px) {
     padding: 60px 0 40px 0;
   }

@@ -1,9 +1,10 @@
 import React from "react";
 import styled from "styled-components";
-import { Link } from "react-scroll";
 import { FaFacebookF, FaTwitter, FaInstagram, FaLinkedinIn, FaWhatsapp } from "react-icons/fa";
 // Assets
 import LogoImg from "../../assets/svg/Logo";
+import { Link } from "react-router-dom";
+import { Link as ScrollLink } from "react-scroll";
 
 export default function Contact() {
   const getCurrentYear = () => new Date().getFullYear();
@@ -46,12 +47,15 @@ export default function Contact() {
                 <FaLinkedinIn />
               </SocialIcon>
             </SocialSection>
+            
           </InnerWrapper>
 
           <LinksSection>
             <StyledLink href="/about">About</StyledLink>
-            <StyledLink href="/terms">Terms &amp; Conditions</StyledLink>
-            <StyledLink href="/privacy">Privacy Policy</StyledLink>
+            <StyledLink href="/privacy">Terms &amp; Conditions</StyledLink>
+            <StyledLink href="/privacy">      
+                Privacy Policy
+            </StyledLink>
             <StyledLink href="#contact-form">Contact</StyledLink>
             <StyledLink href="mailto:info.tekcrewz@gmail.com">
               <strong>info.tekcrewz@gmail.com</strong>
@@ -62,14 +66,14 @@ export default function Contact() {
             <StyleP className="whiteColor font13">
               © {getCurrentYear()} - <span className="purpleColor font13">TekCrewz</span> All Rights Reserved
             </StyleP>
-            <Link className="whiteColor animate pointer font13" to="home" smooth={true} offset={-80}>
+            <ScrollLink to="home" smooth={true} offset={-80} duration={500} className="whiteColor animate pointer font13">
               Back to top
-            </Link>
+            </ScrollLink>
+
           </BottomWrapper>
         </div>
       </div>
 
-      {/* NEW: Fixed-position WhatsApp Icon */}
       <FixedWhatsapp href="https://wa.me/+919655466339" target="_blank">
         <FaWhatsapp size={38} />
       </FixedWhatsapp>
@@ -153,6 +157,10 @@ const NewsletterForm = styled.form`
   justify-content: center;
   align-items: center;
   gap: 10px;
+    @media (max-width: 768px) {
+    display: flex;
+    flex-direction: column;
+  }
 `;
 const NewsletterInput = styled.input`
   padding: 10px;
@@ -181,6 +189,8 @@ const BottomWrapper = styled.div`
   @media (max-width: 768px) {
     flex-direction: column;
     gap: 10px;
+    align-items: center;
+    justify-content: center;
   }
 `;
 const StyleP = styled.p`
@@ -220,10 +230,25 @@ const FixedWhatsapp = styled.a`
     width: 55px;
     height: 55px;
 
-    /* Adjust the icon size inside the container */
-    svg {
-      font-size: 24px;
+    background: linear-gradient(
+    45deg,
+    rgba(53, 173, 97),
+    #22c55e,
+    #00d757,
+    rgb(0, 255, 42)
+      );
+
+      @keyframes pulse {
+    0% {
+      opacity: 1;
     }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
   }
 
   @keyframes pulse {

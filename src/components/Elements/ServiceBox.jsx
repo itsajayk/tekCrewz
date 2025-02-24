@@ -19,7 +19,7 @@ export default function ServiceBox({icon, title, subtitle}) {
     case "browser":
       getIcon = <img src={BrowserIcon} alt="Browser Icon" width="60" height="60" />;
       break;
-    case "graph": // Ensure it's lowercase
+    case "graph": 
       getIcon = <img src={GraphIcon} alt="Graph Icon" width="60" height="60" />;
       break;
       
@@ -27,8 +27,6 @@ export default function ServiceBox({icon, title, subtitle}) {
       getIcon = <img src={RollerIcon} alt="Monitor Icon" width="60" height="60" />;
       break;
   }
-  console.log("Graph Icon Path:", GraphIcon);
-
 
   return (
     <Wrapper className="flex flexColumn">
@@ -55,6 +53,10 @@ const Wrapper = styled.div`
   font-family: cursive;
   box-shadow: linear-gradient(90deg, #5ddcff, #3c67e3, #4e00c2);
   cursor: pointer;
+
+    @media (max-width: 868px) {
+      height: 300px;
+  }
 
 
   /* Keyframes for stronger glowing effect */

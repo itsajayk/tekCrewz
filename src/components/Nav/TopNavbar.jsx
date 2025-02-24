@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import styled from "styled-components";
-import { Link } from "react-scroll";
+import NavbarLink from "./NavbarLink"; // import the helper
+import { Link as RouterLink } from "react-router-dom";
 // Components
 import Sidebar from "../Nav/Sidebar";
 import Backdrop from "../Elements/Backdrop";
@@ -19,54 +20,66 @@ export default function TopNavbar() {
       window.removeEventListener("scroll", handleScroll);
     };
   }, []);
-  
-
 
   return (
     <>
-  <Sidebar sidebarOpen={sidebarOpen} toggleSidebar={() => setSidebarOpen(false)} />
-        {sidebarOpen && <Backdrop />}
-      <Wrapper className="flexCenter animate whiteBg" style={y > 100 ? { height: "60px" } : { height: "80px" }}>
+      <Sidebar sidebarOpen={sidebarOpen} toggleSidebar={() => setSidebarOpen(false)} />
+      {sidebarOpen && <Backdrop />}
+      <Wrapper
+        className="flexCenter animate whiteBg"
+        style={y > 100 ? { height: "60px" } : { height: "80px" }}
+      >
         <NavInner className="container flexSpaceCenter">
-          <Link className="pointer flexNullCenter" to="home" smooth={true}>
+          <NavbarLink 
+            to="home" 
+            offset={0} 
+            style={{ display: "flex", alignItems: "center", cursor: "pointer" }}
+          >
             <LogoIcon />
             <h1 style={{ marginLeft: "15px" }} className="font20 extraBold">
               TEKCREWZ
             </h1>
-          </Link>
+          </NavbarLink>
           <BurderWrapper className="pointer" onClick={() => setSidebarOpen(!sidebarOpen)}>
-          <BurgerIcon />
+            <BurgerIcon />
           </BurderWrapper>
           <UlWrapper className="flexNullCenter">
             <li className="font18 pointer">
-              <Link activeClass="active" style={{ padding: "10px 15px" }} to="home" spy={true} smooth={true} offset={-80}>
+              <NavbarLink to="home" offset={-80} style={{ padding: "10px 15px" }}>
                 HOME
-              </Link>
+              </NavbarLink>
             </li>
             <li className="font18 pointer">
-              <Link activeClass="active" style={{ padding: "10px 15px" }} to="services" spy={true} smooth={true} offset={-80}>
+              <NavbarLink to="services" offset={-80} style={{ padding: "10px 15px" }}>
                 SERVICES
-              </Link>
+              </NavbarLink>
             </li>
             <li className="font18 pointer">
-              <Link activeClass="active" style={{ padding: "10px 15px" }} to="projects" spy={true} smooth={true} offset={-80}>
+              <NavbarLink to="projects" offset={-80} style={{ padding: "10px 15px" }}>
                 COURSES
-              </Link>
+              </NavbarLink>
             </li>
             <li className="font18 pointer">
-              <Link activeClass="active" style={{ padding: "10px 15px" }} to="blog" spy={true} smooth={true} offset={-80}>
+              <NavbarLink to="blog" offset={-80} style={{ padding: "10px 15px" }}>
                 TESTIMONIALS
-              </Link>
+              </NavbarLink>
             </li>
             {/* <li className="semiBold font15 pointer">
-              <Link activeClass="active" style={{ padding: "10px 15px" }} to="pricing" spy={true} smooth={true} offset={-80}>
+              <NavbarLink 
+                activeClass="active" 
+                style={{ padding: "10px 15px" }} 
+                to="pricing" 
+                spy={true} 
+                smooth={true} 
+                offset={-80}
+              >
                 Pricing
-              </Link>
+              </NavbarLink>
             </li> */}
             <li className="font18 pointer">
-              <Link activeClass="active" style={{ padding: "10px 15px" }} to="contact" spy={true} smooth={true} offset={-80}>
+              <NavbarLink to="contact" offset={-80} style={{ padding: "10px 15px" }}>
                 CONTACT
-              </Link>
+              </NavbarLink>
             </li>
           </UlWrapper>
           <UlWrapperRight className="flexNullCenter">
@@ -77,7 +90,7 @@ export default function TopNavbar() {
             </li> */}
             <li className="font15 pointer flexCenter">
               <a href="/" className="radius9 lightBg" style={{ padding: "10px 15px" }}>
-              LOG IN
+                LOG IN
               </a>
             </li>
           </UlWrapperRight>
@@ -97,7 +110,7 @@ const Wrapper = styled.nav`
 const NavInner = styled.div`
   position: relative;
   height: 100%;
-`
+`;
 const BurderWrapper = styled.button`
   outline: none;
   border: 0px;
@@ -120,5 +133,3 @@ const UlWrapperRight = styled.ul`
     display: none;
   }
 `;
-
-

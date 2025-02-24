@@ -2,6 +2,9 @@ import React from "react";
 import { Helmet } from "react-helmet";
 // Screens
 import Landing from "./screens/Landing.jsx";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import Privacy from "./components/Sections/Privacy.jsx";
+
 
 export default function App() {
   return (
@@ -11,7 +14,12 @@ export default function App() {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link href="https://fonts.googleapis.com/css2?family=Khula:wght@400;600;800&display=swap" rel="stylesheet" />
       </Helmet>
-      <Landing />
+      <Router>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/privacy" element={<Privacy />} />
+      </Routes>
+    </Router>
     </>
   );
 }

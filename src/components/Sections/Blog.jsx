@@ -95,9 +95,9 @@ export default function Blog() {
           <HeaderInfo>
             <h1 className="font40 extraBold">“Clients Testimonial”</h1>
             <p className="font15">
-            We take pride in the relationships we build. Here's how we have made an impact for our clients. Behind every testimonial is a story of collaboration and achievement.
-              <br />
-            Here's a glimpse into what we’ve accomplished together so far, Yet We have Miles to GO!!
+              We take pride in our client relationships. Every testimonial reflects collaboration and success.  
+              <br />  
+              Here's a glimpse of our journey—many more miles to go!  
             </p>
           </HeaderInfo>
           <TestimonialSlider />
@@ -114,6 +114,9 @@ const Wrapper = styled.section`
 const HeaderInfo = styled.div`
   margin-bottom: 30px;
   text-align: center;
+    p{
+      color: orange;
+    }
   @media (max-width: 860px) {
     text-align: center;
   }

@@ -31,9 +31,9 @@ export default function Services() {
           <HeaderInfo>
             <h1 className="font40 extraBold">Our Awesome Services</h1>
             <p className="font15">
-            TekCrewz is specialized in Software Development, Skill development courses with Placement support, 
-              <br />
-              Business consulting, and EPFO consulting to empower businesses and individuals with revolutionary technology.
+              TekCrewz specializes in Software Development, Skill Training with Placement,  
+              <br />  
+              Business & EPFO Consulting to empower businesses and individuals with technology.  
             </p>
           </HeaderInfo>
           <ServiceBoxRow className="flex col-xs-12">
@@ -140,9 +140,12 @@ const ServiceBoxWrapper = styled.div`
 const HeaderInfo = styled.div`
     text-align: center;
     text-transform: uppercase;
-  @media (max-width: 860px) {
-    text-align: center;
-  }
+    p{
+      color: orange;
+    }
+    @media (max-width: 860px) {
+      text-align: center;
+    }
 `;
 const Advertising = styled.div`
   margin: 80px 0;
