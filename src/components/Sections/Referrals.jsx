@@ -49,23 +49,63 @@ const Referrals = () => {
         if (!formData.referrerName) tempErrors.referrerName = "Referrer's Name is required.";
         if (!formData.referrerPosition) tempErrors.referrerPosition = "Position is required.";
         if (!formData.referrerCollege) tempErrors.referrerCollege = "College is required.";
+        
         // Candidate validations
         if (!formData.candidateName) tempErrors.candidateName = "Candidate Name is required.";
         if (!formData.candidateDegree) tempErrors.candidateDegree = "Degree is required.";
         if (!formData.candidateCourseName) tempErrors.candidateCourseName = "Course Name is required.";
-        if (!formData.marksType) tempErrors.marksType = "Marks type is required.";
-        if (!formData.score) tempErrors.score = "Score is required.";
-        if (!formData.mobile) tempErrors.mobile = "Mobile Number is required.";
-        if (!formData.parentMobile) tempErrors.parentMobile = "Parent Mobile Number is required.";
-        if (!formData.email) tempErrors.email = "Email is required.";
-        else if (!/\S+@\S+\.\S+/.test(formData.email)) tempErrors.email = "Invalid email address.";
-        if (!formData.coursesEnquired) tempErrors.coursesEnquired = "Courses Enquired is required.";
-        if (!formData.dateOfVisit) tempErrors.dateOfVisit = "Date of Visit is required.";
-        if (!formData.paymentTerm) tempErrors.paymentTerm = "Payment Term is required.";
-        if (!formData.communicationScore) tempErrors.communicationScore = "Communication Score is required.";
-        setErrors(tempErrors);
-        return Object.keys(tempErrors).length === 0;
-    };
+        
+        // Marks & Score validation
+        if (!formData.marksType) {
+            tempErrors.marksType = "Marks type is required.";
+            }
+            
+            if (!formData.score) {
+            tempErrors.score = "Score is required.";
+            } else {
+            const scoreValue = parseFloat(formData.score);
+            if (formData.marksType === "CGPA") {
+                // Ensure CGPA is between 0 and 10 (you can adjust the range as needed)
+                if (isNaN(scoreValue) || scoreValue < 0 || scoreValue > 10) {
+                tempErrors.score = "Please enter a valid CGPA between 0 and 10.";
+                }
+            } else if (formData.marksType === "Percentage") {
+                // Ensure percentage is between 0 and 100
+                if (isNaN(scoreValue) || scoreValue < 0 || scoreValue > 100) {
+                tempErrors.score = "Please enter a valid percentage between 0 and 100.";
+                }
+            }
+            }
+            
+            // Mobile number validations
+            if (!formData.mobile) {
+            tempErrors.mobile = "Mobile Number is required.";
+            } else if (!/^\d{10}$/.test(formData.mobile)) {
+            tempErrors.mobile = "Mobile number must be exactly 10 digits.";
+            }
+            
+            if (!formData.parentMobile) {
+            tempErrors.parentMobile = "Parent Mobile Number is required.";
+            } else if (!/^\d{10}$/.test(formData.parentMobile)) {
+            tempErrors.parentMobile = "Mobile number must be exactly 10 digits.";
+            }
+            
+            // Email validation
+            if (!formData.email) {
+            tempErrors.email = "Email is required.";
+            } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+            tempErrors.email = "Invalid email address.";
+            }
+            
+            if (!formData.coursesEnquired) tempErrors.coursesEnquired = "Courses Enquired is required.";
+            if (!formData.dateOfVisit) tempErrors.dateOfVisit = "Date of Visit is required.";
+            if (!formData.paymentTerm) tempErrors.paymentTerm = "Payment Term is required.";
+            if (!formData.communicationScore) tempErrors.communicationScore = "Communication Score is required.";
+            
+            setErrors(tempErrors);
+            return Object.keys(tempErrors).length === 0;
+        };
+        
 
     const closeSuccessModal = () => {
         setSuccessModal(false);
@@ -82,7 +122,7 @@ const Referrals = () => {
             "t3fbhvx8myxJiqSOC"
         )
         .then((response) => {
-            console.log("Email sent successfully:", response.status, response.text);
+            // console.log("Email sent successfully:", response.status, response.text);
             setIsLoading(false); // Stop loading
             // Reset form and close referral modal
             setFormData({

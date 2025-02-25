@@ -19,7 +19,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/privacy" element={<Privacy />} />
-        <Route path="/Referral"element={<Referrals />}/>
+        <Route path="/admin"element={<Referrals />}/>
       </Routes>
     </Router>
     </>

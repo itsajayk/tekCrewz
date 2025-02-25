@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react"; 
-import styled from "styled-components";
+import styled, { keyframes } from 'styled-components';
 import ProjectBox from "../Elements/ProjectBox";
 import FullButton from "../Buttons/FullButton";
 import { motion } from "framer-motion";
@@ -20,7 +20,8 @@ export default function Projects() {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [successModal, setSuccessModal] = useState(false);
   const [errors, setErrors] = useState({});
-
+  const [isLoading, setIsLoading] = useState(false); // New loading state
+  
   const scrollToContactForm = () => {
     const element = document.getElementById("contact-form");
     if (element) {
@@ -105,7 +106,8 @@ export default function Projects() {
     emailjs
       .send(serviceID, templateID, formData, userID)
       .then((response) => {
-        console.log("SUCCESS!", response.status, response.text);
+        setIsLoading(true); // Start loading
+        // console.log("SUCCESS!", response.status, response.text);
         // Optionally, you could reset the formData here
         setFormData({
           name: "",
@@ -321,6 +323,14 @@ export default function Projects() {
           </ModalContent>
         </ModalOverlay>
       )}
+
+      {isLoading && (
+                  <ModalOverlay>
+                  <LoaderContainer>
+                      <Loader />
+                  </LoaderContainer>
+                  </ModalOverlay>
+              )}
     </Wrapper>
   );
 }
@@ -557,3 +567,27 @@ const CloseIcon = styled(CloseOutlined)`
     color: #7620ff;
   }
 `;
+
+const spin = keyframes`
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+    `;
+
+    // Loader spinner
+    const Loader = styled.div`
+    border: 8px solid #f3f3f3;
+    border-top: 8px solid #7620ff;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    animation: ${spin} 1.5s linear infinite;
+    `;
+
+    // Container to center the Loader
+    const LoaderContainer = styled.div`
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    `;
+

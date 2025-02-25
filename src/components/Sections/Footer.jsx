@@ -74,9 +74,11 @@ export default function Contact() {
         </div>
       </div>
 
-      <FixedWhatsapp href="https://wa.me/+919655466339" target="_blank">
-        <FaWhatsapp size={38} />
+      <FixedWhatsapp href="https://wa.me/919655466339?text=Hello!%20there.%20I%20have%20a%20query%20and%20would%20appreciate%20your%20assistance." target="_blank">
+            <FaWhatsapp size={38} />
       </FixedWhatsapp>
+
+
     </Wrapper>
   );
 }
@@ -219,7 +221,7 @@ const FixedWhatsapp = styled.a`
     color: rgb(0, 255, 42);
     background:  #fff;
     border: solid .2px rgb(0, 255, 42);
-
+    transition: 1s;
   }
 
   @media (max-width: 860px) {
@@ -227,14 +229,8 @@ const FixedWhatsapp = styled.a`
     right: 28px;
     width: 55px;
     height: 55px;
-
-    background: linear-gradient(
-    45deg,
-    rgba(53, 173, 97),
-    #22c55e,
-    #00d757,
-    rgb(0, 255, 42)
-      );
+    background: rgb(0, 255, 42);;
+    
 
       @keyframes pulse {
     0% {
@@ -252,7 +248,7 @@ const FixedWhatsapp = styled.a`
   @keyframes pulse {
     0% {
       transform: scale(1);
-      opacity: 0.8;
+      opacity: 1;
     }
     50% {
       transform: scale(1.2);
@@ -260,7 +256,7 @@ const FixedWhatsapp = styled.a`
     }
     100% {
       transform: scale(1);
-      opacity: 0.8;
+      opacity: 1;
     }
   }
 `;
