@@ -4,6 +4,7 @@ import { Helmet } from "react-helmet";
 import Landing from "./screens/Landing.jsx";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Privacy from "./components/Sections/Privacy.jsx";
+import Referrals from "./components/Sections/Referrals.jsx";
 
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/Referral"element={<Referrals />}/>
       </Routes>
     </Router>
     </>

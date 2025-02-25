@@ -313,7 +313,7 @@ export default function Projects() {
       {successModal && (
         <ModalOverlay>
           <ModalContent>
-            <h2>Registration Successful ! </h2>
+            <h2>Registration Successful ! <i class="fa-solid fa-circle-check fa-bounce" style={{color:" #14a800"}}></i></h2>
             <p>Our team will contact you shortly.</p>
             <Button type="primary" onClick={closeSuccessModal}>
               OK

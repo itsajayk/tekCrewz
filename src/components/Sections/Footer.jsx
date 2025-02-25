@@ -205,13 +205,7 @@ const FixedWhatsapp = styled.a`
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: linear-gradient(
-    45deg,
-    rgba(53, 173, 97, 0.1),
-    #22c55e,
-    #00d757,
-    rgb(0, 255, 42)
-  );
+  background:  rgb(0, 255, 42);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -219,9 +213,13 @@ const FixedWhatsapp = styled.a`
   cursor: pointer;
   z-index: 1000;
   animation: pulse 1.5s infinite;
+  border: solid .2px transparent;
 
   &:hover {
-    color: #0a1014;
+    color: rgb(0, 255, 42);
+    background:  #fff;
+    border: solid .2px rgb(0, 255, 42);
+
   }
 
   @media (max-width: 860px) {
