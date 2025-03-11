@@ -607,13 +607,13 @@ import SignaturePad from "react-signature-canvas";
                         checked={signatureMode === 'type'}
                         onChange={handleSignatureModeChange}
                     /> Type
-                    <SignatureModeOption
+                    {/* <SignatureModeOption
                         type="radio"
                         name="signatureMode"
                         value="draw"
                         checked={signatureMode === 'draw'}
                         onChange={handleSignatureModeChange}
-                    /> Draw
+                    /> Draw */}
                     </SignatureModeSelector>
                 </SignatureToggleContainer>
                 {signatureMode === 'upload' ? (
@@ -681,12 +681,17 @@ import SignaturePad from "react-signature-canvas";
     const Content = styled.main`
     flex: 1;
     max-width: 500px;
-    width: 90%;
+    width: 100%;
     margin: 80px auto;
     padding: 20px;
     background: #fff;
     box-shadow: 0 0 8px rgba(0,0,0,0.1);
     border-radius: 8px;
+
+    @media (max-width: 760px) {
+        width: 80%;
+        max-width: 300px;
+    }
     `;
 
     const FormTitle = styled.h1`
