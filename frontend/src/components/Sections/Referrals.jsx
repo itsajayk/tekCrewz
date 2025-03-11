@@ -10,16 +10,18 @@ import { collection, query, where, getDocs, documentId } from 'firebase/firestor
 import { db } from '../Pages/firebase';
 
 const Referrals = () => {
+
+  const API_BASE_URL = 'https://tekcrewz.onrender.com';
   const navigate = useNavigate();
 
   // Use a single dropdown field named userId to select either Admin or a referrer.
   const [formData, setFormData] = useState({
-    userId: '', // will hold either "admin" or a referrer id (e.g. "REFSD001")
+    userId: '',
     candidateName: '',
     college: '',
     candidateDegree: '',
     candidateCourseName: '',
-    marksType: '', // "CGPA" or "Percentage"
+    marksType: '',
     score: '',
     scholarshipSecured: '',
     mobile: '',
@@ -51,10 +53,8 @@ const Referrals = () => {
         const querySnapshot = await getDocs(q);
         const referrers = [];
         querySnapshot.forEach((doc) => {
-          // If your referrer document has a field "referrerName", use that; otherwise, use the ID.
           referrers.push({ id: doc.id, label: doc.data().referrerName || doc.id });
         });
-        // Combine with a single Admin option.
         const combined = [{ id: 'admin', label: 'Admin' }, ...referrers];
         setUserOptions(combined);
       } catch (error) {
@@ -78,15 +78,11 @@ const Referrals = () => {
 
   const validate = () => {
     let tempErrors = {};
-    // Validate the combined user dropdown
     if (!formData.userId) tempErrors.userId = "Please select a user (Admin or Referrer).";
-    
-    // Candidate validations
     if (!formData.candidateName) tempErrors.candidateName = "Candidate Name is required.";
     if (!formData.college) tempErrors.college = "College Name is required.";
     if (!formData.candidateDegree) tempErrors.candidateDegree = "Degree is required.";
     if (!formData.candidateCourseName) tempErrors.candidateCourseName = "Course Name is required.";
-    // Marks & Score validation
     if (!formData.marksType) {
       tempErrors.marksType = "Marks type is required.";
     }
@@ -104,7 +100,6 @@ const Referrals = () => {
         }
       }
     }
-    // Mobile validations
     if (!formData.mobile) {
       tempErrors.mobile = "Mobile Number is required.";
     } else if (!/^\d{10}$/.test(formData.mobile)) {
@@ -115,7 +110,6 @@ const Referrals = () => {
     } else if (!/^\d{10}$/.test(formData.parentMobile)) {
       tempErrors.parentMobile = "Mobile number must be exactly 10 digits.";
     }
-    // Email validation
     if (!formData.email) {
       tempErrors.email = "Email is required.";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
@@ -140,10 +134,9 @@ const Referrals = () => {
       setIsLoading(true);
       try {
         console.log("Submitting referral with data:", formData);
-        const response = await axios.post("http://localhost:5000/api/referrals", formData);
+        const response = await axios.post(`${API_BASE_URL}/api/referrals`, formData);
         console.log("Response from server:", response.data);
         setIsLoading(false);
-        // Reset form and close modal
         setFormData({
           userId: '',
           candidateName: '',
@@ -191,7 +184,7 @@ const Referrals = () => {
             </ModalButton>
           </div>
           <SwitchLink onClick={() => navigate('/signup')}>
-            Create new account for Admin or Referrer ?
+            Create an account for Admin or Referrer ?
           </SwitchLink>
         </HeaderInfo>
         <Footer openReferralModal={() => setShowModal(true)} />
@@ -206,7 +199,6 @@ const Referrals = () => {
             </ModalHeader>
             <ModalBody>
               <Form onSubmit={handleSubmit}>
-                {/* Single dropdown for selecting Admin or Referrer */}
                 <InputGroup>
                   <Label>Select User</Label>
                   <Select name="userId" value={formData.userId} onChange={handleChange}>
@@ -220,7 +212,6 @@ const Referrals = () => {
                   {errors.userId && <ErrorText>{errors.userId}</ErrorText>}
                 </InputGroup>
 
-                {/* Existing candidate fields */}
                 <InputGroup>
                   <Label>Candidate Name</Label>
                   <Input
@@ -433,27 +424,54 @@ const Referrals = () => {
 
 export default Referrals;
 
+/* Keyframe animations for interesting effects */
+const gradientAnimation = keyframes`
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+`;
+
+const fadeInZoom = keyframes`
+  0% { opacity: 0; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1); }
+`;
+
 /* Styled Components for Referrals.jsx */
 const Wrapper = styled.section`
   padding-top: 80px;
   width: 100%;
-  background: linear-gradient(90deg, #f7f7f7, #eaeaea);
+  background: linear-gradient(270deg, #f7f7f7, #eaeaea, #f7f7f7);
+  background-size: 600% 600%;
+  animation: ${gradientAnimation} 10s ease infinite;
   display: flex;
   flex-direction: column;
+
+  @media (max-width: 600px) {
+    padding-top: 60px;
+  }
 `;
 
 const HeaderInfo = styled.div`
   text-align: center;
   padding: 50px 20px;
+
   h1 {
     font-size: 3.5rem;
     font-weight: 800;
     margin-bottom: 20px;
     color: #333;
   }
+
   @media (max-width: 860px) {
     h1 {
       font-size: 2.5rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    // padding: 30px 10px;
+    h1 {
+      font-size: 2rem;
     }
   }
 `;
@@ -468,8 +486,14 @@ const ModalButton = styled.button`
   font-size: 16px;
   transition: background 0.3s ease;
   margin-right: 20px;
+
   &:hover {
     background: #e68a00;
+  }
+
+  @media (max-width: 480px) {
+    width: 100%;
+    margin: 0 0 10px 0;
   }
 `;
 
@@ -494,6 +518,7 @@ const ModalOverlay = styled.div`
   align-items: center;
   z-index: 1100;
   padding: 15px;
+  animation: ${fadeInZoom} 0.5s ease-out;
 `;
 
 const ModalContent = styled.div`
@@ -506,7 +531,8 @@ const ModalContent = styled.div`
   position: relative;
   display: flex;
   flex-direction: column;
-  
+  animation: ${fadeInZoom} 0.4s ease-out;
+
   input:-webkit-autofill,
   input:-webkit-autofill:hover,
   input:-webkit-autofill:focus,
@@ -519,6 +545,11 @@ const ModalContent = styled.div`
   
   input::first-letter {
     text-transform: uppercase;
+  }
+
+  @media (max-width: 480px) {
+    max-width: 95%;
+    max-height: 90vh;
   }
 `;
 
@@ -548,13 +579,17 @@ const ModalBody = styled.div`
   padding: 20px;
   overflow-y: auto;
   max-height: calc(80vh - 50px);
+
+  @media (max-width: 480px) {
+    padding: 15px;
+  }
 `;
 
 const Form = styled.form`
   display: flex;
   flex-direction: column;
   text-align: left;
-  
+
   input:-webkit-autofill,
   input:-webkit-autofill:hover,
   input:-webkit-autofill:focus,
@@ -563,6 +598,10 @@ const Form = styled.form`
   textarea:-webkit-autofill:focus {
     -webkit-text-fill-color: black !important;
     transition: background-color 5000s ease-in-out 0s;
+  }
+
+  @media (max-width: 480px) {
+    width: 100%;
   }
 `;
 
@@ -590,6 +629,8 @@ const Input = styled.input`
   border: 1px solid #ccc;
   border-radius: 4px;
   font-size: 15px;
+  width: 100%;
+  box-sizing: border-box;
   &:focus {
     outline: none;
     border-color: #ff9900;
@@ -602,6 +643,8 @@ const Select = styled.select`
   border: 1px solid #ccc;
   border-radius: 4px;
   font-size: 15px;
+  width: 100%;
+  box-sizing: border-box;
   &:focus {
     outline: none;
     border-color: #ff9900;
@@ -624,6 +667,8 @@ const TextArea = styled.textarea`
   border-radius: 4px;
   font-size: 15px;
   resize: vertical;
+  width: 100%;
+  box-sizing: border-box;
   &:focus {
     outline: none;
     border-color: #ff9900;
@@ -639,9 +684,10 @@ const SubmitButton = styled.button`
   border-radius: 15px;
   font-size: 16px;
   cursor: pointer;
-  transition: background 0.3s ease;
+  transition: background 0.3s ease, transform 0.2s ease;
   &:hover {
     background: #580cd2;
+    transform: scale(1.02);
   }
 `;
 

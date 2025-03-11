@@ -12,6 +12,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import CandidatesList from './components/Sections/CandidatesList.jsx';
 import ReferrerCandidatesList from './components/Sections/ReferrerCandidatesList.jsx';
 import ReferrerRoute from './components/Routes/ReferrerRoute.jsx';
+import AddCandidate from './components/Sections/AddCandidate.jsx'
 
 export default function App() {
   return (
@@ -48,6 +49,7 @@ export default function App() {
             }/>
             <Route path="/login" element={<LoginPage />}/>
             <Route path="/reset-password" element={<ResetPasswordPage />}/>
+            <Route path="/add-candidate" element={<AddCandidate />}/>
           </Routes>
         </Router>
       </AuthProvider>

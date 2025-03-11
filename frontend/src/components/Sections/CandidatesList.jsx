@@ -14,6 +14,9 @@ const CandidatesList = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [editedCandidates, setEditedCandidates] = useState({});
 
+  const API_BASE_URL = 'https://tekcrewz.onrender.com';
+
+
   const fetchCandidates = async () => {
     setIsLoading(true);
     try {
@@ -28,7 +31,7 @@ const CandidatesList = () => {
       if (filters.userId) {
         params.userId = filters.userId;
       }
-      const response = await axios.get('http://localhost:5000/api/candidates', { params });
+      const response = await axios.get(`${API_BASE_URL}/api/candidates`, { params });
       setCandidates(response.data);
       // Initialize editedCandidates for inline editing
       const initialEdits = {};
@@ -75,7 +78,7 @@ const CandidatesList = () => {
 
   const handleSave = async (id) => {
     try {
-      await axios.put(`http://localhost:5000/api/candidates/${id}`, editedCandidates[id]);
+      await axios.put(`${API_BASE_URL}/api/candidates/${id}`, editedCandidates[id]);
       fetchCandidates();
     } catch (error) {
       console.error('Error updating candidate:', error);
@@ -84,7 +87,7 @@ const CandidatesList = () => {
 
   const handleRemove = async (id) => {
     try {
-      await axios.delete(`http://localhost:5000/api/candidates/${id}`);
+      await axios.delete(`${API_BASE_URL}/api/candidates/${id}`);
       fetchCandidates();
     } catch (error) {
       console.error('Error removing candidate:', error);
@@ -302,7 +305,7 @@ const Filters = styled.div`
   /* Stack filters vertically on smaller screens */
   @media (max-width: 768px) {
     flex-direction: column;
-    gap: 10px;
+    // gap: 10px;
   }
 `;
 

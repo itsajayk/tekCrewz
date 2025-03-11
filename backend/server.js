@@ -8,6 +8,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use(cors({ origin: 'https://www.tekcrewz.com', credentials: true }));
+
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => console.log('MongoDB Atlas connected'))

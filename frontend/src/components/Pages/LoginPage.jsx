@@ -151,6 +151,11 @@ const FormContainer = styled.div`
   width: 400px;
   text-align: center;
   position: relative;
+
+  @media (max-width: 760px) {
+    width: 300px
+  }
+
 `;
 
 const Title = styled.h2`
