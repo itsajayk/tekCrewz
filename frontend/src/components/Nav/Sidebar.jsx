@@ -103,7 +103,7 @@ const Wrapper = styled.nav`
   transition: right 1.3s ease-in-out;
 
   @media (max-width: 760px) {
-    width: 100%;
+    // width: 100%;
     right: ${({ sidebarOpen }) => (sidebarOpen ? "0px" : "-430px")};
   }
 `;
