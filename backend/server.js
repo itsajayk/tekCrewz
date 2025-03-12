@@ -21,10 +21,10 @@ const allowedOrigins = [
   'http://localhost:3000'
 ];
 
-// Use cors with a dynamic origin callback
+// Use CORS with a dynamic origin callback
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (e.g., mobile apps or curl)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
@@ -65,9 +65,10 @@ const candidateSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   candidateName: { type: String, required: true },
   college: { type: String, required: true },
-  candidateDegree: { type: String, required: true },
-  candidateCourseName: { type: String, required: true },
-  programme: { type: String, required: true },
+  // Make these fields optional in schema
+  candidateDegree: { type: String },
+  candidateCourseName: { type: String },
+  programme: { type: String },
   marksType: { type: String, enum: ['CGPA', 'Percentage'], required: true },
   score: { type: Number, required: true },
   scholarshipSecured: { type: String },
@@ -90,11 +91,19 @@ const candidateSchema = new mongoose.Schema({
   status: { type: String, default: 'Registered' }
 }, { timestamps: true });
 
+// Pre-validation hook to enforce that either candidateCourseName is provided 
+// or both candidateDegree and programme are provided.
+candidateSchema.pre('validate', function(next) {
+  if (!this.candidateCourseName && (!this.candidateDegree || !this.programme)) {
+    return next(new Error('Either candidateCourseName or both candidateDegree and programme must be provided.'));
+  }
+  next();
+});
+
 const Candidate = mongoose.model('Candidate', candidateSchema);
 
 // POST endpoint to receive candidate data with file uploads
 app.post('/api/referrals', 
-  // Use multer to handle file uploads; expect candidatePic, markStatement, and signature files
   upload.fields([
     { name: 'candidatePic', maxCount: 1 },
     { name: 'markStatement', maxCount: 1 },
@@ -102,7 +111,7 @@ app.post('/api/referrals',
   ]),
   async (req, res) => {
     try {
-      // If files are uploaded, attach their paths to the request body
+      // Attach file paths if uploaded
       if (req.files['candidatePic'] && req.files['candidatePic'][0]) {
         req.body.candidatePic = req.files['candidatePic'][0].path;
       }
