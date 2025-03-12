@@ -14,6 +14,7 @@ const CandidatesList = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [editedCandidates, setEditedCandidates] = useState({});
 
+  // API base URL
   const API_BASE_URL = 'https://tekcrewz.onrender.com';
 
   const fetchCandidates = async () => {
@@ -125,18 +126,17 @@ const CandidatesList = () => {
               <option value="Term 2 Paid">Term 2 Paid</option>
             </SelectFilter>
           </FilterGroup>
-          {/* 
-            If needed, uncomment to filter by user ID:
-            <FilterGroup>
-              <FilterLabel>User ID:</FilterLabel>
-              <InputFilter
-                type="text"
-                name="userId"
-                value={filters.userId}
-                onChange={handleFilterChange}
-                placeholder="Enter User ID"
-              />
-            </FilterGroup>
+          {/* Uncomment to filter by user ID if needed:
+          <FilterGroup>
+            <FilterLabel>User ID:</FilterLabel>
+            <InputFilter
+              type="text"
+              name="userId"
+              value={filters.userId}
+              onChange={handleFilterChange}
+              placeholder="Enter User ID"
+            />
+          </FilterGroup>
           */}
           <SortButton onClick={toggleSortOrder}>
             Sort Date: {filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
@@ -244,6 +244,8 @@ const CandidatesList = () => {
                     </td>
                     <td>
                       {candidate.markStatement ? (
+                        // The backend returns a relative path (e.g., "uploads/filename.webp").
+                        // We prepend the API base URL here.
                         <DownloadButton
                           href={`${API_BASE_URL}/${candidate.markStatement}`}
                           download
