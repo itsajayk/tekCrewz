@@ -9,31 +9,26 @@ import Footer from '../Sections/Footer';
 
 const CandidatesList = () => {
   const [candidates, setCandidates] = useState([]);
-  // Extra filter field "userId" for filtering by user
   const [filters, setFilters] = useState({ date: null, status: '', sortOrder: 'desc', userId: '' });
   const [isLoading, setIsLoading] = useState(false);
   const [editedCandidates, setEditedCandidates] = useState({});
 
-  // API base URL
   const API_BASE_URL = 'https://tekcrewz.onrender.com';
 
   const fetchCandidates = async () => {
     setIsLoading(true);
     try {
-      // Format the date as YYYY-MM if selected (month-wise)
       let params = { status: filters.status, sortOrder: filters.sortOrder };
       if (filters.date) {
         const year = filters.date.getFullYear();
         const month = String(filters.date.getMonth() + 1).padStart(2, '0');
         params.date = `${year}-${month}`;
       }
-      // Add userId filter if provided
       if (filters.userId) {
         params.userId = filters.userId;
       }
       const response = await axios.get(`${API_BASE_URL}/api/candidates`, { params });
       setCandidates(response.data);
-      // Initialize editedCandidates for inline editing
       const initialEdits = {};
       response.data.forEach(candidate => {
         initialEdits[candidate._id] = {
@@ -126,8 +121,8 @@ const CandidatesList = () => {
               <option value="Term 2 Paid">Term 2 Paid</option>
             </SelectFilter>
           </FilterGroup>
-          {/* Uncomment to filter by user ID if needed:
-          <FilterGroup>
+          {/* Uncomment the block below to enable filtering by user ID */}
+          {/* <FilterGroup>
             <FilterLabel>User ID:</FilterLabel>
             <InputFilter
               type="text"
@@ -136,8 +131,7 @@ const CandidatesList = () => {
               onChange={handleFilterChange}
               placeholder="Enter User ID"
             />
-          </FilterGroup>
-          */}
+          </FilterGroup> */}
           <SortButton onClick={toggleSortOrder}>
             Sort Date: {filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
           </SortButton>
@@ -244,8 +238,6 @@ const CandidatesList = () => {
                     </td>
                     <td>
                       {candidate.markStatement ? (
-                        // The backend returns a relative path (e.g., "uploads/filename.webp").
-                        // We prepend the API base URL here.
                         <DownloadButton
                           href={`${API_BASE_URL}/${candidate.markStatement}`}
                           download
@@ -295,12 +287,10 @@ const Content = styled.main`
   background: #fff;
   box-shadow: 0 0 10px rgba(0,0,0,0.05);
   border-radius: 8px;
-
   @media (max-width: 768px) {
     margin: 60px auto 20px;
     padding: 20px 8px;
   }
-
   @media (max-width: 480px) {
     margin: 40px 10px;
     padding: 20px 5px;
@@ -313,7 +303,6 @@ const Filters = styled.div`
   margin: 20px auto;
   align-items: center;
   flex-wrap: wrap;
-
   @media (max-width: 768px) {
     flex-direction: column;
   }
@@ -338,7 +327,6 @@ const DateButton = styled.button`
   font-size: 16px;
   cursor: pointer;
   position: relative;
-
   &:after {
     content: '';
     position: absolute;
@@ -349,10 +337,8 @@ const DateButton = styled.button`
     border-right: 6px solid transparent;
     border-top: 8px solid #e68a00;
   }
-
   &:hover {
     border-color: #7620ff;
-    
     &:after {
       border-top-color: #7620ff;
     }
@@ -370,14 +356,12 @@ const Table = styled.table`
   border-collapse: collapse;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   table-layout: auto;
-
   th, td {
     padding: 12px;
     border: 1px solid #ddd;
     vertical-align: middle;
     text-align: left;
   }
-
   th {
     background-color: #f3f3f3;
     font-size: 16px;
@@ -388,30 +372,25 @@ const Table = styled.table`
     top: 0;
     z-index: 1;
   }
-
   tr:nth-child(even) {
     background-color: #f9f9f9;
   }
-
   tr:hover {
     background-color: #e0e0e0;
     transition: background-color 0.3s ease;
   }
-
   @media (max-width: 1024px) {
     th, td {
       padding: 10px;
       font-size: 13px;
     }
   }
-
   @media (max-width: 768px) {
     th, td {
       padding: 8px;
       font-size: 12px;
     }
   }
-
   @media (max-width: 480px) {
     th, td {
       padding: 6px;
@@ -445,11 +424,9 @@ const SortButton = styled.button`
   border-radius: 4px;
   cursor: pointer;
   transition: background 0.3s ease;
-
   &:hover {
     background: #580cd2;
   }
-
   @media (max-width: 480px) {
     padding: 4px 10px;
     font-size: 14px;
@@ -468,7 +445,6 @@ const InputField = styled.input`
   border: 1px solid #ccc;
   border-radius: 4px;
   font-size: 14px;
-
   &:focus {
     border-color: #7620ff;
     outline: none;
@@ -481,7 +457,6 @@ const SelectField = styled.select`
   border: 1px solid #ccc;
   border-radius: 4px;
   font-size: 14px;
-
   &:focus {
     border-color: #7620ff;
     outline: none;
@@ -496,7 +471,6 @@ const TextAreaField = styled.textarea`
   font-size: 12px;
   resize: vertical;
   min-height: 40px;
-
   &:focus {
     border-color: #7620ff;
     outline: none;
@@ -518,7 +492,6 @@ const SaveButton = styled.button`
   font-size: 14px;
   cursor: pointer;
   transition: background 0.3s ease;
-
   &:hover {
     background: #580cd2;
   }
@@ -533,7 +506,6 @@ const RemoveButton = styled.button`
   font-size: 14px;
   cursor: pointer;
   transition: background 0.3s ease;
-
   &:hover {
     background: #b71c1c;
   }
@@ -547,7 +519,6 @@ const DownloadButton = styled.a`
   border-radius: 4px;
   text-decoration: none;
   font-size: 14px;
-
   &:hover {
     background: #218838;
   }

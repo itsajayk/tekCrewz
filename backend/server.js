@@ -35,21 +35,21 @@ app.use(cors({
   credentials: true
 }));
 
-// 4️⃣ Set Content Security Policy (CSP) headers to allow fonts and other resources.
-// Adjust this header as needed for your project.
+// 4️⃣ Set Content Security Policy headers to allow fonts and other resources.
+// Adjust the directives as needed for your project.
 app.use((req, res, next) => {
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; " +
     "font-src 'self' data: https://fonts.gstatic.com; " +
     "style-src 'self' 'unsafe-inline'; " +
-    "img-src 'self' data:; " +
+    "img-src 'self' data: https://tekcrewz.onrender.com; " +
     "script-src 'self' 'unsafe-inline'"
   );
   next();
 });
 
-// 5️⃣ Serve static files from "uploads" so the frontend can download/display them
+// 5️⃣ Serve static files from "uploads" so the frontend can display/download them
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // 6️⃣ Parse JSON and URL-encoded data
@@ -79,7 +79,7 @@ const candidateSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   candidateName: { type: String, required: true },
   college: { type: String, required: true },
-  // Make these fields optional in schema
+  // These fields are optional in the schema – our pre‑validation enforces rules.
   candidateDegree: { type: String },
   candidateCourseName: { type: String },
   programme: { type: String },
@@ -94,9 +94,9 @@ const candidateSchema = new mongoose.Schema({
   paymentTerm: { type: String, required: true },
   communicationScore: { type: Number, required: true },
   remarks: { type: String },
-  // File fields – store the file paths (as strings)
+  // File fields – store relative file paths
   candidatePic: { type: String },
-  markStatement: { type: String },
+  markStatement: { type: String }, // This can be an image or a PDF file.
   signature: { type: String },
   // Additional fields (admin updates)
   paidAmount: { type: Number, default: 0 },
@@ -105,7 +105,8 @@ const candidateSchema = new mongoose.Schema({
   status: { type: String, default: 'Registered' }
 }, { timestamps: true });
 
-// Pre-validation hook to enforce either candidateCourseName OR (candidateDegree && programme)
+// Pre-validation hook to enforce that either candidateCourseName is provided
+// or both candidateDegree and programme are provided.
 candidateSchema.pre('validate', function(next) {
   if (!this.candidateCourseName && (!this.candidateDegree || !this.programme)) {
     return next(
@@ -126,7 +127,7 @@ app.post('/api/referrals',
   ]),
   async (req, res) => {
     try {
-      // Attach file paths if uploaded (store relative paths)
+      // Attach file paths if uploaded (these are relative paths, e.g. "uploads/filename.ext")
       if (req.files['candidatePic'] && req.files['candidatePic'][0]) {
         req.body.candidatePic = req.files['candidatePic'][0].path;
       }
@@ -153,7 +154,7 @@ app.get('/api/candidates', async (req, res) => {
     const { date, status, sortOrder, userId } = req.query;
     let filter = {};
 
-    // Filter by date (YYYY-MM)
+    // Filter by date (expects "YYYY-MM")
     if (date) {
       const [year, month] = date.split('-');
       const start = new Date(year, month - 1, 1);
@@ -168,9 +169,7 @@ app.get('/api/candidates', async (req, res) => {
     }
     const sortValue = sortOrder === 'asc' ? 1 : -1;
     const candidates = await Candidate.find(filter).sort({ dateOfVisit: sortValue });
-
-    // Return candidates with relative file paths.
-    // Your frontend should prepend the API base URL to candidate.markStatement.
+    // Return the candidates (file paths remain relative)
     res.json(candidates);
   } catch (error) {
     console.error('Error fetching candidates:', error);
