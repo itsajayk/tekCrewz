@@ -16,7 +16,6 @@ const CandidatesList = () => {
 
   const API_BASE_URL = 'https://tekcrewz.onrender.com';
 
-
   const fetchCandidates = async () => {
     setIsLoading(true);
     try {
@@ -163,6 +162,7 @@ const CandidatesList = () => {
                   <th>Status</th>
                   <th>Course Registered</th>
                   <th>Remarks</th>
+                  <th>Marksheet</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -243,6 +243,18 @@ const CandidatesList = () => {
                       />
                     </td>
                     <td>
+                      {candidate.markStatement ? (
+                        <DownloadButton
+                          href={`${API_BASE_URL}/${candidate.markStatement}`}
+                          download
+                        >
+                          Download
+                        </DownloadButton>
+                      ) : (
+                        'No file'
+                      )}
+                    </td>
+                    <td>
                       <ActionButtons>
                         <SaveButton onClick={() => handleSave(candidate._id)}>
                           Save
@@ -275,20 +287,18 @@ const Wrapper = styled.div`
 
 const Content = styled.main`
   flex: 1;
-  max-width: 1500px;
+  max-width: 1300px;
   margin: 100px auto 20px;
   padding: 10px;
   background: #fff;
   box-shadow: 0 0 10px rgba(0,0,0,0.05);
   border-radius: 8px;
 
-  /* Medium devices (tablets) */
   @media (max-width: 768px) {
     margin: 60px auto 20px;
     padding: 20px 8px;
   }
 
-  /* Small devices (mobile phones) */
   @media (max-width: 480px) {
     margin: 40px 10px;
     padding: 20px 5px;
@@ -302,10 +312,8 @@ const Filters = styled.div`
   align-items: center;
   flex-wrap: wrap;
 
-  /* Stack filters vertically on smaller screens */
   @media (max-width: 768px) {
     flex-direction: column;
-    // gap: 10px;
   }
 `;
 
@@ -328,6 +336,7 @@ const DateButton = styled.button`
   font-size: 16px;
   cursor: pointer;
   position: relative;
+
   &:after {
     content: '';
     position: absolute;
@@ -338,25 +347,27 @@ const DateButton = styled.button`
     border-right: 6px solid transparent;
     border-top: 8px solid #e68a00;
   }
+
   &:hover {
     border-color: #7620ff;
+    
     &:after {
       border-top-color: #7620ff;
     }
   }
 `;
 
-// Wrap the table in a horizontally scrollable container
 const TableWrapper = styled.div`
   width: 100%;
-  overflow-x: auto;  /* allows horizontal scrolling */
+  overflow-x: auto;
   margin-top: 20px;
 `;
 
 const Table = styled.table`
-  min-width: 1200px;
+  width: 100%;
   border-collapse: collapse;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  table-layout: auto;
 
   th, td {
     padding: 12px;
@@ -371,40 +382,41 @@ const Table = styled.table`
     text-transform: uppercase;
     letter-spacing: 0.05em;
     text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 1;
   }
 
-  td {
-    font-size: 14px;
+  tr:nth-child(even) {
+    background-color: #f9f9f9;
   }
 
-  /* Adjust table spacing for medium devices */
+  tr:hover {
+    background-color: #e0e0e0;
+    transition: background-color 0.3s ease;
+  }
+
   @media (max-width: 1024px) {
-    min-width: 800px;
     th, td {
       padding: 10px;
       font-size: 13px;
     }
   }
 
-  /* Further adjust for tablets */
   @media (max-width: 768px) {
-    min-width: 600px;
     th, td {
       padding: 8px;
       font-size: 12px;
     }
   }
 
-  /* On small devices, allow scrolling if needed */
   @media (max-width: 480px) {
-    min-width: 400px;
     th, td {
       padding: 6px;
       font-size: 11px;
     }
   }
 `;
-
 
 const InputFilter = styled.input`
   margin-left: 10px;
@@ -436,13 +448,11 @@ const SortButton = styled.button`
     background: #580cd2;
   }
 
-  /* Reduce button size on smaller screens */
   @media (max-width: 480px) {
     padding: 4px 10px;
     font-size: 14px;
   }
 `;
-
 
 const LoadingMessage = styled.p`
   text-align: center;
@@ -456,6 +466,7 @@ const InputField = styled.input`
   border: 1px solid #ccc;
   border-radius: 4px;
   font-size: 14px;
+
   &:focus {
     border-color: #7620ff;
     outline: none;
@@ -468,6 +479,7 @@ const SelectField = styled.select`
   border: 1px solid #ccc;
   border-radius: 4px;
   font-size: 14px;
+
   &:focus {
     border-color: #7620ff;
     outline: none;
@@ -482,6 +494,7 @@ const TextAreaField = styled.textarea`
   font-size: 12px;
   resize: vertical;
   min-height: 40px;
+
   &:focus {
     border-color: #7620ff;
     outline: none;
@@ -503,6 +516,7 @@ const SaveButton = styled.button`
   font-size: 14px;
   cursor: pointer;
   transition: background 0.3s ease;
+
   &:hover {
     background: #580cd2;
   }
@@ -517,8 +531,23 @@ const RemoveButton = styled.button`
   font-size: 14px;
   cursor: pointer;
   transition: background 0.3s ease;
+
   &:hover {
     background: #b71c1c;
+  }
+`;
+
+const DownloadButton = styled.a`
+  display: inline-block;
+  padding: 6px 12px;
+  background: #28a745;
+  color: #fff;
+  border-radius: 4px;
+  text-decoration: none;
+  font-size: 14px;
+
+  &:hover {
+    background: #218838;
   }
 `;
 

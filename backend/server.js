@@ -41,7 +41,7 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files from the "uploads" directory so the frontend can display images
+// Serve static files from the "uploads" directory so the frontend can display images and download files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Configure multer storage for file uploads
@@ -145,7 +145,17 @@ app.get('/api/candidates', async (req, res) => {
     }
     const sortValue = sortOrder === 'asc' ? 1 : -1;
     const candidates = await Candidate.find(filter).sort({ dateOfVisit: sortValue });
-    res.json(candidates);
+    
+    // Adjust each candidate's markStatement field to return an absolute URL if available.
+    const candidatesWithAbsoluteMarksheet = candidates.map(candidate => {
+      const candidateObj = candidate.toObject();
+      if (candidateObj.markStatement) {
+        candidateObj.markStatement = `${req.protocol}://${req.get('host')}/${candidateObj.markStatement}`;
+      }
+      return candidateObj;
+    });
+    
+    res.json(candidatesWithAbsoluteMarksheet);
   } catch (error) {
     console.error('Error fetching candidates:', error);
     res.status(500).json({ error: 'Server error' });
