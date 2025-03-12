@@ -35,14 +35,28 @@ app.use(cors({
   credentials: true
 }));
 
-// 4️⃣ Serve static files from "uploads" so frontend can download them
+// 4️⃣ Set Content Security Policy (CSP) headers to allow fonts and other resources.
+// Adjust this header as needed for your project.
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; " +
+    "font-src 'self' data: https://fonts.gstatic.com; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data:; " +
+    "script-src 'self' 'unsafe-inline'"
+  );
+  next();
+});
+
+// 5️⃣ Serve static files from "uploads" so the frontend can download/display them
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// 5️⃣ Parse JSON and URL-encoded data
+// 6️⃣ Parse JSON and URL-encoded data
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 6️⃣ Configure Multer storage for file uploads
+// 7️⃣ Configure Multer storage for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, 'uploads/'); // Ensure this folder exists
@@ -54,13 +68,13 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// 7️⃣ Connect to MongoDB Atlas using the URI in .env (MONGODB_URI)
+// 8️⃣ Connect to MongoDB Atlas using the URI in .env (MONGODB_URI)
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => console.log('MongoDB Atlas connected'))
   .catch(err => console.error(err));
 
-// 8️⃣ Define the Candidate schema
+// 9️⃣ Define the Candidate schema
 const candidateSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   candidateName: { type: String, required: true },
@@ -91,8 +105,7 @@ const candidateSchema = new mongoose.Schema({
   status: { type: String, default: 'Registered' }
 }, { timestamps: true });
 
-// 9️⃣ Pre-validation hook to enforce either candidateCourseName
-// OR (candidateDegree && programme)
+// Pre-validation hook to enforce either candidateCourseName OR (candidateDegree && programme)
 candidateSchema.pre('validate', function(next) {
   if (!this.candidateCourseName && (!this.candidateDegree || !this.programme)) {
     return next(
@@ -113,17 +126,17 @@ app.post('/api/referrals',
   ]),
   async (req, res) => {
     try {
-      // Attach file paths if uploaded (relative path only)
+      // Attach file paths if uploaded (store relative paths)
       if (req.files['candidatePic'] && req.files['candidatePic'][0]) {
-        req.body.candidatePic = req.files['candidatePic'][0].path; // e.g. "uploads/filename.webp"
+        req.body.candidatePic = req.files['candidatePic'][0].path;
       }
       if (req.files['markStatement'] && req.files['markStatement'][0]) {
-        req.body.markStatement = req.files['markStatement'][0].path; // e.g. "uploads/filename.pdf"
+        req.body.markStatement = req.files['markStatement'][0].path;
       }
       if (req.files['signature'] && req.files['signature'][0]) {
-        req.body.signature = req.files['signature'][0].path; // e.g. "uploads/filename.png"
+        req.body.signature = req.files['signature'][0].path;
       }
-      // Create and save a new Candidate
+      // Create and save a new Candidate document
       const candidate = new Candidate(req.body);
       await candidate.save();
       res.status(201).json({ message: 'Referral submitted successfully', candidate });
@@ -156,15 +169,8 @@ app.get('/api/candidates', async (req, res) => {
     const sortValue = sortOrder === 'asc' ? 1 : -1;
     const candidates = await Candidate.find(filter).sort({ dateOfVisit: sortValue });
 
-    // ✅ Return the markStatement as a relative path
-    //    so the frontend can do: `${API_BASE_URL}/${candidate.markStatement}`
-    //    If you want to store the full URL, uncomment the next lines
-    // candidates.forEach(candidate => {
-    //   if (candidate.markStatement) {
-    //     candidate.markStatement = `${req.protocol}://${req.get('host')}/${candidate.markStatement}`;
-    //   }
-    // });
-
+    // Return candidates with relative file paths.
+    // Your frontend should prepend the API base URL to candidate.markStatement.
     res.json(candidates);
   } catch (error) {
     console.error('Error fetching candidates:', error);
