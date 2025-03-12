@@ -113,15 +113,15 @@ app.post('/api/referrals',
   ]),
   async (req, res) => {
     try {
-      // Attach file paths if uploaded
+      // Attach file paths if uploaded (relative path only)
       if (req.files['candidatePic'] && req.files['candidatePic'][0]) {
-        req.body.candidatePic = req.files['candidatePic'][0].path;
+        req.body.candidatePic = req.files['candidatePic'][0].path; // e.g. "uploads/filename.webp"
       }
       if (req.files['markStatement'] && req.files['markStatement'][0]) {
-        req.body.markStatement = req.files['markStatement'][0].path;
+        req.body.markStatement = req.files['markStatement'][0].path; // e.g. "uploads/filename.pdf"
       }
       if (req.files['signature'] && req.files['signature'][0]) {
-        req.body.signature = req.files['signature'][0].path;
+        req.body.signature = req.files['signature'][0].path; // e.g. "uploads/filename.png"
       }
       // Create and save a new Candidate
       const candidate = new Candidate(req.body);
@@ -156,16 +156,16 @@ app.get('/api/candidates', async (req, res) => {
     const sortValue = sortOrder === 'asc' ? 1 : -1;
     const candidates = await Candidate.find(filter).sort({ dateOfVisit: sortValue });
 
-    // Convert markStatement to an absolute URL if present
-    const candidatesWithAbsoluteMarksheet = candidates.map(candidate => {
-      const candidateObj = candidate.toObject();
-      if (candidateObj.markStatement) {
-        candidateObj.markStatement = `${req.protocol}://${req.get('host')}/${candidateObj.markStatement}`;
-      }
-      return candidateObj;
-    });
+    // ✅ Return the markStatement as a relative path
+    //    so the frontend can do: `${API_BASE_URL}/${candidate.markStatement}`
+    //    If you want to store the full URL, uncomment the next lines
+    // candidates.forEach(candidate => {
+    //   if (candidate.markStatement) {
+    //     candidate.markStatement = `${req.protocol}://${req.get('host')}/${candidate.markStatement}`;
+    //   }
+    // });
 
-    res.json(candidatesWithAbsoluteMarksheet);
+    res.json(candidates);
   } catch (error) {
     console.error('Error fetching candidates:', error);
     res.status(500).json({ error: 'Server error' });
