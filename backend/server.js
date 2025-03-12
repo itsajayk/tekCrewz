@@ -8,26 +8,26 @@ const cors = require('cors');
 
 const app = express();
 
-// Ensure the uploads directory exists
+// 1️⃣ Ensure the uploads directory exists
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
 }
 
-// Allowed origins array - include both versions of your domain
+// 2️⃣ Allowed origins array - include both versions of your domain & localhost
 const allowedOrigins = [
   'https://tekcrewz.com',
   'https://www.tekcrewz.com',
   'http://localhost:3000'
 ];
 
-// Use CORS with a dynamic origin callback
+// 3️⃣ Use CORS with a dynamic origin callback
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (e.g., mobile apps or curl)
+    // Allow requests with no origin (e.g., mobile apps, curl)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      const msg = 'CORS policy does not allow access from this origin.';
       return callback(new Error(msg), false);
     }
     return callback(null, true);
@@ -35,17 +35,17 @@ app.use(cors({
   credentials: true
 }));
 
-// Serve static files from the "uploads" directory so the frontend can display/download files
+// 4️⃣ Serve static files from "uploads" so frontend can download them
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Parse JSON and URL-encoded data
+// 5️⃣ Parse JSON and URL-encoded data
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Configure multer storage for file uploads
+// 6️⃣ Configure Multer storage for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/'); // ensure this folder exists
+    cb(null, 'uploads/'); // Ensure this folder exists
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
@@ -54,13 +54,13 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Connect to MongoDB Atlas using the URI in your .env file (MONGODB_URI)
+// 7️⃣ Connect to MongoDB Atlas using the URI in .env (MONGODB_URI)
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => console.log('MongoDB Atlas connected'))
   .catch(err => console.error(err));
 
-// Define the Candidate schema
+// 8️⃣ Define the Candidate schema
 const candidateSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   candidateName: { type: String, required: true },
@@ -91,19 +91,21 @@ const candidateSchema = new mongoose.Schema({
   status: { type: String, default: 'Registered' }
 }, { timestamps: true });
 
-// Pre-validation hook to enforce that either candidateCourseName is provided 
-// or both candidateDegree and programme are provided.
+// 9️⃣ Pre-validation hook to enforce either candidateCourseName
+// OR (candidateDegree && programme)
 candidateSchema.pre('validate', function(next) {
   if (!this.candidateCourseName && (!this.candidateDegree || !this.programme)) {
-    return next(new Error('Either candidateCourseName or both candidateDegree and programme must be provided.'));
+    return next(
+      new Error('Either candidateCourseName or both candidateDegree and programme must be provided.')
+    );
   }
   next();
 });
 
 const Candidate = mongoose.model('Candidate', candidateSchema);
 
-// POST endpoint to receive candidate data with file uploads
-app.post('/api/referrals', 
+// 1️⃣0️⃣ POST endpoint to receive candidate data with file uploads
+app.post('/api/referrals',
   upload.fields([
     { name: 'candidatePic', maxCount: 1 },
     { name: 'markStatement', maxCount: 1 },
@@ -121,7 +123,7 @@ app.post('/api/referrals',
       if (req.files['signature'] && req.files['signature'][0]) {
         req.body.signature = req.files['signature'][0].path;
       }
-      // Create and save a new Candidate document using text fields and file paths
+      // Create and save a new Candidate
       const candidate = new Candidate(req.body);
       await candidate.save();
       res.status(201).json({ message: 'Referral submitted successfully', candidate });
@@ -132,13 +134,14 @@ app.post('/api/referrals',
   }
 );
 
-// GET endpoint to list candidates with optional filters
+// 1️⃣1️⃣ GET endpoint to list candidates with optional filters
 app.get('/api/candidates', async (req, res) => {
   try {
     const { date, status, sortOrder, userId } = req.query;
     let filter = {};
+
+    // Filter by date (YYYY-MM)
     if (date) {
-      // Expecting date in "YYYY-MM" format; filter by the month of dateOfVisit
       const [year, month] = date.split('-');
       const start = new Date(year, month - 1, 1);
       const end = new Date(year, month, 0, 23, 59, 59, 999);
@@ -152,8 +155,8 @@ app.get('/api/candidates', async (req, res) => {
     }
     const sortValue = sortOrder === 'asc' ? 1 : -1;
     const candidates = await Candidate.find(filter).sort({ dateOfVisit: sortValue });
-    
-    // Adjust each candidate's markStatement field to return an absolute URL if available.
+
+    // Convert markStatement to an absolute URL if present
     const candidatesWithAbsoluteMarksheet = candidates.map(candidate => {
       const candidateObj = candidate.toObject();
       if (candidateObj.markStatement) {
@@ -161,7 +164,7 @@ app.get('/api/candidates', async (req, res) => {
       }
       return candidateObj;
     });
-    
+
     res.json(candidatesWithAbsoluteMarksheet);
   } catch (error) {
     console.error('Error fetching candidates:', error);
@@ -169,10 +172,14 @@ app.get('/api/candidates', async (req, res) => {
   }
 });
 
-// PUT endpoint to update candidate data
+// 1️⃣2️⃣ PUT endpoint to update candidate data
 app.put('/api/candidates/:id', async (req, res) => {
   try {
-    const updatedCandidate = await Candidate.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const updatedCandidate = await Candidate.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
     res.json(updatedCandidate);
   } catch (error) {
     console.error('Error updating candidate:', error);
@@ -180,7 +187,7 @@ app.put('/api/candidates/:id', async (req, res) => {
   }
 });
 
-// DELETE endpoint to remove candidate data
+// 1️⃣3️⃣ DELETE endpoint to remove a candidate
 app.delete('/api/candidates/:id', async (req, res) => {
   try {
     await Candidate.findByIdAndDelete(req.params.id);
@@ -191,5 +198,6 @@ app.delete('/api/candidates/:id', async (req, res) => {
   }
 });
 
+// 1️⃣4️⃣ Start the Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
