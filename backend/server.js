@@ -9,7 +9,7 @@ const cors = require('cors');
 const app = express();
 
 // 1️⃣ Ensure the uploads directory exists
-const uploadsDir = path.join(__dirname, './uploads');
+const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
 }
