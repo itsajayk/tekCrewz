@@ -23,6 +23,7 @@ const allowedOrigins = [
 // 3️⃣ Use CORS with dynamic origin checking
 app.use(cors({
   origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
       const msg = 'CORS policy does not allow access from this origin.';
@@ -56,7 +57,7 @@ app.use(express.urlencoded({ extended: true }));
 // 7️⃣ Configure multer storage for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/'); // ensure the uploads folder exists
+    cb(null, 'uploads/'); // make sure the uploads folder exists
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
@@ -65,20 +66,19 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// 8️⃣ Connect to MongoDB Atlas using the URI from your .env file
+// 8️⃣ Connect to MongoDB Atlas using the URI from your .env
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => console.log('MongoDB Atlas connected'))
   .catch(err => console.error(err));
 
 // 9️⃣ Define the Candidate schema and model
-// Note: candidateCourseName is now optional.
 const candidateSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   candidateName: { type: String, required: true },
   college: { type: String, required: true },
   candidateDegree: { type: String },
-  candidateCourseName: { type: String }, // Optional if candidateDegree & programme are provided
+  candidateCourseName: { type: String },
   programme: { type: String },
   marksType: { type: String, enum: ['CGPA', 'Percentage'], required: true },
   score: { type: Number, required: true },
@@ -91,7 +91,7 @@ const candidateSchema = new mongoose.Schema({
   paymentTerm: { type: String, required: true },
   communicationScore: { type: Number, required: true },
   remarks: { type: String },
-  // File fields – store relative file paths
+  // File fields – store the relative file paths
   candidatePic: { type: String },
   markStatement: { type: String },
   signature: { type: String },
@@ -104,11 +104,9 @@ const candidateSchema = new mongoose.Schema({
 
 const Candidate = mongoose.model('Candidate', candidateSchema);
 
-// (Optional) Pre-validation hook – you could enforce that if candidateCourseName is not provided,
- // then candidateDegree and programme must be provided. For now, we just leave candidateCourseName optional.
- 
 // 1️⃣0️⃣ POST endpoint to receive candidate data with file uploads
 app.post('/api/referrals',
+  // Use multer middleware to handle three file fields
   upload.fields([
     { name: 'candidatePic', maxCount: 1 },
     { name: 'markStatement', maxCount: 1 },
