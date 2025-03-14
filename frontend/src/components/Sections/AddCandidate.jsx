@@ -35,16 +35,15 @@ const AddCandidate = () => {
   });
 
   // File inputs state
-  const [candidatePic, setCandidatePic] = useState(null); // original image URL for cropping
-  const [croppedCandidatePic, setCroppedCandidatePic] = useState(null); // cropped image URL
+  const [candidatePic, setCandidatePic] = useState(null);
+  const [croppedCandidatePic, setCroppedCandidatePic] = useState(null);
   const [markStatement, setMarkStatement] = useState(null);
   
-  // Signature state (using upload and type modes only)
+  // Signature state (upload and type modes only)
   const [signatureMode, setSignatureMode] = useState('upload');
   const [signatureFile, setSignatureFile] = useState(null);
   const [signatureText, setSignatureText] = useState('');
-  const [drawnSignature, setDrawnSignature] = useState(null);
-
+  
   // Cropper states for candidate picture
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -135,16 +134,8 @@ const AddCandidate = () => {
   // Handle signature mode change
   const handleSignatureModeChange = (e) => {
     setSignatureMode(e.target.value);
-    // Clear previous signature values
     setSignatureFile(null);
     setSignatureText('');
-    setDrawnSignature(null);
-    if (signatureInputRef.current) {
-      signatureInputRef.current.value = "";
-    }
-    if (signaturePadRef.current) {
-      signaturePadRef.current.clear();
-    }
   };
 
   // Cropper onCropComplete callback
@@ -163,7 +154,7 @@ const AddCandidate = () => {
     }
   };
 
-  // Remove functions for file inputs – also reset file input elements
+  // Remove functions for file inputs
   const removeCandidatePic = () => {
     setCandidatePic(null);
     setCroppedCandidatePic(null);
@@ -183,20 +174,11 @@ const AddCandidate = () => {
   const removeSignature = () => {
     setSignatureFile(null);
     setSignatureText('');
-    setDrawnSignature(null);
     if (signatureInputRef.current) {
       signatureInputRef.current.value = "";
     }
     if (signaturePadRef.current) {
       signaturePadRef.current.clear();
-    }
-  };
-
-  // Save drawn signature as data URL (if using draw mode)
-  const handleSaveDrawing = () => {
-    if (signaturePadRef.current) {
-      const dataUrl = signaturePadRef.current.getTrimmedCanvas().toDataURL('image/png');
-      setDrawnSignature(dataUrl);
     }
   };
 
@@ -207,7 +189,10 @@ const AddCandidate = () => {
     if (!formData.candidateName) tempErrors.candidateName = "Candidate Name is required.";
     if (!formData.college) tempErrors.college = "College Name is required.";
     if (!formData.candidateDegree) tempErrors.candidateDegree = "Degree is required.";
-    if (!formData.candidateCourseName) tempErrors.candidateCourseName = "Course Name is required.";
+    // Only require candidateCourseName if degree and programme are not both filled
+    if (!formData.candidateCourseName && (!formData.candidateDegree || !formData.programme)) {
+      tempErrors.candidateCourseName = "Course Name is required if Degree and Programme are not provided.";
+    }
     if (!formData.programme) tempErrors.programme = "Programme selection is required.";
     if (!formData.marksType) tempErrors.marksType = "Marks type is required.";
     if (!formData.score) {
@@ -244,7 +229,7 @@ const AddCandidate = () => {
     return Object.keys(tempErrors).length === 0;
   };
 
-  // Handle form submission with file uploads using FormData
+  // Handle form submission with FormData for file uploads
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
@@ -254,16 +239,16 @@ const AddCandidate = () => {
       Object.keys(formData).forEach(key => {
         data.append(key, formData[key]);
       });
+      // Append candidatePic – use cropped version if available
       if (croppedCandidatePic) {
         const response = await fetch(croppedCandidatePic);
         const blob = await response.blob();
         data.append('candidatePic', blob, 'candidatePic.jpg');
       }
       if (markStatement) data.append('markStatement', markStatement);
+      // For signature, use based on selected mode (only upload or type)
       if (signatureMode === 'upload' && signatureFile) {
         data.append('signature', signatureFile);
-      } else if (signatureMode === 'draw' && drawnSignature) {
-        data.append('signature', drawnSignature);
       } else {
         data.append('signature', signatureText);
       }
@@ -366,7 +351,7 @@ const AddCandidate = () => {
               {errors.programme && <ErrorText>{errors.programme}</ErrorText>}
             </InputGroup>
             <InputGroup>
-              <Label>Course Name (optional if not in list)</Label>
+              <Label>Course Name (optional if Degree & Programme are filled)</Label>
               <Input
                 type="text"
                 name="candidateCourseName"
@@ -374,7 +359,7 @@ const AddCandidate = () => {
                 onChange={handleChange}
                 placeholder="Enter course name"
               />
-              {errors.candidateCourseName && <ErrorText>{errors.candidateCourseName}</ErrorText>}
+              {/* No error message if left empty and degree/programme are provided */}
             </InputGroup>
             {/* Marks & Score */}
             <InputGroup>
@@ -387,8 +372,7 @@ const AddCandidate = () => {
                     value="CGPA"
                     checked={formData.marksType === "CGPA"}
                     onChange={handleChange}
-                  />
-                  CGPA
+                  /> CGPA
                 </label>
                 <label>
                   <input
@@ -397,8 +381,7 @@ const AddCandidate = () => {
                     value="Percentage"
                     checked={formData.marksType === "Percentage"}
                     onChange={handleChange}
-                  />
-                  Percentage
+                  /> Percentage
                 </label>
               </RadioGroup>
               {errors.marksType && <ErrorText>{errors.marksType}</ErrorText>}
@@ -559,28 +542,24 @@ const AddCandidate = () => {
               )}
             </InputGroup>
             <InputGroup>
-              <Label>Cumulative Mark Statement</Label>
+              <Label>Cumulative Mark Statement (PDF only)</Label>
               <InputFile 
                 type="file" 
-                accept="application/pdf, image/*" 
+                accept="application/pdf" 
                 onChange={(e) => handleFileChange(e, setMarkStatement)} 
                 ref={markStatementInputRef}
               />
               {markStatement && (
                 <ImagePreviewWrapper>
-                  {markStatement.type.includes('pdf') ? (
-                    <PDFPreview>
-                      <PDFIcon className="fa-solid fa-file-pdf" />
-                      <PDFName>{markStatement.name}</PDFName>
-                    </PDFPreview>
-                  ) : (
-                    <ImagePreview src={URL.createObjectURL(markStatement)} alt="Mark Statement Preview" />
-                  )}
+                  <PDFPreview>
+                    <PDFIcon className="fa-solid fa-file-pdf" />
+                    <PDFName>{markStatement.name}</PDFName>
+                  </PDFPreview>
                   <RemoveIcon onClick={removeMarkStatement}>×</RemoveIcon>
                 </ImagePreviewWrapper>
               )}
             </InputGroup>
-            {/* Signature Section – only using upload and type modes */}
+            {/* Signature Section (upload or type only) */}
             <InputGroup>
               <Label>Signature</Label>
               <SignatureToggleContainer>
@@ -628,8 +607,19 @@ const AddCandidate = () => {
             </InputGroup>
             <SubmitButton type="submit">Submit Candidate</SubmitButton>
           </Form>
-          {isLoading && <LoadingMessage>Submitting...</LoadingMessage>}
-          {successMessage && <SuccessMessageDiv>{successMessage}</SuccessMessageDiv>}
+          {isLoading && (
+            <LoadingOverlay>
+              <Spinner />
+            </LoadingOverlay>
+          )}
+          {successMessage && (
+            <SuccessModalOverlay>
+              <SuccessModalContent>
+                <SuccessTitle>{successMessage} <i className="fa-solid fa-circle-check fa-bounce" style={{ color: "#14a800" }}></i></SuccessTitle>
+                <ModalCloseButton onClick={() => setSuccessMessage('')}>Close</ModalCloseButton>
+              </SuccessModalContent>
+            </SuccessModalOverlay>
+          )}
         </Content>
         <Footer />
       </Wrapper>
@@ -640,6 +630,11 @@ const AddCandidate = () => {
 export default AddCandidate;
 
 /* Styled Components */
+
+const spin = keyframes`
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+`;
 
 const Wrapper = styled.div`
   padding-top: 80px;
@@ -662,15 +657,15 @@ const Content = styled.main`
     width: 80%;
     max-width: 300px;
   }
-    input:-webkit-autofill,
-    input:-webkit-autofill:hover,
-    input:-webkit-autofill:focus,
-    textarea:-webkit-autofill,
-    textarea:-webkit-autofill:hover,
-    textarea:-webkit-autofill:focus {
-        -webkit-text-fill-color: black !important;
-        transition: background-color 5000s ease-in-out 0s;
-    }
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus {
+    -webkit-text-fill-color: black !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
 `;
 
 const FormTitle = styled.h1`
@@ -773,21 +768,69 @@ const SubmitButton = styled.button`
   }
 `;
 
-const LoadingMessage = styled.p`
-  text-align: center;
-  font-size: 18px;
-  color: #555;
-  margin-top: 20px;
+const LoadingOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
 `;
 
-const SuccessMessageDiv = styled.div`
-  text-align: center;
-  font-size: 18px;
-  color: green;
-  margin-top: 20px;
+const Spinner = styled.div`
+  border: 8px solid #f3f3f3;
+  border-top: 8px solid #7620ff;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  animation: ${spin} 1.5s linear infinite;
 `;
 
-/* Cropper styling */
+const SuccessModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+`;
+
+const SuccessModalContent = styled.div`
+  background: #fff;
+  padding: 20px 30px;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+  text-align: center;
+`;
+
+const SuccessTitle = styled.h2`
+  font-size: 2rem;
+  color: #333;
+  margin-bottom: 10px;
+`;
+
+const ModalCloseButton = styled.button`
+  margin-top: 20px;
+  padding: 8px 16px;
+  background: #7620ff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  &:hover {
+    background: #580cd2;
+  }
+`;
+
+// Cropper styling
 const CropperWrapper = styled.div`
   position: relative;
   width: 100%;
@@ -821,7 +864,7 @@ const RemoveIcon = styled.span`
   position: absolute;
   top: 5px;
   left: 5px;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0,0,0,0.6);
   color: #fff;
   border-radius: 50%;
   width: 24px;
@@ -862,7 +905,6 @@ const SliderInput = styled.input`
   width: 100%;
 `;
 
-/* Signature section styling */
 const SignatureToggleContainer = styled.div`
   margin-bottom: 10px;
   display: flex;
@@ -885,39 +927,24 @@ const SignatureModeOption = styled.input`
   accent-color: #ff9900;
 `;
 
-const SignatureCanvasWrapper = styled.div`
-  margin-top: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-`;
+ const PDFPreview = styled.div`
+ display: flex;
+ align-items: center;
+ padding: 5px;
+ border: 1px solid #ccc;
+ border-radius: 4px;
+ background: #f9f9f9;
+ max-width: 200px;
+ max-height: 200px;
+ `;
 
-const SignatureControls = styled.div`
-  display: flex;
-  justify-content: center;
-  margin-top: 10px;
-`;
+ const PDFIcon = styled.i`
+ color: #d9534f;
+ font-size: 24px;
+ margin-right: 5px;
+ `;
 
-/* PDF preview styling */
-const PDFPreview = styled.div`
-  display: flex;
-  align-items: center;
-  padding: 5px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: #f9f9f9;
-  max-width: 200px;
-  max-height: 200px;
-`;
-
-const PDFIcon = styled.i`
-  color: #d9534f;
-  font-size: 24px;
-  margin-right: 5px;
-`;
-
-const PDFName = styled.span`
-  font-size: 14px;
-  word-break: break-all;
-`;
-
-export { };
+ const PDFName = styled.span`
+ font-size: 14px;
+ word-break: break-all;
+ `;
