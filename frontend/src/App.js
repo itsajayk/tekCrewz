@@ -37,6 +37,11 @@ export default function App() {
                 <CandidatesList />
               </AdminRoute>
             }/>
+            <Route path="/add-candidate" element={
+              <AdminRoute>
+                <AddCandidate />
+              </AdminRoute>
+            }/>
             <Route path="/signup" element={
               <AdminRoute>
                 <SignupPage />
@@ -49,7 +54,6 @@ export default function App() {
             }/>
             <Route path="/login" element={<LoginPage />}/>
             <Route path="/reset-password" element={<ResetPasswordPage />}/>
-            <Route path="/add-candidate" element={<AddCandidate />}/>
           </Routes>
         </Router>
       </AuthProvider>

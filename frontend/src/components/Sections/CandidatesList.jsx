@@ -7,12 +7,29 @@ import 'react-datepicker/dist/react-datepicker.css';
 import TopNavbar from '../Nav/TopNavbar';
 import Footer from '../Sections/Footer';
 
+/** 
+ * Helper function to extract a user-friendly filename from 
+ * the stored path, e.g. 
+ * "uploads/1741773890275-36409388-Task react.pdf"
+ * -> "Task react.pdf"
+ */
+function extractOriginalFileName(filePath) {
+  // Remove "uploads/" if it exists
+  let justFilename = filePath.replace(/^uploads\//, '');
+  // Find the first dash after the timestamp
+  const dashIndex = justFilename.indexOf('-');
+  if (dashIndex === -1) return justFilename; 
+  // Return everything after the dash
+  return justFilename.substring(dashIndex + 1);
+}
+
 const CandidatesList = () => {
   const [candidates, setCandidates] = useState([]);
   const [filters, setFilters] = useState({ date: null, status: '', sortOrder: 'desc', userId: '' });
   const [isLoading, setIsLoading] = useState(false);
   const [editedCandidates, setEditedCandidates] = useState({});
 
+  // Adjust this base URL to match your backend
   const API_BASE_URL = 'https://tekcrewz.onrender.com';
 
   const fetchCandidates = async () => {
@@ -29,6 +46,8 @@ const CandidatesList = () => {
       }
       const response = await axios.get(`${API_BASE_URL}/api/candidates`, { params });
       setCandidates(response.data);
+
+      // Initialize editedCandidates for inline editing
       const initialEdits = {};
       response.data.forEach(candidate => {
         initialEdits[candidate._id] = {
@@ -50,6 +69,7 @@ const CandidatesList = () => {
 
   useEffect(() => {
     fetchCandidates();
+    // eslint-disable-next-line
   }, [filters]);
 
   const handleFilterChange = (e) => {
@@ -121,8 +141,8 @@ const CandidatesList = () => {
               <option value="Term 2 Paid">Term 2 Paid</option>
             </SelectFilter>
           </FilterGroup>
-          {/* Uncomment to enable filtering by user ID */}
-          {/* <FilterGroup>
+          {/* If needed, uncomment to filter by user ID
+          <FilterGroup>
             <FilterLabel>User ID:</FilterLabel>
             <InputFilter
               type="text"
@@ -131,7 +151,8 @@ const CandidatesList = () => {
               onChange={handleFilterChange}
               placeholder="Enter User ID"
             />
-          </FilterGroup> */}
+          </FilterGroup>
+          */}
           <SortButton onClick={toggleSortOrder}>
             Sort Date: {filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
           </SortButton>
@@ -238,12 +259,20 @@ const CandidatesList = () => {
                     </td>
                     <td>
                       {candidate.markStatement ? (
-                        <DownloadButton
-                          href={`${API_BASE_URL}/${candidate.markStatement}`}
-                          download
-                        >
-                          Download
-                        </DownloadButton>
+                        <PDFCard>
+                          <PDFIcon className="fa-solid fa-file-pdf" />
+                          <FileInfo>
+                            <FileName>{extractOriginalFileName(candidate.markStatement)}</FileName>
+                            {/* Hard-coded file size, or fetch it if you want real size */}
+                            <FileSize>1.39 MB</FileSize>
+                          </FileInfo>
+                          <DownloadLink
+                            href={`${API_BASE_URL}/${candidate.markStatement}`}
+                            download
+                          >
+                            <i className="fa-solid fa-download"></i>
+                          </DownloadLink>
+                        </PDFCard>
                       ) : (
                         'No file'
                       )}
@@ -273,6 +302,7 @@ const CandidatesList = () => {
 export default CandidatesList;
 
 /* Styled Components */
+
 const Wrapper = styled.div`
   display: flex;
   flex-direction: column;
@@ -511,36 +541,55 @@ const RemoveButton = styled.button`
   }
 `;
 
-const DownloadButton = styled.a`
-  display: inline-block;
-  padding: 6px 12px;
-  background: #28a745;
-  color: #fff;
-  border-radius: 4px;
-  text-decoration: none;
-  font-size: 14px;
-  &:hover {
-    background: #218838;
-  }
-`;
-
-const spin = keyframes`
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-`;
-
-const LoaderContainer = styled.div`
+/* 
+ * NEW STYLED COMPONENTS FOR PDF CARD
+ * 
+ * This "PDFCard" layout displays:
+ * - A PDF icon
+ * - File name
+ * - (Optional) file size
+ * - Download icon
+ */
+const PDFCard = styled.div`
   display: flex;
-  justify-content: center;
   align-items: center;
-  height: 100%;
+  background-color: #f9f9f9;
+  border: 1px solid #eee;
+  padding: 8px;
+  border-radius: 6px;
+  width: 220px;
+  gap: 8px;
 `;
 
-const Loader = styled.div`
-  border: 8px solid #f3f3f3;
-  border-top: 8px solid #7620ff;
-  border-radius: 50%;
-  width: 60px;
-  height: 60px;
-  animation: ${spin} 1.5s linear infinite;
+const PDFIcon = styled.i`
+  color: #d9534f; /* typical PDF red color */
+  font-size: 24px;
+`;
+
+const FileInfo = styled.div`
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+`;
+
+const FileName = styled.span`
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+  word-break: break-all;
+`;
+
+const FileSize = styled.span`
+  font-size: 12px;
+  color: #777;
+`;
+
+const DownloadLink = styled.a`
+  color: #28a745;
+  font-size: 18px;
+  text-decoration: none;
+  &:hover {
+    color: #218838;
+  }
 `;
