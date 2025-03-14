@@ -5,7 +5,6 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
-
 const app = express();
 
 // 1️⃣ Ensure the uploads directory exists
@@ -14,16 +13,17 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
 }
 
-// 2️⃣ Allowed origins array - include both versions of your domain & localhost
+// 2️⃣ Define allowed origins (include your domain and localhost)
 const allowedOrigins = [
   'https://tekcrewz.com',
   'https://www.tekcrewz.com',
   'http://localhost:3000'
 ];
 
-// 3️⃣ Use CORS with a dynamic origin callback
+// 3️⃣ Use CORS with dynamic origin checking
 app.use(cors({
   origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
       const msg = 'CORS policy does not allow access from this origin.';
@@ -34,7 +34,7 @@ app.use(cors({
   credentials: true
 }));
 
-// 4️⃣ Set Content Security Policy headers to allow fonts and other assets
+// 4️⃣ Set Content Security Policy headers (adjust as needed)
 app.use((req, res, next) => {
   res.setHeader(
     'Content-Security-Policy',
@@ -47,17 +47,17 @@ app.use((req, res, next) => {
   next();
 });
 
-// 5️⃣ Serve static files from "uploads"
+// 5️⃣ Serve static files from "uploads" so that the frontend can display them
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // 6️⃣ Parse JSON and URL-encoded data
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 7️⃣ Configure Multer storage for file uploads
+// 7️⃣ Configure multer storage for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+    cb(null, 'uploads/'); // make sure the uploads folder exists
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
@@ -66,13 +66,13 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// 8️⃣ Connect to MongoDB Atlas
+// 8️⃣ Connect to MongoDB Atlas using the URI from your .env
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => console.log('MongoDB Atlas connected'))
   .catch(err => console.error(err));
 
-// 9️⃣ Define the Candidate schema
+// 9️⃣ Define the Candidate schema and model
 const candidateSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   candidateName: { type: String, required: true },
@@ -91,27 +91,22 @@ const candidateSchema = new mongoose.Schema({
   paymentTerm: { type: String, required: true },
   communicationScore: { type: Number, required: true },
   remarks: { type: String },
+  // File fields – store the relative file paths
   candidatePic: { type: String },
   markStatement: { type: String },
   signature: { type: String },
+  // Additional fields (admin updates)
   paidAmount: { type: Number, default: 0 },
   courseRegistered: { type: String, default: '' },
   paidDate: { type: Date },
   status: { type: String, default: 'Registered' }
 }, { timestamps: true });
 
-// Pre-validation hook
-candidateSchema.pre('validate', function(next) {
-  if (!this.candidateCourseName && (!this.candidateDegree || !this.programme)) {
-    return next(new Error('Either candidateCourseName or both candidateDegree and programme must be provided.'));
-  }
-  next();
-});
-
 const Candidate = mongoose.model('Candidate', candidateSchema);
 
 // 1️⃣0️⃣ POST endpoint to receive candidate data with file uploads
 app.post('/api/referrals',
+  // Use multer middleware to handle three file fields
   upload.fields([
     { name: 'candidatePic', maxCount: 1 },
     { name: 'markStatement', maxCount: 1 },
@@ -119,6 +114,7 @@ app.post('/api/referrals',
   ]),
   async (req, res) => {
     try {
+      // Attach file paths to the request body if files are provided
       if (req.files['candidatePic'] && req.files['candidatePic'][0]) {
         req.body.candidatePic = req.files['candidatePic'][0].path;
       }
@@ -149,8 +145,12 @@ app.get('/api/candidates', async (req, res) => {
       const end = new Date(year, month, 0, 23, 59, 59, 999);
       filter.dateOfVisit = { $gte: start, $lte: end };
     }
-    if (status) filter.status = status;
-    if (userId) filter.userId = userId;
+    if (status) {
+      filter.status = status;
+    }
+    if (userId) {
+      filter.userId = userId;
+    }
     const sortValue = sortOrder === 'asc' ? 1 : -1;
     const candidates = await Candidate.find(filter).sort({ dateOfVisit: sortValue });
     res.json(candidates);
@@ -171,7 +171,7 @@ app.put('/api/candidates/:id', async (req, res) => {
   }
 });
 
-// 1️⃣3️⃣ DELETE endpoint to remove a candidate
+// 1️⃣3️⃣ DELETE endpoint to remove candidate data
 app.delete('/api/candidates/:id', async (req, res) => {
   try {
     await Candidate.findByIdAndDelete(req.params.id);
@@ -182,6 +182,6 @@ app.delete('/api/candidates/:id', async (req, res) => {
   }
 });
 
-// 1️⃣4️⃣ Start the Server
+// 1️⃣4️⃣ Start the server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
