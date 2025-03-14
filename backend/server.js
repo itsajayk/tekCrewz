@@ -35,12 +35,11 @@ app.use(cors({
   credentials: true
 }));
 
-// 4️⃣ Set Content Security Policy headers to allow fonts and other resources.
-// Adjust the directives as needed.
+// 4️⃣ Set Content Security Policy headers to allow fonts and necessary assets
 app.use((req, res, next) => {
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+    "default-src 'self'; " +
     "font-src 'self' data: https://fonts.gstatic.com; " +
     "style-src 'self' 'unsafe-inline'; " +
     "img-src 'self' data: https://tekcrewz.onrender.com; " +
@@ -57,6 +56,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // 7️⃣ Configure Multer storage for file uploads
+// We allow all files for candidatePic and signature, but for markStatement we assume PDFs.
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, 'uploads/'); // Ensure this folder exists
@@ -79,7 +79,7 @@ const candidateSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   candidateName: { type: String, required: true },
   college: { type: String, required: true },
-  // These fields are optional here; our pre-validation enforces the rule.
+  // Optional fields; our pre‑validation will enforce rules.
   candidateDegree: { type: String },
   candidateCourseName: { type: String },
   programme: { type: String },
@@ -94,9 +94,9 @@ const candidateSchema = new mongoose.Schema({
   paymentTerm: { type: String, required: true },
   communicationScore: { type: Number, required: true },
   remarks: { type: String },
-  // File fields – store relative file paths (e.g., "uploads/filename.pdf")
+  // File fields – store relative file paths
   candidatePic: { type: String },
-  markStatement: { type: String }, // Can be a PDF file (or image)
+  markStatement: { type: String }, // Expecting a PDF file
   signature: { type: String },
   // Additional fields (admin updates)
   paidAmount: { type: Number, default: 0 },
@@ -105,8 +105,7 @@ const candidateSchema = new mongoose.Schema({
   status: { type: String, default: 'Registered' }
 }, { timestamps: true });
 
-// Pre-validation hook to enforce that either candidateCourseName is provided
-// or both candidateDegree and programme are provided.
+// Pre-validation: Either candidateCourseName OR (candidateDegree AND programme) must be provided.
 candidateSchema.pre('validate', function(next) {
   if (!this.candidateCourseName && (!this.candidateDegree || !this.programme)) {
     return next(new Error('Either candidateCourseName or both candidateDegree and programme must be provided.'));
@@ -135,7 +134,6 @@ app.post('/api/referrals',
       if (req.files['signature'] && req.files['signature'][0]) {
         req.body.signature = req.files['signature'][0].path;
       }
-      // Create and save a new Candidate document
       const candidate = new Candidate(req.body);
       await candidate.save();
       res.status(201).json({ message: 'Referral submitted successfully', candidate });
@@ -152,7 +150,6 @@ app.get('/api/candidates', async (req, res) => {
     const { date, status, sortOrder, userId } = req.query;
     let filter = {};
 
-    // Filter by date (expects "YYYY-MM")
     if (date) {
       const [year, month] = date.split('-');
       const start = new Date(year, month - 1, 1);
@@ -167,7 +164,6 @@ app.get('/api/candidates', async (req, res) => {
     }
     const sortValue = sortOrder === 'asc' ? 1 : -1;
     const candidates = await Candidate.find(filter).sort({ dateOfVisit: sortValue });
-    // Return candidates (file paths remain relative)
     res.json(candidates);
   } catch (error) {
     console.error('Error fetching candidates:', error);
@@ -178,11 +174,7 @@ app.get('/api/candidates', async (req, res) => {
 // 1️⃣2️⃣ PUT endpoint to update candidate data
 app.put('/api/candidates/:id', async (req, res) => {
   try {
-    const updatedCandidate = await Candidate.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true }
-    );
+    const updatedCandidate = await Candidate.findByIdAndUpdate(req.params.id, req.body, { new: true });
     res.json(updatedCandidate);
   } catch (error) {
     console.error('Error updating candidate:', error);

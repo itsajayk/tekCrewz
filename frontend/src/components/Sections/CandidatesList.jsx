@@ -1,3 +1,4 @@
+// CandidatesList.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import styled, { keyframes } from 'styled-components';
@@ -120,7 +121,7 @@ const CandidatesList = () => {
               <option value="Term 2 Paid">Term 2 Paid</option>
             </SelectFilter>
           </FilterGroup>
-          {/* Uncomment the block below to filter by user ID if needed */}
+          {/* Uncomment to enable filtering by user ID */}
           {/* <FilterGroup>
             <FilterLabel>User ID:</FilterLabel>
             <InputFilter
