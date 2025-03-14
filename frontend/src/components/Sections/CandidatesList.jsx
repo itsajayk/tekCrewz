@@ -7,19 +7,16 @@ import 'react-datepicker/dist/react-datepicker.css';
 import TopNavbar from '../Nav/TopNavbar';
 import Footer from '../Sections/Footer';
 
-/** 
+/**
  * Helper function to extract a user-friendly filename from 
- * the stored path, e.g. 
+ * the stored path, e.g.:
  * "uploads/1741773890275-36409388-Task react.pdf"
  * -> "Task react.pdf"
  */
 function extractOriginalFileName(filePath) {
-  // Remove "uploads/" if it exists
   let justFilename = filePath.replace(/^uploads\//, '');
-  // Find the first dash after the timestamp
   const dashIndex = justFilename.indexOf('-');
   if (dashIndex === -1) return justFilename; 
-  // Return everything after the dash
   return justFilename.substring(dashIndex + 1);
 }
 
@@ -141,24 +138,15 @@ const CandidatesList = () => {
               <option value="Term 2 Paid">Term 2 Paid</option>
             </SelectFilter>
           </FilterGroup>
-          {/* If needed, uncomment to filter by user ID
-          <FilterGroup>
-            <FilterLabel>User ID:</FilterLabel>
-            <InputFilter
-              type="text"
-              name="userId"
-              value={filters.userId}
-              onChange={handleFilterChange}
-              placeholder="Enter User ID"
-            />
-          </FilterGroup>
-          */}
           <SortButton onClick={toggleSortOrder}>
             Sort Date: {filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
           </SortButton>
         </Filters>
+        
         {isLoading ? (
-          <LoadingMessage>Loading...</LoadingMessage>
+          <SpinnerContainer>
+            <Loader />
+          </SpinnerContainer>
         ) : (
           <TableWrapper>
             <Table>
@@ -263,7 +251,6 @@ const CandidatesList = () => {
                           <PDFIcon className="fa-solid fa-file-pdf" />
                           <FileInfo>
                             <FileName>{extractOriginalFileName(candidate.markStatement)}</FileName>
-                            {/* Hard-coded file size, or fetch it if you want real size */}
                             <FileSize>1.39 MB</FileSize>
                           </FileInfo>
                           <DownloadLink
@@ -463,10 +450,26 @@ const SortButton = styled.button`
   }
 `;
 
-const LoadingMessage = styled.p`
-  text-align: center;
-  font-size: 18px;
-  color: #555;
+/* SPINNER REPLACES LoadingMessage */
+const spin = keyframes`
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+`;
+
+const SpinnerContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 60px; /* Adjust spacing as needed */
+`;
+
+const Loader = styled.div`
+  border: 8px solid #f3f3f3;
+  border-top: 8px solid #7620ff;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  animation: ${spin} 1.5s linear infinite;
 `;
 
 const InputField = styled.input`
@@ -541,15 +544,7 @@ const RemoveButton = styled.button`
   }
 `;
 
-/* 
- * NEW STYLED COMPONENTS FOR PDF CARD
- * 
- * This "PDFCard" layout displays:
- * - A PDF icon
- * - File name
- * - (Optional) file size
- * - Download icon
- */
+/* PDF Card Components */
 const PDFCard = styled.div`
   display: flex;
   align-items: center;
