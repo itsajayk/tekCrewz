@@ -35,8 +35,8 @@ app.use(cors({
   credentials: true
 }));
 
-// 4️⃣ Set Content Security Policy headers to allow fonts and other resources.
-// Adjust the directives as needed for your project.
+// 4️⃣ Set Content Security Policy headers to allow fonts and other assets.
+// You can adjust these directives as needed.
 app.use((req, res, next) => {
   res.setHeader(
     'Content-Security-Policy',
@@ -49,7 +49,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// 5️⃣ Serve static files from "uploads" so the frontend can display/download them
+// 5️⃣ Serve static files from "uploads" so the frontend can download/display them
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // 6️⃣ Parse JSON and URL-encoded data
@@ -79,7 +79,7 @@ const candidateSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   candidateName: { type: String, required: true },
   college: { type: String, required: true },
-  // These fields are optional in the schema – our pre‑validation enforces rules.
+  // These fields are optional here; our pre‑validation enforces the rule.
   candidateDegree: { type: String },
   candidateCourseName: { type: String },
   programme: { type: String },
@@ -96,7 +96,7 @@ const candidateSchema = new mongoose.Schema({
   remarks: { type: String },
   // File fields – store relative file paths
   candidatePic: { type: String },
-  markStatement: { type: String }, // This can be an image or a PDF file.
+  markStatement: { type: String }, // Can be an image or PDF file
   signature: { type: String },
   // Additional fields (admin updates)
   paidAmount: { type: Number, default: 0 },
@@ -105,13 +105,10 @@ const candidateSchema = new mongoose.Schema({
   status: { type: String, default: 'Registered' }
 }, { timestamps: true });
 
-// Pre-validation hook to enforce that either candidateCourseName is provided
-// or both candidateDegree and programme are provided.
+// Pre-validation hook: either candidateCourseName is provided, or both candidateDegree and programme
 candidateSchema.pre('validate', function(next) {
   if (!this.candidateCourseName && (!this.candidateDegree || !this.programme)) {
-    return next(
-      new Error('Either candidateCourseName or both candidateDegree and programme must be provided.')
-    );
+    return next(new Error('Either candidateCourseName or both candidateDegree and programme must be provided.'));
   }
   next();
 });
@@ -127,7 +124,7 @@ app.post('/api/referrals',
   ]),
   async (req, res) => {
     try {
-      // Attach file paths if uploaded (these are relative paths, e.g. "uploads/filename.ext")
+      // Attach file paths if uploaded (store relative paths)
       if (req.files['candidatePic'] && req.files['candidatePic'][0]) {
         req.body.candidatePic = req.files['candidatePic'][0].path;
       }
@@ -169,7 +166,7 @@ app.get('/api/candidates', async (req, res) => {
     }
     const sortValue = sortOrder === 'asc' ? 1 : -1;
     const candidates = await Candidate.find(filter).sort({ dateOfVisit: sortValue });
-    // Return the candidates (file paths remain relative)
+    // Return candidates with relative file paths
     res.json(candidates);
   } catch (error) {
     console.error('Error fetching candidates:', error);
@@ -180,11 +177,7 @@ app.get('/api/candidates', async (req, res) => {
 // 1️⃣2️⃣ PUT endpoint to update candidate data
 app.put('/api/candidates/:id', async (req, res) => {
   try {
-    const updatedCandidate = await Candidate.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true }
-    );
+    const updatedCandidate = await Candidate.findByIdAndUpdate(req.params.id, req.body, { new: true });
     res.json(updatedCandidate);
   } catch (error) {
     console.error('Error updating candidate:', error);
