@@ -9,7 +9,7 @@ import getCroppedImg from '../Helper/cropImage';
 import SignaturePad from "react-signature-canvas";
 
 // Use environment variable for API base URL or default to production URL
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://tekcrewz.onrender.com';
+const API_BASE_URL = 'https://tekcrewz.onrender.com';
 
 const AddCandidate = () => {
   const navigate = useNavigate();
