@@ -46,6 +46,10 @@ const Referrals = () => {
     navigate('/candidateList');
   };
 
+  const openQuizList = () => {
+    navigate('/admin-report');
+  };
+
   return (
     <>
       <Wrapper>
@@ -58,6 +62,9 @@ const Referrals = () => {
             </ModalButton>
             <ModalButton onClick={openCandidateList}>
               View Candidate List
+            </ModalButton>
+            <ModalButton onClick={openQuizList}>
+              View Quiz Report
             </ModalButton>
           </div>
           <SwitchLink onClick={() => navigate('/signup')}>

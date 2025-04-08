@@ -1,18 +1,38 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import styled from "styled-components";
-import { useLocation, Link as RouterLink } from "react-router-dom";
+import { useLocation, Link as RouterLink, useNavigate } from "react-router-dom";
 import { Link as ScrollLink } from "react-scroll";
 // Assets
 import CloseIcon from "../../assets/svg/CloseIcon";
 import LogoIcon from "../../assets/svg/Logo";
+// Firebase Auth
+import { auth } from ".././Pages/firebase";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 
 export default function Sidebar({ sidebarOpen, toggleSidebar }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+    return unsubscribe;
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      navigate("/");
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
 
   const handleNavigation = (to) => {
     toggleSidebar();
     if (location.pathname === "/") {
-      // Scroll directly if already on home page
       ScrollLink.scroller.scrollTo(to, { smooth: true, offset: -60, duration: 500 });
     }
   };
@@ -39,44 +59,100 @@ export default function Sidebar({ sidebarOpen, toggleSidebar }) {
         </li>
         <li className="semiBold font15 pointer">
           {location.pathname === "/" ? (
-            <ScrollLink onClick={toggleSidebar} to="services" smooth={true} offset={-60} duration={500} className="whiteColor" style={{ padding: "10px 15px" }}>
+            <ScrollLink
+              onClick={toggleSidebar}
+              to="services"
+              smooth={true}
+              offset={-60}
+              duration={500}
+              className="whiteColor"
+              style={{ padding: "10px 15px" }}
+            >
               Services
             </ScrollLink>
           ) : (
-            <RouterLink to="/" state={{ scrollTo: "services" }} onClick={toggleSidebar} className="whiteColor" style={{ padding: "10px 15px" }}>
+            <RouterLink
+              to="/"
+              state={{ scrollTo: "services" }}
+              onClick={toggleSidebar}
+              className="whiteColor"
+              style={{ padding: "10px 15px" }}
+            >
               Services
             </RouterLink>
           )}
         </li>
         <li className="semiBold font15 pointer">
           {location.pathname === "/" ? (
-            <ScrollLink onClick={toggleSidebar} to="projects" smooth={true} offset={-60} duration={500} className="whiteColor" style={{ padding: "10px 15px" }}>
+            <ScrollLink
+              onClick={toggleSidebar}
+              to="projects"
+              smooth={true}
+              offset={-60}
+              duration={500}
+              className="whiteColor"
+              style={{ padding: "10px 15px" }}
+            >
               Courses
             </ScrollLink>
           ) : (
-            <RouterLink to="/" state={{ scrollTo: "projects" }} onClick={toggleSidebar} className="whiteColor" style={{ padding: "10px 15px" }}>
+            <RouterLink
+              to="/"
+              state={{ scrollTo: "projects" }}
+              onClick={toggleSidebar}
+              className="whiteColor"
+              style={{ padding: "10px 15px" }}
+            >
               Courses
             </RouterLink>
           )}
         </li>
         <li className="semiBold font15 pointer">
           {location.pathname === "/" ? (
-            <ScrollLink onClick={toggleSidebar} to="blog" smooth={true} offset={-60} duration={500} className="whiteColor" style={{ padding: "10px 15px" }}>
+            <ScrollLink
+              onClick={toggleSidebar}
+              to="blog"
+              smooth={true}
+              offset={-60}
+              duration={500}
+              className="whiteColor"
+              style={{ padding: "10px 15px" }}
+            >
               Testimonials
             </ScrollLink>
           ) : (
-            <RouterLink to="/" state={{ scrollTo: "blog" }} onClick={toggleSidebar} className="whiteColor" style={{ padding: "10px 15px" }}>
+            <RouterLink
+              to="/"
+              state={{ scrollTo: "blog" }}
+              onClick={toggleSidebar}
+              className="whiteColor"
+              style={{ padding: "10px 15px" }}
+            >
               Testimonials
             </RouterLink>
           )}
         </li>
         <li className="semiBold font15 pointer">
           {location.pathname === "/" ? (
-            <ScrollLink onClick={toggleSidebar} to="contact" smooth={true} offset={-60} duration={500} className="whiteColor" style={{ padding: "10px 15px" }}>
+            <ScrollLink
+              onClick={toggleSidebar}
+              to="contact"
+              smooth={true}
+              offset={-60}
+              duration={500}
+              className="whiteColor"
+              style={{ padding: "10px 15px" }}
+            >
               Contact
             </ScrollLink>
           ) : (
-            <RouterLink to="/" state={{ scrollTo: "contact" }} onClick={toggleSidebar} className="whiteColor" style={{ padding: "10px 15px" }}>
+            <RouterLink
+              to="/"
+              state={{ scrollTo: "contact" }}
+              onClick={toggleSidebar}
+              className="whiteColor"
+              style={{ padding: "10px 15px" }}
+            >
               Contact
             </RouterLink>
           )}
@@ -84,9 +160,29 @@ export default function Sidebar({ sidebarOpen, toggleSidebar }) {
       </UlStyle>
       <UlStyle>
         <li className="semiBold font15 pointer flexCenter">
-          <RouterLink to="/" className="radius8 lightBg" style={{ padding: "10px 15px" }}>
-            Log in
-          </RouterLink>
+          {currentUser ? (
+            <RouterLink
+              className="radius8 lightBg"
+              style={{ padding: "10px 15px", cursor: "pointer" }}
+              onClick={() => {
+                toggleSidebar();
+                handleLogout();
+              }}
+            >
+              Log Out
+            </RouterLink>
+          ) : (
+            <RouterLink
+              className="radius8 lightBg"
+              style={{ padding: "10px 15px", cursor: "pointer" }}
+              onClick={() => {
+                toggleSidebar();
+                setTimeout(() => navigate('/s-loginPage'), 300);
+              }}
+            >
+              Log In
+            </RouterLink>
+          )}
         </li>
       </UlStyle>
     </Wrapper>
@@ -103,7 +199,6 @@ const Wrapper = styled.nav`
   transition: right 1.3s ease-in-out;
 
   @media (max-width: 760px) {
-    // width: 100%;
     right: ${({ sidebarOpen }) => (sidebarOpen ? "0px" : "-430px")};
   }
 `;
@@ -113,7 +208,7 @@ const SidebarHeader = styled.div`
 `;
 
 const CloseBtn = styled.button`
-  border: 0px;
+  border: 0;
   outline: none;
   background-color: transparent;
   padding: 10px;

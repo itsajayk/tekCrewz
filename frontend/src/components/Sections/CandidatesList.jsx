@@ -7,279 +7,236 @@ import 'react-datepicker/dist/react-datepicker.css';
 import TopNavbar from '../Nav/TopNavbar';
 import Footer from '../Sections/Footer';
 
-
-  function extractOriginalFileName(filePath) {
-    let justFilename = filePath.replace(/^uploads\//, '');
-    const dashIndex = justFilename.indexOf('-');
-    if (dashIndex === -1) return justFilename; 
-    return justFilename.substring(dashIndex + 1);
+// Extract original filename from Cloudinary URL
+function extractOriginalFileName(fileUrl) {
+  try {
+    const url = new URL(fileUrl);
+    const segments = url.pathname.split('/');
+    const fileWithPrefix = segments[segments.length - 1];
+    const dashIndex = fileWithPrefix.indexOf('-');
+    return dashIndex === -1 ? fileWithPrefix : fileWithPrefix.substring(dashIndex + 1);
+  } catch (err) {
+    return fileUrl;
   }
+}
 
-  const CandidatesList = () => {
-    const [candidates, setCandidates] = useState([]);
-    const [filters, setFilters] = useState({ date: null, status: '', sortOrder: 'desc', userId: '' });
-    const [isLoading, setIsLoading] = useState(false);
-    const [editedCandidates, setEditedCandidates] = useState({});
+const CandidatesList = () => {
+  const [candidates, setCandidates] = useState([]);
+  const [filters, setFilters] = useState({ date: null, status: '', sortOrder: 'desc', userId: '' });
+  const [isLoading, setIsLoading] = useState(false);
+  const [editedCandidates, setEditedCandidates] = useState({});
 
-    // Adjust this base URL to match your backend
-    const API_BASE_URL = 'https://tekcrewz.onrender.com';
+  // Use env var for API base URL
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://tekcrewz.onrender.com';
 
-    const fetchCandidates = async () => {
-      setIsLoading(true);
-      try {
-        let params = { status: filters.status, sortOrder: filters.sortOrder };
-        if (filters.date) {
-          const year = filters.date.getFullYear();
-          const month = String(filters.date.getMonth() + 1).padStart(2, '0');
-          params.date = `${year}-${month}`;
-        }
-        if (filters.userId) {
-          params.userId = filters.userId;
-        }
-        const response = await axios.get(`${API_BASE_URL}/api/candidates`, { params });
-        setCandidates(response.data);
-
-        // Initialize editedCandidates for inline editing
-        const initialEdits = {};
-        response.data.forEach(candidate => {
-          initialEdits[candidate._id] = {
-            paidAmount: candidate.paidAmount || 0,
-            paidDate: candidate.paidDate ? candidate.paidDate.split('T')[0] : '',
-            paymentTerm: candidate.paymentTerm || '',
-            status: candidate.status || 'Registered',
-            remarks: candidate.remarks || '',
-            courseRegistered: candidate.courseRegistered || ''
-          };
-        });
-        setEditedCandidates(initialEdits);
-      } catch (error) {
-        console.error('Error fetching candidates:', error);
-      } finally {
-        setIsLoading(false);
+  const fetchCandidates = async () => {
+    setIsLoading(true);
+    try {
+      let params = { status: filters.status, sortOrder: filters.sortOrder };
+      if (filters.date) {
+        const year = filters.date.getFullYear();
+        const month = String(filters.date.getMonth() + 1).padStart(2, '0');
+        params.date = `${year}-${month}`;
       }
-    };
+      if (filters.userId) params.userId = filters.userId;
 
-    useEffect(() => {
-      fetchCandidates();
-      // eslint-disable-next-line
-    }, [filters]);
+      const response = await axios.get(`${API_BASE_URL}/api/candidates`, { params });
+      setCandidates(response.data);
 
-    const handleFilterChange = (e) => {
-      setFilters({ ...filters, [e.target.name]: e.target.value });
-    };
-
-    const handleDateChange = (date) => {
-      setFilters({ ...filters, date });
-    };
-
-    const toggleSortOrder = () => {
-      setFilters({ ...filters, sortOrder: filters.sortOrder === 'asc' ? 'desc' : 'asc' });
-    };
-
-    const handleFieldChange = (id, field, value) => {
-      setEditedCandidates(prev => ({
-        ...prev,
-        [id]: { ...prev[id], [field]: value }
-      }));
-    };
-
-    const handleSave = async (id) => {
-      try {
-        await axios.put(`${API_BASE_URL}/api/candidates/${id}`, editedCandidates[id]);
-        fetchCandidates();
-      } catch (error) {
-        console.error('Error updating candidate:', error);
-      }
-    };
-
-    const handleRemove = async (id) => {
-      try {
-        await axios.delete(`${API_BASE_URL}/api/candidates/${id}`);
-        fetchCandidates();
-      } catch (error) {
-        console.error('Error removing candidate:', error);
-      }
-    };
-
-    return (
-      <Wrapper>
-        <TopNavbar />
-        <Content>
-          <Filters>
-            <FilterGroup>
-              <FilterLabel>Date of Visit (Month):</FilterLabel>
-              <DatePicker
-                selected={filters.date}
-                onChange={handleDateChange}
-                dateFormat="yyyy-MM"
-                placeholderText="Select Month"
-                showMonthYearPicker
-                customInput={<DateButton />}
-                isClearable
-              />
-            </FilterGroup>
-            <FilterGroup>
-              <FilterLabel>Status:</FilterLabel>
-              <SelectFilter
-                name="status"
-                value={filters.status}
-                onChange={handleFilterChange}
-              >
-                <option value="">All</option>
-                <option value="Registered">Registered</option>
-                <option value="Enrolled">Enrolled</option>
-                <option value="Full term fee paid">Full term fee paid</option>
-                <option value="Term 1 Paid">Term 1 Paid</option>
-                <option value="Term 2 Paid">Term 2 Paid</option>
-              </SelectFilter>
-            </FilterGroup>
-            <SortButton onClick={toggleSortOrder}>
-              Sort Date: {filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
-            </SortButton>
-          </Filters>
-          {isLoading ? (
-            <LoadingMessage>Loading...</LoadingMessage>
-          ) : (
-            <TableWrapper>
-              <Table>
-                <thead>
-                  <tr>
-                    <th>S.No</th>
-                    <th>User ID</th>
-                    <th>Name</th>
-                    <th>Degree – Course Name</th>
-                    <th>College Name</th>
-                    <th>Courses Enquired</th>
-                    <th>Date of Visit</th>
-                    <th>Paid Amount</th>
-                    <th>Paid Date</th>
-                    <th>Payment Term</th>
-                    <th>Status</th>
-                    <th>Course Registered</th>
-                    <th>Remarks</th>
-                    <th>Marksheet</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {candidates.map((candidate, index) => (
-                    <tr key={candidate._id}>
-                      <td>{index + 1}</td>
-                      <td>{candidate.userId}</td>
-                      <td>{candidate.candidateName}</td>
-                      <td>{candidate.candidateDegree} – {candidate.candidateCourseName}</td>
-                      <td>{candidate.college}</td>
-                      <td>{candidate.coursesEnquired}</td>
-                      <td>{new Date(candidate.dateOfVisit).toLocaleDateString()}</td>
-                      <td>
-                        <InputField
-                          type="number"
-                          value={editedCandidates[candidate._id]?.paidAmount || ''}
-                          onChange={(e) =>
-                            handleFieldChange(candidate._id, 'paidAmount', Number(e.target.value))
-                          }
-                        />
-                      </td>
-                      <td>
-                        <InputField
-                          type="date"
-                          value={editedCandidates[candidate._id]?.paidDate || ''}
-                          onChange={(e) =>
-                            handleFieldChange(candidate._id, 'paidDate', e.target.value)
-                          }
-                        />
-                      </td>
-                      <td>
-                        <SelectField
-                          value={editedCandidates[candidate._id]?.paymentTerm || ''}
-                          onChange={(e) =>
-                            handleFieldChange(candidate._id, 'paymentTerm', e.target.value)
-                          }
-                        >
-                          <option value="">Select</option>
-                          <option value="Full term fee">Full term fee</option>
-                          <option value="Term 1 Fee">Term 1 Fee</option>
-                          <option value="Term 2 Fee">Term 2 Fee</option>
-                        </SelectField>
-                      </td>
-                      <td>
-                        <SelectField
-                          value={editedCandidates[candidate._id]?.status || 'Registered'}
-                          onChange={(e) =>
-                            handleFieldChange(candidate._id, 'status', e.target.value)
-                          }
-                        >
-                          <option value="Registered">Registered</option>
-                          <option value="Enrolled">Enrolled</option>
-                          <option value="Full term fee paid">Full term fee paid</option>
-                          <option value="Term 1 Paid">Term 1 Paid</option>
-                          <option value="Term 2 Paid">Term 2 Paid</option>
-                        </SelectField>
-                      </td>
-                      <td>
-                        <SelectField
-                          value={editedCandidates[candidate._id]?.courseRegistered || ''}
-                          onChange={(e) =>
-                            handleFieldChange(candidate._id, 'courseRegistered', e.target.value)
-                          }
-                        >
-                          <option value="">Select Course</option>
-                          <option value="Full Stack">Full Stack</option>
-                          <option value="Python">Python</option>
-                          <option value="Digital Marketing">Digital Marketing</option>
-                        </SelectField>
-                      </td>
-                      <td>
-                        <TextAreaField
-                          value={editedCandidates[candidate._id]?.remarks || ''}
-                          onChange={(e) =>
-                            handleFieldChange(candidate._id, 'remarks', e.target.value)
-                          }
-                        />
-                      </td>
-                      <td>
-                        {candidate.markStatement ? (
-                          <PDFCard>
-                            <PDFIcon className="fa-solid fa-file-pdf" />
-                            <FileInfo>
-                              <FileName>{extractOriginalFileName(candidate.markStatement)}</FileName>
-                              {/* Hard-coded file size, or fetch it if you want real size */}
-                              <FileSize>1.39 MB</FileSize>
-                            </FileInfo>
-                            <DownloadLink
-                              href={`${API_BASE_URL}/${candidate.markStatement}`}
-                              download
-                            >
-                              <i className="fa-solid fa-download"></i>
-                            </DownloadLink>
-                          </PDFCard>
-                        ) : (
-                          'No file'
-                        )}
-                      </td>
-                      <td>
-                        <ActionButtons>
-                          <SaveButton onClick={() => handleSave(candidate._id)}>
-                            Save
-                          </SaveButton>
-                          <RemoveButton onClick={() => handleRemove(candidate._id)}>
-                            Remove
-                          </RemoveButton>
-                        </ActionButtons>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </TableWrapper>
-          )}
-        </Content>
-        <Footer />
-      </Wrapper>
-    );
+      // Initialize inline edit state
+      const initialEdits = {};
+      response.data.forEach(c => {
+        initialEdits[c._id] = {
+          paidAmount: c.paidAmount || 0,
+          paidDate: c.paidDate ? c.paidDate.split('T')[0] : '',
+          paymentTerm: c.paymentTerm || '',
+          status: c.status || 'Registered',
+          remarks: c.remarks || '',
+          courseRegistered: c.courseRegistered || ''
+        };
+      });
+      setEditedCandidates(initialEdits);
+    } catch (err) {
+      console.error('Error fetching candidates:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  export default CandidatesList;
+  useEffect(() => { fetchCandidates(); /* eslint-disable-next-line */ }, [filters]);
+
+  const handleFilterChange = e => setFilters({ ...filters, [e.target.name]: e.target.value });
+  const handleDateChange = date => setFilters({ ...filters, date });
+  const toggleSortOrder = () => setFilters({ ...filters, sortOrder: filters.sortOrder === 'asc' ? 'desc' : 'asc' });
+
+  const handleFieldChange = (id, field, value) => {
+    setEditedCandidates(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
+  };
+
+  const handleSave = async id => {
+    try {
+      await axios.put(`${API_BASE_URL}/api/candidates/${id}`, editedCandidates[id]);
+      fetchCandidates();
+    } catch (err) {
+      console.error('Error updating candidate:', err);
+    }
+  };
+
+  const handleRemove = async id => {
+    try {
+      await axios.delete(`${API_BASE_URL}/api/candidates/${id}`);
+      fetchCandidates();
+    } catch (err) {
+      console.error('Error removing candidate:', err);
+    }
+  };
+
+  return (
+    <Wrapper>
+      <TopNavbar />
+      <Content>
+        <Filters>
+          <FilterGroup>
+            <FilterLabel>Date of Visit (Month):</FilterLabel>
+            <DatePicker
+              selected={filters.date}
+              onChange={handleDateChange}
+              dateFormat="yyyy-MM"
+              placeholderText="Select Month"
+              showMonthYearPicker
+              customInput={<DateButton />}
+              isClearable
+            />
+          </FilterGroup>
+          <FilterGroup>
+            <FilterLabel>Status:</FilterLabel>
+            <SelectFilter name="status" value={filters.status} onChange={handleFilterChange}>
+              <option value="">All</option>
+              <option value="Registered">Registered</option>
+              <option value="Enrolled">Enrolled</option>
+              <option value="Full term fee paid">Full term fee paid</option>
+              <option value="Term 1 Paid">Term 1 Paid</option>
+              <option value="Term 2 Paid">Term 2 Paid</option>
+            </SelectFilter>
+          </FilterGroup>
+          <SortButton onClick={toggleSortOrder}>
+            Sort Date: {filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+          </SortButton>
+        </Filters>
+
+        {isLoading ? (
+          <LoadingMessage>Loading...</LoadingMessage>
+        ) : (
+          <TableWrapper>
+            <Table>
+              <thead>
+                <tr>
+                  <th>S.No</th><th>User ID</th><th>Name</th>
+                  <th>Degree – Course</th><th>College</th><th>Enquired</th>
+                  <th>Date of Visit</th><th>Paid Amount</th><th>Paid Date</th>
+                  <th>Payment Term</th><th>Status</th><th>Course Registered</th>
+                  <th>Remarks</th><th>Marksheet</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {candidates.map((c, i) => (
+                  <tr key={c._id}>
+                    <td>{i+1}</td>
+                    <td>{c.userId}</td>
+                    <td>{c.candidateName}</td>
+                    <td>{c.candidateDegree} – {c.candidateCourseName}</td>
+                    <td>{c.college}</td>
+                    <td>{c.coursesEnquired}</td>
+                    <td>{new Date(c.dateOfVisit).toLocaleDateString()}</td>
+                    <td>
+                      <InputField
+                        type="number"
+                        value={editedCandidates[c._id]?.paidAmount || ''}
+                        onChange={e => handleFieldChange(c._id, 'paidAmount', Number(e.target.value))}
+                      />
+                    </td>
+                    <td>
+                      <InputField
+                        type="date"
+                        value={editedCandidates[c._id]?.paidDate || ''}
+                        onChange={e => handleFieldChange(c._id, 'paidDate', e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <SelectField
+                        value={editedCandidates[c._id]?.paymentTerm || ''}
+                        onChange={e => handleFieldChange(c._id, 'paymentTerm', e.target.value)}
+                      >
+                        <option value="">Select</option>
+                        <option value="Full term fee paid">Full term fee paid</option>
+                        <option value="Term 1 Paid">Term 1 Paid</option>
+                        <option value="Term 2 Paid">Term 2 Paid</option>
+                      </SelectField>
+                    </td>
+                    <td>
+                      <SelectField
+                        value={editedCandidates[c._id]?.status || 'Registered'}
+                        onChange={e => handleFieldChange(c._id, 'status', e.target.value)}
+                      >
+                        <option value="Registered">Registered</option>
+                        <option value="Enrolled">Enrolled</option>
+                        <option value="Full term fee paid">Full term fee paid</option>
+                        <option value="Term 1 Paid">Term 1 Paid</option>
+                        <option value="Term 2 Paid">Term 2 Paid</option>
+                      </SelectField>
+                    </td>
+                    <td>
+                      <SelectField
+                        value={editedCandidates[c._id]?.courseRegistered || ''}
+                        onChange={e => handleFieldChange(c._id, 'courseRegistered', e.target.value)}
+                      >
+                        <option value="">Select Course</option>
+                        <option value="Full Stack">Full Stack</option>
+                        <option value="Python">Python</option>
+                        <option value="Digital Marketing">Digital Marketing</option>
+                      </SelectField>
+                    </td>
+                    <td>
+                      <TextAreaField
+                        value={editedCandidates[c._id]?.remarks || ''}
+                        onChange={e => handleFieldChange(c._id, 'remarks', e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      {c.markStatement ? (
+                        <PDFCard>
+                          <PDFIcon className="fa-solid fa-file-pdf" />
+                          <FileInfo>
+                            <FileName>{extractOriginalFileName(c.markStatement)}</FileName>
+                          </FileInfo>
+                          <DownloadLink href={c.markStatement} download>
+                            <i className="fa-solid fa-download"></i>
+                          </DownloadLink>
+                        </PDFCard>
+                      ) : 'No file'}
+                    </td>
+                    <td>
+                      <ActionButtons>
+                        <SaveButton onClick={() => handleSave(c._id)}>Save</SaveButton>
+                        <RemoveButton onClick={() => handleRemove(c._id)}>Remove</RemoveButton>
+                      </ActionButtons>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </TableWrapper>
+        )}
+      </Content>
+      <Footer />
+    </Wrapper>
+  );
+};
+
+export default CandidatesList;
+
+// (Styled components remain unchanged from your original file)
+
 
   /* Styled Components */
 

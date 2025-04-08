@@ -13,6 +13,11 @@ import CandidatesList from './components/Sections/CandidatesList.jsx';
 import ReferrerCandidatesList from './components/Sections/ReferrerCandidatesList.jsx';
 import ReferrerRoute from './components/Routes/ReferrerRoute.jsx';
 import AddCandidate from './components/Sections/AddCandidate.jsx'
+import StudentSignUp from './student-pages/StudentSignUp.jsx';
+import StudentLogin from './student-pages/StudentLogin.jsx';
+import QuizPage from './components/Sections/QuizPage.jsx';
+import AdminReport from './components/Sections/AdminReport.jsx';
+import StudentRoute from './components/Routes/StudentRoute.jsx';
 
 export default function App() {
   return (
@@ -37,14 +42,19 @@ export default function App() {
                 <CandidatesList />
               </AdminRoute>
             }/>
-            <Route path="/add-candidate" element={
+            {/* <Route path="/add-candidate" element={
               <AdminRoute>
                 <AddCandidate />
               </AdminRoute>
-            }/>
+            }/> */}
             <Route path="/signup" element={
               <AdminRoute>
-                <SignupPage />
+                <AdminReport />
+              </AdminRoute>
+            }/>
+            <Route path="/admin-report" element={
+              <AdminRoute>
+                <AdminReport />
               </AdminRoute>
             }/>
             <Route path="/refCandidList" element={
@@ -52,8 +62,21 @@ export default function App() {
                 <ReferrerCandidatesList />
               </ReferrerRoute>
             }/>
+            
+            {/* Student Protected Route */}
+            <Route path="/Quiz" element={
+              <StudentRoute>
+                <QuizPage />
+              </StudentRoute>
+            }/>
+            
             <Route path="/login" element={<LoginPage />}/>
             <Route path="/reset-password" element={<ResetPasswordPage />}/>
+            <Route path="/s-signUpPage" element={<StudentSignUp />}/>
+            <Route path="/s-loginPage" element={<StudentLogin />}/>
+            {/* <Route path="/Quiz" element={<QuizPage />}/> */}
+            {/* <Route path="/admin-report" element={<AdminReport />}/> */}
+            <Route path="/add-candidate" element={<AddCandidate />}/>
           </Routes>
         </Router>
       </AuthProvider>

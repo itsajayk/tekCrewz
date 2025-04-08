@@ -1,87 +1,72 @@
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const cors = require('cors');
+const { v2: cloudinary } = require('cloudinary');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const multer = require('multer');
 const app = express();
 
-// 1️⃣ Ensure the uploads directory exists
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir);
-}
+// 1️⃣ Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-// 2️⃣ Define allowed origins (include your domain and localhost)
+// 2️⃣ Set up multer-storage-cloudinary
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: async (req, file) => {
+    // Store everything under a "candidates" folder
+    const folder = 'candidates';
+    // Allow auto-detection of file type (images, PDFs, etc.)
+    return {
+      folder,
+      resource_type: 'auto',
+      public_id: `${Date.now()}-${file.originalname}`,
+    };
+  },
+});
+const upload = multer({ storage });
+
+// 3️⃣ CORS & Middleware
 const allowedOrigins = [
   'https://tekcrewz.com',
   'https://www.tekcrewz.com',
   'http://localhost:3000'
 ];
-
-// 3️⃣ Use CORS with dynamic origin checking
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
+  origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'CORS policy does not allow access from this origin.';
-      return callback(new Error(msg), false);
+    if (!allowedOrigins.includes(origin)) {
+      return callback(new Error('CORS policy does not allow this origin'), false);
     }
     return callback(null, true);
   },
   credentials: true
 }));
-
-// 4️⃣ Set Content Security Policy headers (adjust as needed)
-app.use((req, res, next) => {
-  res.setHeader(
-    'Content-Security-Policy',
-    "default-src 'self'; " +
-    "font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; " +
-    "style-src 'self' 'unsafe-inline'; " +
-    "img-src 'self' data: https://tekcrewz.onrender.com; " +
-    "script-src 'self' 'unsafe-inline'"
-  );
-  next();
-});
-
-// 5️⃣ Serve static files from "uploads" so that the frontend can display them
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// 6️⃣ Parse JSON and URL-encoded data
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 7️⃣ Configure multer storage for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/'); // make sure the uploads folder exists
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + '-' + file.originalname);
-  }
-});
-const upload = multer({ storage });
+// 4️⃣ Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(() => console.log('MongoDB connected'))
+.catch(err => console.error('MongoDB connection error:', err));
 
-// 8️⃣ Connect to MongoDB Atlas using the URI from your .env
-mongoose
-  .connect(process.env.MONGODB_URI)
-  .then(() => console.log('MongoDB Atlas connected'))
-  .catch(err => console.error(err));
-
-// 9️⃣ Define the Candidate schema and model
+// 5️⃣ Candidate Schema & Model
 const candidateSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   candidateName: { type: String, required: true },
   college: { type: String, required: true },
-  candidateDegree: { type: String },
-  candidateCourseName: { type: String },
+  candidateDegree: { type: String, required: true },
   programme: { type: String },
+  candidateCourseName: { type: String },
   marksType: { type: String, enum: ['CGPA', 'Percentage'], required: true },
-  score: { type: Number, required: true },
+  score: { type: Number, default: 0 },
   scholarshipSecured: { type: String },
   mobile: { type: String, required: true },
   parentMobile: { type: String, required: true },
@@ -91,97 +76,74 @@ const candidateSchema = new mongoose.Schema({
   paymentTerm: { type: String, required: true },
   communicationScore: { type: Number, required: true },
   remarks: { type: String },
-  // File fields – store the relative file paths
-  candidatePic: { type: String },
-  markStatement: { type: String },
-  signature: { type: String },
-  // Additional fields (admin updates)
+  candidatePic: { type: String },       // Cloudinary URL
+  markStatement: { type: String },     // Cloudinary URL
+  signature: { type: String },         // Cloudinary URL or typed text
   paidAmount: { type: Number, default: 0 },
   courseRegistered: { type: String, default: '' },
   paidDate: { type: Date },
-  status: { type: String, default: 'Registered' }
+  status: { type: String, default: 'Registered' },
+  role: { type: String, default: 'student' }
 }, { timestamps: true });
 
 const Candidate = mongoose.model('Candidate', candidateSchema);
 
-// 1️⃣0️⃣ POST endpoint to receive candidate data with file uploads
-app.post('/api/referrals',
-  // Use multer middleware to handle three file fields
-  upload.fields([
-    { name: 'candidatePic', maxCount: 1 },
-    { name: 'markStatement', maxCount: 1 },
-    { name: 'signature', maxCount: 1 }
-  ]),
-  async (req, res) => {
-    try {
-      // Attach file paths to the request body if files are provided
-      if (req.files['candidatePic'] && req.files['candidatePic'][0]) {
-        req.body.candidatePic = req.files['candidatePic'][0].path;
-      }
-      if (req.files['markStatement'] && req.files['markStatement'][0]) {
-        req.body.markStatement = req.files['markStatement'][0].path;
-      }
-      if (req.files['signature'] && req.files['signature'][0]) {
-        req.body.signature = req.files['signature'][0].path;
-      }
-      const candidate = new Candidate(req.body);
-      await candidate.save();
-      res.status(201).json({ message: 'Referral submitted successfully', candidate });
-    } catch (error) {
-      console.error('Error saving referral:', error);
-      res.status(500).json({ error: 'Server error' });
-    }
-  }
-);
+// 6️⃣ Routes
 
-// 1️⃣1️⃣ GET endpoint to list candidates with optional filters
+// Create candidate (with file uploads)
+app.post('/api/referrals', upload.fields([
+  { name: 'candidatePic', maxCount: 1 },
+  { name: 'markStatement', maxCount: 1 },
+  { name: 'signature', maxCount: 1 }
+]), async (req, res) => {
+  try {
+    const files = req.files;
+    const body = req.body;
+
+    const newCandidate = new Candidate({
+      ...body,
+      candidatePic: files.candidatePic?.[0].path,
+      markStatement: files.markStatement?.[0].path,
+      // If signature was uploaded, it's in files.signature; otherwise use typed text
+      signature: files.signature?.[0].path || body.signature
+    });
+
+    await newCandidate.save();
+    res.status(201).json({ message: 'Candidate saved', candidate: newCandidate });
+  } catch (error) {
+    console.error('Error creating candidate:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// List, update, delete endpoints (unchanged, except now file URLs are in DB)
 app.get('/api/candidates', async (req, res) => {
   try {
-    const { date, status, sortOrder, userId } = req.query;
-    let filter = {};
-    if (date) {
-      const [year, month] = date.split('-');
-      const start = new Date(year, month - 1, 1);
-      const end = new Date(year, month, 0, 23, 59, 59, 999);
-      filter.dateOfVisit = { $gte: start, $lte: end };
-    }
-    if (status) {
-      filter.status = status;
-    }
-    if (userId) {
-      filter.userId = userId;
-    }
-    const sortValue = sortOrder === 'asc' ? 1 : -1;
-    const candidates = await Candidate.find(filter).sort({ dateOfVisit: sortValue });
+    const candidates = await Candidate.find().sort({ dateOfVisit: -1 });
     res.json(candidates);
-  } catch (error) {
-    console.error('Error fetching candidates:', error);
+  } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// 1️⃣2️⃣ PUT endpoint to update candidate data
 app.put('/api/candidates/:id', async (req, res) => {
   try {
-    const updatedCandidate = await Candidate.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    res.json(updatedCandidate);
-  } catch (error) {
-    console.error('Error updating candidate:', error);
+    const updated = await Candidate.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(updated);
+  } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// 1️⃣3️⃣ DELETE endpoint to remove candidate data
 app.delete('/api/candidates/:id', async (req, res) => {
   try {
     await Candidate.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Candidate removed successfully' });
-  } catch (error) {
-    console.error('Error removing candidate:', error);
+    res.json({ message: 'Candidate deleted' });
+  } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// 1️⃣4️⃣ Start the server
+// 7️⃣ Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
