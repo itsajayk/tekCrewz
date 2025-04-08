@@ -7,26 +7,26 @@ const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
 const app = express();
 
-// 1️⃣ Configure Cloudinary
+// 1️⃣ Configure Cloudinary with environment variables
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key:    process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// 2️⃣ Configure Multer with Cloudinary storage
+// 2️⃣ Configure Multer and CloudinaryStorage
 const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => ({
-    folder:        'candidates',
+    folder: 'candidates',
     resource_type: 'auto',
-    // Sanitize the file name if needed
-    public_id:     `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`,
+    // Replace spaces to avoid issues with file names
+    public_id: `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`,
   }),
 });
 const upload = multer({ storage });
 
-// 3️⃣ CORS & body parsing
+// 3️⃣ Setup CORS and body parsing
 const allowedOrigins = [
   'https://tekcrewz.com',
   'https://www.tekcrewz.com',
@@ -40,18 +40,18 @@ app.use(cors({
     }
     return cb(null, true);
   },
-  credentials: true
+  credentials: true,
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 4️⃣ MongoDB connection
+// 4️⃣ Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser:    true,
+  useNewUrlParser: true,
   useUnifiedTopology: true
 })
-.then(() => console.log('MongoDB connected'))
-.catch(err => console.error('MongoDB connection error:', err));
+  .then(() => console.log('MongoDB connected'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
 // 5️⃣ Candidate schema & model
 const candidateSchema = new mongoose.Schema({
@@ -61,7 +61,7 @@ const candidateSchema = new mongoose.Schema({
   candidateDegree:    { type: String, required: true },
   programme:          { type: String },
   candidateCourseName:{ type: String },
-  marksType:          { type: String, enum: ['CGPA','Percentage'], required: true },
+  marksType:          { type: String, enum: ['CGPA', 'Percentage'], required: true },
   score:              { type: Number, default: 0 },
   scholarshipSecured: { type: String },
   mobile:             { type: String, required: true },
@@ -95,13 +95,12 @@ app.post('/api/referrals',
   ]),
   async (req, res) => {
     try {
+      // Log the incoming request to help with debugging
       console.log("Request Body:", req.body);
       console.log("Request Files:", req.files);
 
-      // Destructure files and body
       const { files = {}, body } = req;
-
-      // Convert specific fields to numbers to avoid Mongoose casting issues.
+      // Convert strings to numbers to avoid Mongoose casting issues
       const numericFields = ['score', 'communicationScore', 'paidAmount'];
       numericFields.forEach(key => {
         if (body[key] !== undefined) {
@@ -109,7 +108,6 @@ app.post('/api/referrals',
         }
       });
 
-      // Create the candidate document
       const newCandidate = new Candidate({
         ...body,
         candidatePic:  files.candidatePic && files.candidatePic[0] ? files.candidatePic[0].path : undefined,
@@ -119,12 +117,13 @@ app.post('/api/referrals',
 
       await newCandidate.save();
       res.status(201).json({
-        message:   'Candidate saved',
+        message: 'Candidate saved',
         candidate: newCandidate
       });
     } catch (error) {
       console.error('Error creating candidate:', error);
-      res.status(500).json({ error: error.message });
+      // Return error details for debugging (remove detailed errors in production)
+      res.status(500).json({ error: error.message, stack: error.stack });
     }
   }
 );
@@ -180,6 +179,6 @@ app.delete('/api/candidates/:id', async (req, res) => {
   }
 });
 
-// 7️⃣ Start server
+// 7️⃣ Start the server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
