@@ -14,13 +14,14 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// 2️⃣ Multer + Cloudinary storage
+// 2️⃣ Configure Multer with Cloudinary storage
 const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => ({
     folder:        'candidates',
     resource_type: 'auto',
-    public_id:     `${Date.now()}-${file.originalname}`,
+    // Sanitize the file name if needed
+    public_id:     `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`,
   }),
 });
 const upload = multer({ storage });
@@ -85,7 +86,7 @@ const Candidate = mongoose.model('Candidate', candidateSchema);
 
 // 6️⃣ Routes
 
-// Create candidate (with uploads)
+// Create candidate (with file uploads)
 app.post('/api/referrals',
   upload.fields([
     { name: 'candidatePic',  maxCount: 1 },
@@ -94,14 +95,26 @@ app.post('/api/referrals',
   ]),
   async (req, res) => {
     try {
-      const files = req.files || {};
-      const body  = req.body;
+      console.log("Request Body:", req.body);
+      console.log("Request Files:", req.files);
 
+      // Destructure files and body
+      const { files = {}, body } = req;
+
+      // Convert specific fields to numbers to avoid Mongoose casting issues.
+      const numericFields = ['score', 'communicationScore', 'paidAmount'];
+      numericFields.forEach(key => {
+        if (body[key] !== undefined) {
+          body[key] = Number(body[key]);
+        }
+      });
+
+      // Create the candidate document
       const newCandidate = new Candidate({
         ...body,
-        candidatePic:  files.candidatePic?.[0].path,
-        markStatement: files.markStatement?.[0].path,
-        signature:     files.signature?.[0].path || body.signature
+        candidatePic:  files.candidatePic && files.candidatePic[0] ? files.candidatePic[0].path : undefined,
+        markStatement: files.markStatement && files.markStatement[0] ? files.markStatement[0].path : undefined,
+        signature:     files.signature && files.signature[0] ? files.signature[0].path : body.signature
       });
 
       await newCandidate.save();
@@ -111,7 +124,6 @@ app.post('/api/referrals',
       });
     } catch (error) {
       console.error('Error creating candidate:', error);
-      // Return the real error message
       res.status(500).json({ error: error.message });
     }
   }

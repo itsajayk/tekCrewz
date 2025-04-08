@@ -42,11 +42,11 @@ export default function App() {
                 <CandidatesList />
               </AdminRoute>
             }/>
-            {/* <Route path="/add-candidate" element={
+            <Route path="/add-candidate" element={
               <AdminRoute>
                 <AddCandidate />
               </AdminRoute>
-            }/> */}
+            }/>
             <Route path="/signup" element={
               <AdminRoute>
                 <AdminReport />
@@ -76,7 +76,7 @@ export default function App() {
             <Route path="/s-loginPage" element={<StudentLogin />}/>
             {/* <Route path="/Quiz" element={<QuizPage />}/> */}
             {/* <Route path="/admin-report" element={<AdminReport />}/> */}
-            <Route path="/add-candidate" element={<AddCandidate />}/>
+            {/* <Route path="/add-candidate" element={<AddCandidate />}/> */}
           </Routes>
         </Router>
       </AuthProvider>
