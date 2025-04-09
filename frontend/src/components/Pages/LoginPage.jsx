@@ -177,6 +177,7 @@ const Form = styled.form`
   textarea:-webkit-autofill:focus {
     -webkit-text-fill-color: black !important;
     transition: background-color 5000s ease-in-out 0s;
+    text-transform: uppercase;
   }
 `;
 

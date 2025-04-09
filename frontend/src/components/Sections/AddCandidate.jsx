@@ -255,29 +255,69 @@ const AddCandidate = () => {
               <TextArea name="remarks" value={formData.remarks} onChange={handleChange} placeholder="Enter remarks" />
             </InputGroup>
 
-            {/* File Uploads */}
+           {/* File Uploads */}
             <InputGroup>
               <Label>Candidate Picture (Passport Size)</Label>
               <InputFile type="file" accept="image/*" onChange={handleCandidatePicChange} ref={candidatePicRef} />
               {candidatePic && showCropper && (
-                <>/* Cropper UI */</>
+                <>
+                  <CropperWrapper>
+                    <Cropper
+                      image={candidatePic}
+                      crop={crop}
+                      zoom={zoom}
+                      aspect={1}
+                      onCropChange={setCrop}
+                      onZoomChange={setZoom}
+                      onCropComplete={onCropComplete}
+                      restrictPosition={false}
+                    />
+                    <RemoveIcon onClick={removeCandidatePic}>×</RemoveIcon>
+                  </CropperWrapper>
+                  <CropControls>
+                    <CropButton type='button' onClick={handleCropImage}>Crop</CropButton>
+                    <SliderContainer>
+                      <SliderLabel>Zoom:</SliderLabel>
+                      <SliderInput
+                        type="range"
+                        min="1"
+                        max="3"
+                        step="0.1"
+                        value={zoom}
+                        onChange={(e) => setZoom(Number(e.target.value))}
+                      />
+                    </SliderContainer>
+                  </CropControls>
+                </>
               )}
               {croppedCandidatePic && !showCropper && (
-                <>/* Cropped preview */</>
+                <ImagePreviewWrapper>
+                  <ImagePreview src={croppedCandidatePic} alt="Cropped Candidate" />
+                  <RemoveIcon onClick={removeCandidatePic}>×</RemoveIcon>
+                </ImagePreviewWrapper>
               )}
             </InputGroup>
             <InputGroup>
               <Label>Cumulative Mark Statement (PDF only)</Label>
               <InputFile type="file" accept="application/pdf" onChange={e=>handleFileChange(e,setMarkStatement)} ref={markStatementRef} />
               {markStatement && (
-                <>/* PDF preview */</>
+                <ImagePreviewWrapper>
+                  <PDFPreview>
+                    <PDFIcon className="fa-solid fa-file-pdf" />
+                    <PDFName>{markStatement.name}</PDFName>
+                  </PDFPreview>
+                  <RemoveIcon onClick={removeMarkStatement}>×</RemoveIcon>
+                </ImagePreviewWrapper>
               )}
             </InputGroup>
             <InputGroup>
               <Label>Signature (upload image)</Label>
               <InputFile type="file" accept="image/*" onChange={e=>handleFileChange(e,setSignatureFile)} ref={signatureRef} />
               {signatureFile && (
-                <>/* Signature preview */</>
+                <ImagePreviewWrapper>
+                  <ImagePreview src={URL.createObjectURL(signatureFile)} alt="Signature Preview" />
+                  <RemoveIcon onClick={removeSignature}>×</RemoveIcon>
+                </ImagePreviewWrapper>
               )}
             </InputGroup>
 
