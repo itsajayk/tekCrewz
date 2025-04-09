@@ -1,5 +1,4 @@
 // server.js
-// 1️⃣ Load env vars immediately
 require('dotenv').config();
 
 const express    = require('express');
@@ -11,14 +10,29 @@ const multer     = require('multer');
 
 const app = express();
 
-// ── 2️⃣ Enable CORS for *all* origins ─────────────────────────────────────────
-app.use(cors({ origin: true, credentials: true }));
+// ── 1) CORS ────────────────────────────────────────────────────────────────
+// allow both production and local dev origins
+const allowedOrigins = [
+  'https://tekcrewz.com',
+  'http://localhost:3000'
+];
 
-// ── 3️⃣ Body parsers ───────────────────────────────────────────────────────────
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
+
+// explicitly handle preflight for all routes
+app.options('*', cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
+
+// ── 2) Body parsers ─────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ── 4️⃣ Connect to MongoDB ────────────────────────────────────────────────────
+// ── 3) MongoDB connection ──────────────────────────────────────────────────
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
@@ -26,14 +40,14 @@ mongoose.connect(process.env.MONGODB_URI, {
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// ── 5️⃣ Configure Cloudinary ─────────────────────────────────────────────────
+// ── 4) Cloudinary configuration ────────────────────────────────────────────
 cloudinary.config({
   cloud_name:   process.env.CLOUDINARY_CLOUD_NAME,
   api_key:      process.env.CLOUDINARY_API_KEY,
   api_secret:   process.env.CLOUDINARY_API_SECRET,
 });
 
-// ── 6️⃣ Multer + CloudinaryStorage ───────────────────────────────────────────
+// ── 5) Multer + CloudinaryStorage ───────────────────────────────────────────
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
@@ -49,7 +63,7 @@ const storage = new CloudinaryStorage({
 });
 const upload = multer({ storage });
 
-// ── 7️⃣ Candidate schema & model ─────────────────────────────────────────────
+// ── 6) Candidate schema & model ─────────────────────────────────────────────
 const candidateSchema = new mongoose.Schema({
   userId:             { type: String, required: true },
   candidateName:      { type: String, required: true },
@@ -80,7 +94,7 @@ const candidateSchema = new mongoose.Schema({
 
 const Candidate = mongoose.model('Candidate', candidateSchema);
 
-// ── 8️⃣ POST /api/referrals ────────────────────────────────────────────────────
+// ── 7) POST /api/referrals ───────────────────────────────────────────────────
 app.post(
   '/api/referrals',
   (req, res, next) => {
@@ -121,7 +135,7 @@ app.post(
   }
 );
 
-// ── 9️⃣ List, Update, Delete routes ────────────────────────────────────────────
+// ── 8) GET /api/candidates ───────────────────────────────────────────────────
 app.get('/api/candidates', async (req, res) => {
   try {
     const { date, status, sortOrder, userId } = req.query;
@@ -145,6 +159,7 @@ app.get('/api/candidates', async (req, res) => {
   }
 });
 
+// ── 9) PUT /api/candidates/:id ───────────────────────────────────────────────
 app.put('/api/candidates/:id', async (req, res) => {
   try {
     const updated = await Candidate.findByIdAndUpdate(
@@ -159,6 +174,7 @@ app.put('/api/candidates/:id', async (req, res) => {
   }
 });
 
+// ── 🔟 DELETE /api/candidates/:id ────────────────────────────────────────────
 app.delete('/api/candidates/:id', async (req, res) => {
   try {
     await Candidate.findByIdAndDelete(req.params.id);
@@ -169,6 +185,6 @@ app.delete('/api/candidates/:id', async (req, res) => {
   }
 });
 
-// ── 🔟 Start server ─────────────────────────────────────────────────────────────
+// ── Start server ─────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
