@@ -1,24 +1,30 @@
 // server.js
 // 1️⃣ Load env vars immediately
 require('dotenv').config();
-const cors = require('cors');
-const express = require('express');
-const mongoose = require('mongoose');
+
+const express    = require('express');
+const cors       = require('cors');
+const mongoose   = require('mongoose');
 const { v2: cloudinary } = require('cloudinary');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const multer = require('multer');
+const multer     = require('multer');
 
 const app = express();
 
-// 2️⃣ Manual CORS & preflight handling
+// ── 2️⃣ Define allowedOrigins up here ─────────────────────────────────────────
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://tekcrewz.com',
+  'https://www.tekcrewz.com'
+];
+
+// ── 3️⃣ Use the cors package ──────────────────────────────────────────────────
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'https://tekcrewz.com',
-    'https://www.tekcrewz.com'
-  ],
+  origin: allowedOrigins,
   credentials: true
 }));
+
+// ── 4️⃣ (Optional) Additional manual CORS/preflight handling ─────────────────
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
@@ -33,15 +39,17 @@ app.use((req, res, next) => {
     'Access-Control-Allow-Methods',
     'GET, POST, PUT, DELETE, OPTIONS'
   );
-  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
   next();
 });
 
-// 3️⃣ Body parsers
+// ── 5️⃣ Body parsers ───────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 4️⃣ Connect to MongoDB
+// ── 6️⃣ Connect to MongoDB ────────────────────────────────────────────────────
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
@@ -49,29 +57,30 @@ mongoose.connect(process.env.MONGODB_URI, {
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// 5️⃣ Configure Cloudinary
+// ── 7️⃣ Configure Cloudinary ─────────────────────────────────────────────────
 cloudinary.config({
   cloud_name:   process.env.CLOUDINARY_CLOUD_NAME,
   api_key:      process.env.CLOUDINARY_API_KEY,
   api_secret:   process.env.CLOUDINARY_API_SECRET,
 });
 
-// 6️⃣ Multer + CloudinaryStorage
+// ── 8️⃣ Multer + CloudinaryStorage ───────────────────────────────────────────
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
     folder: 'candidates',
     resource_type: 'auto',
     public_id: (req, file) => {
-      // Remove file extension and spaces
-      const name = file.originalname.replace(/\.[^/.]+$/, '').replace(/\s+/g, '-');
+      const name = file.originalname
+        .replace(/\.[^/.]+$/, '')
+        .replace(/\s+/g, '-');
       return `${Date.now()}-${name}`;
     }
   }
 });
 const upload = multer({ storage });
 
-// 7️⃣ Candidate schema & model
+// ── 9️⃣ Candidate schema & model ─────────────────────────────────────────────
 const candidateSchema = new mongoose.Schema({
   userId:             { type: String, required: true },
   candidateName:      { type: String, required: true },
@@ -102,7 +111,7 @@ const candidateSchema = new mongoose.Schema({
 
 const Candidate = mongoose.model('Candidate', candidateSchema);
 
-// 8️⃣ POST /api/referrals
+// ── 🔟 POST /api/referrals ────────────────────────────────────────────────────
 app.post(
   '/api/referrals',
   (req, res, next) => {
@@ -120,7 +129,7 @@ app.post(
   },
   async (req, res) => {
     try {
-      console.log('Body:', req.body);
+      console.log('Body:',  req.body);
       console.log('Files:', req.files);
 
       // Cast numeric fields
@@ -143,7 +152,7 @@ app.post(
   }
 );
 
-// List candidates
+// ── List, Update, Delete routes (unchanged) ──────────────────────────────────
 app.get('/api/candidates', async (req, res) => {
   try {
     const { date, status, sortOrder, userId } = req.query;
@@ -155,8 +164,8 @@ app.get('/api/candidates', async (req, res) => {
         $lte: new Date(year, month, 0, 23,59,59,999)
       };
     }
-    if (status) filter.status = status;
-    if (userId) filter.userId = userId;
+    if (status)   filter.status = status;
+    if (userId)   filter.userId = userId;
 
     const sortDir = sortOrder === 'asc' ? 1 : -1;
     const candidates = await Candidate.find(filter).sort({ dateOfVisit: sortDir });
@@ -167,7 +176,6 @@ app.get('/api/candidates', async (req, res) => {
   }
 });
 
-// Update candidate
 app.put('/api/candidates/:id', async (req, res) => {
   try {
     const updated = await Candidate.findByIdAndUpdate(
@@ -182,7 +190,6 @@ app.put('/api/candidates/:id', async (req, res) => {
   }
 });
 
-// Delete candidate
 app.delete('/api/candidates/:id', async (req, res) => {
   try {
     await Candidate.findByIdAndDelete(req.params.id);
@@ -193,6 +200,6 @@ app.delete('/api/candidates/:id', async (req, res) => {
   }
 });
 
-// 8️⃣ Start server
+// ── Start server ─────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
