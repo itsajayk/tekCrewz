@@ -1,7 +1,7 @@
 // server.js
 // 1️⃣ Load env vars immediately
 require('dotenv').config();
-
+const cors = require('cors');
 const express = require('express');
 const mongoose = require('mongoose');
 const { v2: cloudinary } = require('cloudinary');
@@ -11,11 +11,14 @@ const multer = require('multer');
 const app = express();
 
 // 2️⃣ Manual CORS & preflight handling
-const allowedOrigins = [
-  'https://tekcrewz.com',
-  'https://www.tekcrewz.com',
-  'http://localhost:3000'
-];
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'https://tekcrewz.com',
+    'https://www.tekcrewz.com'
+  ],
+  credentials: true
+}));
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
