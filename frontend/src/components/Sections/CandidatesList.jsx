@@ -7,6 +7,16 @@ import 'react-datepicker/dist/react-datepicker.css';
 import TopNavbar from '../Nav/TopNavbar';
 import Footer from '../Sections/Footer';
 
+function getDownloadUrl(fileUrl) {
+  try {
+    // Check if URL already has query parameters.
+    const separator = fileUrl.includes('?') ? '&' : '?';
+    return `${fileUrl}${separator}fl_attachment=true`;
+  } catch (err) {
+    return fileUrl;
+  }
+}
+
 // Extract original filename from Cloudinary URL
 function extractOriginalFileName(fileUrl) {
   try {
@@ -27,7 +37,7 @@ const CandidatesList = () => {
   const [editedCandidates, setEditedCandidates] = useState({});
 
   // Use env var for API base URL
-  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://tekcrewz.onrender.com';
+  const API_BASE_URL = 'https://tekcrewz.onrender.com';
 
   const fetchCandidates = async () => {
     setIsLoading(true);
@@ -209,7 +219,7 @@ const CandidatesList = () => {
                           <FileInfo>
                             <FileName>{extractOriginalFileName(c.markStatement)}</FileName>
                           </FileInfo>
-                          <DownloadLink href={c.markStatement} download>
+                          <DownloadLink href={getDownloadUrl(c.markStatement)} download>
                             <i className="fa-solid fa-download"></i>
                           </DownloadLink>
                         </PDFCard>

@@ -8,118 +8,81 @@ import Cropper from 'react-easy-crop';
 import getCroppedImg from '../Helper/cropImage';
 import SignaturePad from "react-signature-canvas";
 
-// Use environment variable for API base URL or default to production URL
+// In development this will be proxied to http://localhost:5000
 const API_BASE_URL = 'https://tekcrewz.onrender.com';
 
 const AddCandidate = () => {
   const navigate = useNavigate();
 
-  // Form fields state
   const [formData, setFormData] = useState({
-    userId: '',
-    candidateName: '',
-    college: '',
-    candidateDegree: '',
-    candidateCourseName: '',
-    programme: '',
-    marksType: '',
-    score: '',
-    scholarshipSecured: '',
-    mobile: '',
-    parentMobile: '',
-    email: '',
-    coursesEnquired: '',
-    dateOfVisit: '',
-    paymentTerm: '',
-    communicationScore: '',
-    remarks: ''
+    userId: '', candidateName: '', college: '',
+    candidateDegree: '', candidateCourseName: '',
+    programme: '', marksType: '', score: '',
+    scholarshipSecured: '', mobile: '', parentMobile: '',
+    email: '', coursesEnquired: '', dateOfVisit: '',
+    paymentTerm: '', communicationScore: '', remarks: ''
   });
 
-  // File inputs state
   const [candidatePic, setCandidatePic] = useState(null);
   const [croppedCandidatePic, setCroppedCandidatePic] = useState(null);
   const [markStatement, setMarkStatement] = useState(null);
-  
-  // Signature state (upload and type modes only)
+
   const [signatureMode, setSignatureMode] = useState('upload');
   const [signatureFile, setSignatureFile] = useState(null);
   const [signatureText, setSignatureText] = useState('');
-  
-  // Cropper states for candidate picture
+
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [showCropper, setShowCropper] = useState(false);
 
-  // Dependent dropdown for Programme
   const [programmeOptions, setProgrammeOptions] = useState([]);
-
-  // Other states
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Refs for file inputs and signature pad
   const candidatePicInputRef = useRef();
   const markStatementInputRef = useRef();
   const signatureInputRef = useRef();
   const signaturePadRef = useRef();
 
-  // Update programme options based on candidateDegree
   useEffect(() => {
     const degree = formData.candidateDegree;
     let opts = [];
-    if (degree === 'UG') {
-      opts = ['BE','B.Sc.','B. Com','BBA','BCA','BA','B.Lit.','B.S.W','B.Ed','B.F.A'];
-    } else if (degree === 'PG') {
-      opts = ['ME','M.Tech','M.Phil','M.A','M.C.A','M.Sc.','M.S.W','M.B.A','M.F.A.'];
-    } else if (degree === 'Integrated') {
-      opts = ['M.Sc','BBA + MBA','BA + Bed','BA+LLB'];
-    }
+    if (degree === 'UG') opts = ['BE','B.Sc.','B. Com','BBA','BCA','BA','B.Lit.','B.S.W','B.Ed','B.F.A'];
+    else if (degree === 'PG') opts = ['ME','M.Tech','M.Phil','M.A','M.C.A','M.Sc.','M.S.W','M.B.A','M.F.A.'];
+    else if (degree === 'Integrated') opts = ['M.Sc','BBA + MBA','BA + Bed','BA+LLB'];
     setProgrammeOptions(opts);
     if (!opts.includes(formData.programme)) {
       setFormData(prev => ({ ...prev, programme: '' }));
     }
   }, [formData.candidateDegree]);
 
-  // Handle text/select inputs
-  const handleChange = (e) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }));
-  };
+  const handleChange = e =>
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
-  // Handle candidate picture file input and open cropper
-  const handleCandidatePicChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const imageUrl = URL.createObjectURL(e.target.files[0]);
-      setCandidatePic(imageUrl);
+  const handleCandidatePicChange = e => {
+    if (e.target.files?.[0]) {
+      setCandidatePic(URL.createObjectURL(e.target.files[0]));
       setShowCropper(true);
       setCroppedCandidatePic(null);
     }
   };
 
-  // Generic file input handler for mark statement and signature file
   const handleFileChange = (e, setter) => {
-    if (e.target.files && e.target.files[0]) {
-      setter(e.target.files[0]);
-    }
+    if (e.target.files?.[0]) setter(e.target.files[0]);
   };
 
-  // Handle signature mode change
-  const handleSignatureModeChange = (e) => {
+  const handleSignatureModeChange = e => {
     setSignatureMode(e.target.value);
     setSignatureFile(null);
     setSignatureText('');
   };
 
-  // Cropper onCropComplete callback
   const onCropComplete = useCallback((_, pixels) => {
     setCroppedAreaPixels(pixels);
   }, []);
 
-  // Handle cropping action
   const handleCropImage = async () => {
     try {
       const { fileUrl } = await getCroppedImg(candidatePic, croppedAreaPixels, 'candidatePic.jpg');
@@ -130,101 +93,83 @@ const AddCandidate = () => {
     }
   };
 
-  // Remove functions for file inputs
   const removeCandidatePic = () => {
     setCandidatePic(null);
     setCroppedCandidatePic(null);
     setShowCropper(false);
-    if (candidatePicInputRef.current) candidatePicInputRef.current.value = '';
+    candidatePicInputRef.current.value = '';
   };
-
   const removeMarkStatement = () => {
     setMarkStatement(null);
-    if (markStatementInputRef.current) markStatementInputRef.current.value = '';
+    markStatementInputRef.current.value = '';
   };
-
   const removeSignature = () => {
     setSignatureFile(null);
     setSignatureText('');
-    if (signatureInputRef.current) signatureInputRef.current.value = '';
-    if (signaturePadRef.current) signaturePadRef.current.clear();
+    signatureInputRef.current.value = '';
+    signaturePadRef.current?.clear();
   };
 
-  // Validation function
   const validate = () => {
-    let tempErrors = {};
-    if (!formData.userId) tempErrors.userId = "User selection is required.";
-    if (!formData.candidateName) tempErrors.candidateName = "Candidate Name is required.";
-    if (!formData.college) tempErrors.college = "College Name is required.";
-    if (!formData.candidateDegree) tempErrors.candidateDegree = "Degree is required.";
-    if (!formData.programme) tempErrors.programme = "Programme selection is required.";
-    if (!formData.marksType) tempErrors.marksType = "Marks type is required.";
-    if (!formData.score) tempErrors.score = "Score is required.";
-    if (!formData.mobile) tempErrors.mobile = "Mobile Number is required.";
-    if (!formData.parentMobile) tempErrors.parentMobile = "Parent Mobile Number is required.";
-    if (!formData.email) tempErrors.email = "Email is required.";
-    if (!formData.coursesEnquired) tempErrors.coursesEnquired = "Courses Enquired is required.";
-    if (!formData.dateOfVisit) tempErrors.dateOfVisit = "Date of Visit is required.";
-    if (!formData.paymentTerm) tempErrors.paymentTerm = "Payment Term is required.";
-    if (!formData.communicationScore) tempErrors.communicationScore = "Communication Score is required.";
-    setErrors(tempErrors);
-    return Object.keys(tempErrors).length === 0;
+    const temp = {};
+    if (!formData.userId) temp.userId = "Required.";
+    if (!formData.candidateName) temp.candidateName = "Required.";
+    if (!formData.college) temp.college = "Required.";
+    if (!formData.candidateDegree) temp.candidateDegree = "Required.";
+    if (!formData.programme) temp.programme = "Required.";
+    if (!formData.marksType) temp.marksType = "Required.";
+    if (!formData.score) temp.score = "Required.";
+    if (!formData.mobile) temp.mobile = "Required.";
+    if (!formData.parentMobile) temp.parentMobile = "Required.";
+    if (!formData.email) temp.email = "Required.";
+    if (!formData.coursesEnquired) temp.coursesEnquired = "Required.";
+    if (!formData.dateOfVisit) temp.dateOfVisit = "Required.";
+    if (!formData.paymentTerm) temp.paymentTerm = "Required.";
+    if (!formData.communicationScore) temp.communicationScore = "Required.";
+    setErrors(temp);
+    return Object.keys(temp).length === 0;
   };
 
-  // Handle form submission with FormData for file uploads
-  const handleSubmit = async (e) => {
+  const handleSubmit = async e => {
     e.preventDefault();
     if (!validate()) return;
     setIsLoading(true);
+
     try {
       const data = new FormData();
-      // Append text fields
-      Object.keys(formData).forEach(key => data.append(key, formData[key]));
+      Object.entries(formData).forEach(([k, v]) => data.append(k, v));
 
-      // Append candidate picture if available (cropped image blob)
       if (croppedCandidatePic) {
         const res = await fetch(croppedCandidatePic);
         const blob = await res.blob();
         data.append('candidatePic', blob, 'candidatePic.jpg');
       }
-      // Append mark statement file if available
       if (markStatement) data.append('markStatement', markStatement);
-      // Handle signature: if upload mode and a file is provided, append file; otherwise, append the text
-      if (signatureMode === 'upload' && signatureFile) data.append('signature', signatureFile);
-      else data.append('signature', signatureText);
+      if (signatureMode === 'upload' && signatureFile) {
+        data.append('signature', signatureFile);
+      } else {
+        data.append('signature', signatureText);
+      }
 
-      const response = await axios.post(
-        `${API_BASE_URL}/api/referrals`,
-        data,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
-      );
-      setSuccessMessage(response.data.message);
-      // Reset form fields and file inputs
+      const res = await axios.post(`${API_BASE_URL}/api/referrals`, data);
+      setSuccessMessage(res.data.message);
+
       setFormData({
-        userId:'',
-        candidateName:'',
-        college:'',
-        candidateDegree:'',
-        candidateCourseName:'',
-        programme:'',
-        marksType:'',
-        score:'',
-        scholarshipSecured:'',
-        mobile:'',
-        parentMobile:'',
-        email:'',
-        coursesEnquired:'',
-        dateOfVisit:'',
-        paymentTerm:'',
-        communicationScore:'',
-        remarks:''
+        userId:'', candidateName:'', college:'', candidateDegree:'', candidateCourseName:'',
+        programme:'', marksType:'', score:'', scholarshipSecured:'', mobile:'',
+        parentMobile:'', email:'', coursesEnquired:'', dateOfVisit:'', paymentTerm:'',
+        communicationScore:'', remarks:''
       });
       removeCandidatePic();
       removeMarkStatement();
       removeSignature();
     } catch (err) {
-      console.error('Failed to submit candidate:', err);
-      alert('There was an error submitting the candidate. Please try again.');
+      console.error('Submit error:', err);
+      if (err.response) {
+        alert(err.response.data.error || err.response.data.message);
+      } else {
+        alert('Network error. Check connection.');
+      }
     } finally {
       setIsLoading(false);
     }
