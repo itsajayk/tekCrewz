@@ -1,4 +1,3 @@
-// server.js
 require('dotenv').config();
 
 const express    = require('express');
@@ -10,52 +9,40 @@ const multer     = require('multer');
 
 const app = express();
 
-// ── 1) CORS ────────────────────────────────────────────────────────────────
-// allow both production and local dev origins
+// 1) CORS
 const allowedOrigins = [
-  'http://localhost:3000',      // local development
-  'https://tekcrewz.com',       // production (non-www)
-  'https://www.tekcrewz.com'    // production (with www)
+  'http://localhost:3000',
+  'https://tekcrewz.com',
+  'https://www.tekcrewz.com'
 ];
+app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.options('*', cors({ origin: allowedOrigins, credentials: true }));
 
-app.use(cors({
-  origin: allowedOrigins,
-  credentials: true
-}));
-
-// explicitly handle preflight for all routes
-app.options('*', cors({
-  origin: allowedOrigins,
-  credentials: true
-}));
-
-// ── 2) Body parsers ─────────────────────────────────────────────────────────
+// 2) Body parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ── 3) MongoDB connection ──────────────────────────────────────────────────
+// 3) MongoDB connection
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => console.error('MongoDB connection error:', err));
+.then(() => console.log('MongoDB connected'))
+.catch(err => console.error('MongoDB connection error:', err));
 
-// ── 4) Cloudinary configuration ────────────────────────────────────────────
+// 4) Cloudinary config
 cloudinary.config({
   cloud_name:   process.env.CLOUDINARY_CLOUD_NAME,
   api_key:      process.env.CLOUDINARY_API_KEY,
   api_secret:   process.env.CLOUDINARY_API_SECRET,
 });
-
-// Quick check for Cloudinary env variables
 if (!process.env.CLOUDINARY_CLOUD_NAME ||
     !process.env.CLOUDINARY_API_KEY ||
     !process.env.CLOUDINARY_API_SECRET) {
-  console.error('⚠️  Missing Cloudinary environment variables!');
+  console.error('⚠️ Missing Cloudinary environment variables!');
 }
 
-// ── 5) Multer + CloudinaryStorage ───────────────────────────────────────────
+// 5) Multer + CloudinaryStorage
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
@@ -71,7 +58,7 @@ const storage = new CloudinaryStorage({
 });
 const upload = multer({ storage });
 
-// ── 6) Candidate schema & model ─────────────────────────────────────────────
+// 6) Candidate schema & model
 const candidateSchema = new mongoose.Schema({
   userId:             { type: String, required: true },
   candidateName:      { type: String, required: true },
@@ -102,8 +89,7 @@ const candidateSchema = new mongoose.Schema({
 
 const Candidate = mongoose.model('Candidate', candidateSchema);
 
-// ── 7) POST /api/candidates ───────────────────────────────────────────────────
-// Changed the endpoint from /api/referrals to /api/candidates for consistency
+// 7) POST /api/candidates
 app.post(
   '/api/candidates',
   (req, res, next) => {
@@ -121,9 +107,6 @@ app.post(
   },
   async (req, res) => {
     try {
-      console.log('Body:', req.body);
-      console.log('Files:', req.files);
-
       // Cast numeric fields
       ['score','communicationScore','paidAmount'].forEach(key => {
         if (req.body[key] != null) req.body[key] = Number(req.body[key]);
@@ -133,9 +116,9 @@ app.post(
         ...req.body,
         candidatePic:  req.files.candidatePic?.[0]?.path,
         markStatement: req.files.markStatement?.[0]?.path,
-        // Use req.files.signature if a file was uploaded; otherwise, fall back to text input
-        signature:     req.files.signature?.[0]?.path || req.body.signature
+        signature:     req.files.signature?.[0]?.path
       });
+
       await newCandidate.save();
       res.status(201).json({ message: 'Candidate saved', candidate: newCandidate });
     } catch (err) {
@@ -145,7 +128,7 @@ app.post(
   }
 );
 
-// ── 8) GET /api/candidates ───────────────────────────────────────────────────
+// 8) GET /api/candidates
 app.get('/api/candidates', async (req, res) => {
   try {
     const { date, status, sortOrder, userId } = req.query;
@@ -169,7 +152,7 @@ app.get('/api/candidates', async (req, res) => {
   }
 });
 
-// ── 9) PUT /api/candidates/:id ───────────────────────────────────────────────
+// 9) PUT /api/candidates/:id
 app.put('/api/candidates/:id', async (req, res) => {
   try {
     const updated = await Candidate.findByIdAndUpdate(
@@ -184,7 +167,7 @@ app.put('/api/candidates/:id', async (req, res) => {
   }
 });
 
-// ── 🔟 DELETE /api/candidates/:id ────────────────────────────────────────────
+// 10) DELETE /api/candidates/:id
 app.delete('/api/candidates/:id', async (req, res) => {
   try {
     await Candidate.findByIdAndDelete(req.params.id);
@@ -195,6 +178,6 @@ app.delete('/api/candidates/:id', async (req, res) => {
   }
 });
 
-// ── Start server ─────────────────────────────────────────────────────────────
+// Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
