@@ -1,33 +1,35 @@
+// 1️⃣ Load env vars before anything else
 require('dotenv').config();
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const { v2: cloudinary } = require('cloudinary');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
+
 const app = express();
 
-// 1️⃣ Configure Cloudinary with environment variables
+// 2️⃣ Configure Cloudinary
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:    process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-  // api_url: process.env.CLOUDINARY_URL,
+  cloud_name:   process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:      process.env.CLOUDINARY_API_KEY,
+  api_secret:   process.env.CLOUDINARY_API_SECRET,
 });
 
-// 2️⃣ Configure Multer and CloudinaryStorage
+// 3️⃣ Configure Multer + CloudinaryStorage with synchronous params
 const storage = new CloudinaryStorage({
   cloudinary,
-  params: async (req, file) => ({
+  params: {
     folder: 'candidates',
     resource_type: 'auto',
-    // Replace spaces to avoid issues with file names
-    public_id: `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`,
-  }),
+    public_id: (req, file) =>
+      `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`
+  }
 });
 const upload = multer({ storage });
 
-// 3️⃣ Setup CORS and body parsing
+// 4️⃣ CORS & body parsing
 const allowedOrigins = [
   'https://tekcrewz.com',
   'https://www.tekcrewz.com',
@@ -46,7 +48,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 4️⃣ Connect to MongoDB
+// 5️⃣ MongoDB connection
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
@@ -54,7 +56,7 @@ mongoose.connect(process.env.MONGODB_URI, {
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// 5️⃣ Candidate schema & model
+// 6️⃣ Candidate schema & model
 const candidateSchema = new mongoose.Schema({
   userId:             { type: String, required: true },
   candidateName:      { type: String, required: true },
@@ -73,9 +75,9 @@ const candidateSchema = new mongoose.Schema({
   paymentTerm:        { type: String, required: true },
   communicationScore: { type: Number, required: true },
   remarks:            { type: String },
-  candidatePic:       { type: String }, // Cloudinary URL
-  markStatement:      { type: String }, // Cloudinary URL
-  signature:          { type: String }, // Cloudinary URL or text
+  candidatePic:       { type: String },
+  markStatement:      { type: String },
+  signature:          { type: String },
   paidAmount:         { type: Number, default: 0 },
   courseRegistered:   { type: String, default: '' },
   paidDate:           { type: Date },
@@ -85,35 +87,40 @@ const candidateSchema = new mongoose.Schema({
 
 const Candidate = mongoose.model('Candidate', candidateSchema);
 
-// 6️⃣ Routes
+// 7️⃣ Routes
 
-// Create candidate (with file uploads)
-app.post('/api/referrals',
-  upload.fields([
-    { name: 'candidatePic',  maxCount: 1 },
-    { name: 'markStatement', maxCount: 1 },
-    { name: 'signature',     maxCount: 1 }
-  ]),
+// Create candidate (with file uploads + Multer error handling)
+app.post(
+  '/api/referrals',
+  (req, res, next) => {
+    upload.fields([
+      { name: 'candidatePic',  maxCount: 1 },
+      { name: 'markStatement', maxCount: 1 },
+      { name: 'signature',     maxCount: 1 }
+    ])(req, res, err => {
+      if (err) {
+        console.error('Multer/Cloudinary error:', err);
+        return res.status(400).json({ error: err.message });
+      }
+      next();
+    });
+  },
   async (req, res) => {
     try {
-      // Log the incoming request to help with debugging
-      console.log("Request Body:", req.body);
-      console.log("Request Files:", req.files);
+      console.log('Request Body:', req.body);
+      console.log('Request Files:', req.files);
 
-      const { files = {}, body } = req;
-      // Convert strings to numbers to avoid Mongoose casting issues
-      const numericFields = ['score', 'communicationScore', 'paidAmount'];
-      numericFields.forEach(key => {
-        if (body[key] !== undefined) {
-          body[key] = Number(body[key]);
-        }
+      // Convert numeric fields
+      const { body, files = {} } = req;
+      ['score', 'communicationScore', 'paidAmount'].forEach(key => {
+        if (body[key] != null) body[key] = Number(body[key]);
       });
 
       const newCandidate = new Candidate({
         ...body,
-        candidatePic:  files.candidatePic && files.candidatePic[0] ? files.candidatePic[0].path : undefined,
-        markStatement: files.markStatement && files.markStatement[0] ? files.markStatement[0].path : undefined,
-        signature:     files.signature && files.signature[0] ? files.signature[0].path : body.signature
+        candidatePic:  files.candidatePic?.[0]?.path,
+        markStatement: files.markStatement?.[0]?.path,
+        signature:     files.signature?.[0]?.path || body.signature
       });
 
       await newCandidate.save();
@@ -123,8 +130,7 @@ app.post('/api/referrals',
       });
     } catch (error) {
       console.error('Error creating candidate:', error);
-      // Return error details for debugging (remove detailed errors in production)
-      res.status(500).json({ error: error.message, stack: error.stack });
+      res.status(500).json({ error: error.message });
     }
   }
 );
@@ -134,12 +140,11 @@ app.get('/api/candidates', async (req, res) => {
   try {
     const { date, status, sortOrder, userId } = req.query;
     const filter = {};
-
     if (date) {
       const [year, month] = date.split('-').map(Number);
       filter.dateOfVisit = {
         $gte: new Date(year, month - 1, 1),
-        $lte: new Date(year, month, 0, 23, 59, 59, 999)
+        $lte: new Date(year, month, 0, 23,59,59,999)
       };
     }
     if (status) filter.status = status;
@@ -180,6 +185,6 @@ app.delete('/api/candidates/:id', async (req, res) => {
   }
 });
 
-// 7️⃣ Start the server
+// 8️⃣ Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
