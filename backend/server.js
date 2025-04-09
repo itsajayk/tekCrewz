@@ -13,9 +13,9 @@ const app = express();
 // ── 1) CORS ────────────────────────────────────────────────────────────────
 // allow both production and local dev origins
 const allowedOrigins = [
-  'https://tekcrewz.com',
-  'https://tekcrewz.com',
-  'http://localhost:3000'
+  'http://localhost:3000',      // local development
+  'https://tekcrewz.com',       // production (non-www)
+  'https://www.tekcrewz.com'    // production (with www)
 ];
 
 app.use(cors({
@@ -47,6 +47,13 @@ cloudinary.config({
   api_key:      process.env.CLOUDINARY_API_KEY,
   api_secret:   process.env.CLOUDINARY_API_SECRET,
 });
+
+// Quick check for Cloudinary env variables
+if (!process.env.CLOUDINARY_CLOUD_NAME ||
+    !process.env.CLOUDINARY_API_KEY ||
+    !process.env.CLOUDINARY_API_SECRET) {
+  console.error('⚠️  Missing Cloudinary environment variables!');
+}
 
 // ── 5) Multer + CloudinaryStorage ───────────────────────────────────────────
 const storage = new CloudinaryStorage({
@@ -95,9 +102,10 @@ const candidateSchema = new mongoose.Schema({
 
 const Candidate = mongoose.model('Candidate', candidateSchema);
 
-// ── 7) POST /api/referrals ───────────────────────────────────────────────────
+// ── 7) POST /api/candidates ───────────────────────────────────────────────────
+// Changed the endpoint from /api/referrals to /api/candidates for consistency
 app.post(
-  '/api/referrals',
+  '/api/candidates',
   (req, res, next) => {
     upload.fields([
       { name: 'candidatePic',  maxCount: 1 },
@@ -113,7 +121,7 @@ app.post(
   },
   async (req, res) => {
     try {
-      console.log('Body:',  req.body);
+      console.log('Body:', req.body);
       console.log('Files:', req.files);
 
       // Cast numeric fields
@@ -121,14 +129,15 @@ app.post(
         if (req.body[key] != null) req.body[key] = Number(req.body[key]);
       });
 
-      const newC = new Candidate({
+      const newCandidate = new Candidate({
         ...req.body,
         candidatePic:  req.files.candidatePic?.[0]?.path,
         markStatement: req.files.markStatement?.[0]?.path,
+        // Use req.files.signature if a file was uploaded; otherwise, fall back to text input
         signature:     req.files.signature?.[0]?.path || req.body.signature
       });
-      await newC.save();
-      res.status(201).json({ message: 'Candidate saved', candidate: newC });
+      await newCandidate.save();
+      res.status(201).json({ message: 'Candidate saved', candidate: newCandidate });
     } catch (err) {
       console.error('Error creating candidate:', err);
       res.status(500).json({ error: err.message });

@@ -150,9 +150,9 @@ const CandidatesList = () => {
     y += 8;
   
     // Degree, Programme and Course Name on one line.
-    const degreeText = `Degree: ${candidate.candidateDegree || "……………………………………"}`;
-    const progText = `Programme: ${candidate.candidateCourseName || "…………………"}`;
-    const courseText = `Course Name: ${candidate.courseRegistered || "…………………………………"}`;
+    const degreeText = `Degree: ${candidate.candidateDegree || "…………………"}`;
+    const progText = `Programme: ${candidate.programme || candidate.candidateCourseName || "…………………"}`;    
+    const courseText = `Course Name: ${candidate.courseRegistered || "…………………"}`;
     doc.text(degreeText, 10, y);
     doc.text(progText, pageWidth / 2 - 20, y);
     doc.text(courseText, pageWidth - rightMargin, y, { align: 'right' });
@@ -185,18 +185,29 @@ const CandidatesList = () => {
     doc.text("TO BE FILLED BY STUDENT COUNSELLOR", pageWidth / 2, y, { align: 'center' });
     y += 12;
   
-    // Payment Term with checkboxes.
-    doc.text("Payment Term:", 10, y);
-    const checkboxSize = 5;
-    let startX = 10 + doc.getTextWidth("Payment Term: ") + 5;
-    // Draw FIRST checkbox for FULL-TERM PAID.
-    doc.rect(startX, y - 5, checkboxSize, checkboxSize);
-    doc.text("FULL-TERM PAID", startX + checkboxSize + 2, y);
-    // Adjust startX for second checkbox.
-    startX += checkboxSize + 2 + doc.getTextWidth("FULL-TERM PAID") + 10;
-    doc.rect(startX, y - 5, checkboxSize, checkboxSize);
-    doc.text("TERM1 FEE PAID", startX + checkboxSize + 2, y);
-    y += 8;
+    // --- Payment Term with dynamic checkboxes ---
+doc.text("Payment Term:", 10, y);
+const checkboxSize = 5;
+let startX = 10 + doc.getTextWidth("Payment Term: ") + 5;
+
+// FULL-TERM PAID checkbox
+  doc.rect(startX, y - 5, checkboxSize, checkboxSize);
+  if (candidate.paymentTerm === 'Full Term') {
+    // draw a checkmark inside the box
+    doc.text('X', startX + 1, y);
+  }
+  doc.text("FULL-TERM PAID", startX + checkboxSize + 2, y);
+
+  // TERM1 FEE PAID checkbox
+  startX += checkboxSize + 2 + doc.getTextWidth("FULL-TERM PAID") + 10;
+  doc.rect(startX, y - 5, checkboxSize, checkboxSize);
+  if (candidate.paymentTerm === 'Term 1') {
+    doc.text('X', startX + 1, y);
+  }
+  doc.text("TERM1 FEE PAID", startX + checkboxSize + 2, y);
+
+  y += 8;
+
   
     // Additional counselor details.
     doc.text("Term 2 Payment Date: ………………………………    Communication Score: ………………", 10, y);
@@ -307,7 +318,7 @@ const CandidatesList = () => {
                     <td>{i + 1}</td>
                     <td>{c.userId}</td>
                     <td>{c.candidateName}</td>
-                    <td>{c.candidateDegree} – {c.candidateCourseName}</td>
+                    <td>{c.candidateDegree} – {c.programme}</td>
                     <td>{c.college}</td>
                     <td>{c.coursesEnquired}</td>
                     <td>{new Date(c.dateOfVisit).toLocaleDateString()}</td>
@@ -331,9 +342,9 @@ const CandidatesList = () => {
                         onChange={e => handleFieldChange(c._id, 'paymentTerm', e.target.value)}
                       >
                         <option value="">Select</option>
-                        <option value="Full term fee paid">Full term fee paid</option>
-                        <option value="Term 1 Paid">Term 1 Paid</option>
-                        <option value="Term 2 Paid">Term 2 Paid</option>
+                        <option value="Full term">Full term fee paid</option>
+                        <option value="Term 1">Term 1 Paid</option>
+                        <option value="Term 2">Term 2 Paid</option>
                       </SelectField>
                     </td>
                     <td>

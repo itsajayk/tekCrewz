@@ -8,19 +8,30 @@ import Cropper from 'react-easy-crop';
 import getCroppedImg from '../Helper/cropImage';
 import SignaturePad from "react-signature-canvas";
 
-// In development this will be proxied to http://localhost:5000
+// Using environment variables for API base URL
 const API_BASE_URL = 'https://tekcrewz.onrender.com';
 
 const AddCandidate = () => {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    userId: '', candidateName: '', college: '',
-    candidateDegree: '', candidateCourseName: '',
-    programme: '', marksType: '', score: '',
-    scholarshipSecured: '', mobile: '', parentMobile: '',
-    email: '', coursesEnquired: '', dateOfVisit: '',
-    paymentTerm: '', communicationScore: '', remarks: ''
+    userId: "",
+    candidateName: "",
+    college: "",
+    candidateDegree: "",
+    candidateCourseName: "",
+    programme: "",
+    marksType: "",
+    score: "",
+    scholarshipSecured: "",
+    mobile: "",
+    parentMobile: "",
+    email: "",
+    coursesEnquired: "",
+    dateOfVisit: "",
+    paymentTerm: "",
+    communicationScore: "",
+    remarks: "",
   });
 
   const [candidatePic, setCandidatePic] = useState(null);
@@ -151,7 +162,7 @@ const AddCandidate = () => {
         data.append('signature', signatureText);
       }
 
-      const res = await axios.post(`${API_BASE_URL}/api/referrals`, data);
+      const res = await axios.post(`${API_BASE_URL}/api/candidates`, data);
       setSuccessMessage(res.data.message);
 
       setFormData({
@@ -257,7 +268,7 @@ const AddCandidate = () => {
                     value="CGPA"
                     checked={formData.marksType === "CGPA"}
                     onChange={handleChange}
-                  /> CGPA
+                  />CGPA
                 </label>
                 <label>
                   <input
@@ -266,7 +277,7 @@ const AddCandidate = () => {
                     value="Percentage"
                     checked={formData.marksType === "Percentage"}
                     onChange={handleChange}
-                  /> Percentage
+                  />Percentage
                 </label>
               </RadioGroup>
               {errors.marksType && <ErrorText>{errors.marksType}</ErrorText>}
