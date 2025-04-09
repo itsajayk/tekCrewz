@@ -210,7 +210,7 @@ const FixedWhatsapp = styled.a`
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background:  rgb(0, 255, 42);
+  background:rgb(4, 250, 94);
   display: flex;
   justify-content: center;
   align-items: center;
