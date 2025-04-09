@@ -14,6 +14,7 @@ const app = express();
 // allow both production and local dev origins
 const allowedOrigins = [
   'https://tekcrewz.com',
+  'https://tekcrewz.com',
   'http://localhost:3000'
 ];
 
