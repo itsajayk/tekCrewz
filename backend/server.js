@@ -1,4 +1,3 @@
-// server.js
 require('dotenv').config();
 
 const express    = require('express');
@@ -10,14 +9,24 @@ const multer     = require('multer');
 
 const app = express();
 
-// 1) CORS
-const allowedOrigins = [
-  'http://localhost:3000',
-  'https://tekcrewz.com',
-  'https://www.tekcrewz.com'
-];
-app.use(cors({ origin: allowedOrigins, credentials: true }));
-app.options('*', cors({ origin: allowedOrigins, credentials: true }));
+// 0) Universal CORS headers for all responses
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const whitelist = [
+    'http://localhost:3000',
+    'https://tekcrewz.com',
+    'https://www.tekcrewz.com'
+  ];
+  if (whitelist.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  }
+  next();
+});
+
+// 1) Preflight
+app.options('*', (req, res) => res.sendStatus(204));
 
 // 2) Body parsers
 app.use(express.json());
@@ -43,40 +52,32 @@ if (!process.env.CLOUDINARY_CLOUD_NAME ||
   console.error('⚠️ Missing Cloudinary environment variables!');
 }
 
-// 5) Multer + CloudinaryStorage + fileFilter + limits
+// 5) Multer + CloudinaryStorage
 const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => {
     try {
-      // 5a) Determine resource_type
       const isPdf = file.mimetype === 'application/pdf';
       const resource_type = isPdf ? 'raw' : 'image';
-
-      // 5b) Sanitize public_id: strip extension, replace non-word chars
       const baseName = file.originalname
         .replace(/\.[^/.]+$/, '')
         .replace(/[^\w\-]+/g, '-');
-
       const public_id = `${Date.now()}-${baseName}`;
       console.log(`📤 Uploading “${file.originalname}” as ${resource_type}, public_id=${public_id}`);
-
       return { folder: 'candidates', resource_type, public_id };
     } catch (e) {
       console.error('⚠️ CloudinaryStorage params error, falling back to auto:', e);
-      // fallback
       return { folder: 'candidates', resource_type: 'auto', public_id: `${Date.now()}` };
     }
   }
 });
-
 const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
-    // only allow images and PDFs
     if (/image\/|application\/pdf/.test(file.mimetype)) cb(null, true);
     else cb(new Error('Unsupported file type: ' + file.mimetype));
   },
-  limits: { fileSize: 5 * 1024 * 1024 } // 5 MB max
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 });
 
 // 6) Candidate schema & model
@@ -107,7 +108,6 @@ const candidateSchema = new mongoose.Schema({
   status:             { type: String, default: 'Registered' },
   role:               { type: String, default: 'student' }
 }, { timestamps: true });
-
 const Candidate = mongoose.model('Candidate', candidateSchema);
 
 // 7) POST /api/candidates
@@ -128,18 +128,15 @@ app.post(
   },
   async (req, res) => {
     try {
-      // Cast numeric fields
       ['score','communicationScore','paidAmount'].forEach(key => {
         if (req.body[key] != null) req.body[key] = Number(req.body[key]);
       });
-
       const newCandidate = new Candidate({
         ...req.body,
         candidatePic:  req.files.candidatePic?.[0]?.path,
         markStatement: req.files.markStatement?.[0]?.path,
         signature:     req.files.signature?.[0]?.path
       });
-
       await newCandidate.save();
       res.status(201).json({ message: 'Candidate saved', candidate: newCandidate });
     } catch (err) {
@@ -148,6 +145,7 @@ app.post(
     }
   }
 );
+
 
 // 8) GET /api/candidates
 app.get('/api/candidates', async (req, res) => {
