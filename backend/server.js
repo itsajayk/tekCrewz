@@ -23,7 +23,7 @@ app.options('*', cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 3) MongoDB connection
+// 3) MongoDB
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
@@ -31,7 +31,7 @@ mongoose.connect(process.env.MONGODB_URI, {
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// 4) Cloudinary config
+// 4) Cloudinary
 cloudinary.config({
   cloud_name:   process.env.CLOUDINARY_CLOUD_NAME,
   api_key:      process.env.CLOUDINARY_API_KEY,
@@ -43,31 +43,41 @@ if (!process.env.CLOUDINARY_CLOUD_NAME ||
   console.error('⚠️ Missing Cloudinary environment variables!');
 }
 
-// 5) Multer + CloudinaryStorage
+// 5) Multer + CloudinaryStorage + fileFilter + limits
 const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => {
-    // Determine resource_type
-    const isPdf = file.mimetype === 'application/pdf';
-    const resource_type = isPdf ? 'raw' : 'image';
+    try {
+      // 5a) Determine resource_type
+      const isPdf = file.mimetype === 'application/pdf';
+      const resource_type = isPdf ? 'raw' : 'image';
 
-    // Sanitize public_id: remove extension, replace non-word chars with hyphens
-    const baseName = file.originalname
-      .replace(/\.[^/.]+$/, '')
-      .replace(/[^\w\-]+/g, '-');
+      // 5b) Sanitize public_id: strip extension, replace non-word chars
+      const baseName = file.originalname
+        .replace(/\.[^/.]+$/, '')
+        .replace(/[^\w\-]+/g, '-');
 
-    const public_id = `${Date.now()}-${baseName}`;
+      const public_id = `${Date.now()}-${baseName}`;
+      console.log(`📤 Uploading “${file.originalname}” as ${resource_type}, public_id=${public_id}`);
 
-    console.log(`📤 Uploading “${file.originalname}” as ${resource_type}, public_id=${public_id}`);
-
-    return {
-      folder: 'candidates',
-      resource_type,
-      public_id
-    };
+      return { folder: 'candidates', resource_type, public_id };
+    } catch (e) {
+      console.error('⚠️ CloudinaryStorage params error, falling back to auto:', e);
+      // fallback
+      return { folder: 'candidates', resource_type: 'auto', public_id: `${Date.now()}` };
+    }
   }
 });
-const upload = multer({ storage });
+
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    // only allow images and PDFs
+    if (/image\/|application\/pdf/.test(file.mimetype)) cb(null, true);
+    else cb(new Error('Unsupported file type: ' + file.mimetype));
+  },
+  limits: { fileSize: 5 * 1024 * 1024 } // 5 MB max
+});
 
 // 6) Candidate schema & model
 const candidateSchema = new mongoose.Schema({
@@ -77,7 +87,7 @@ const candidateSchema = new mongoose.Schema({
   candidateDegree:    { type: String, required: true },
   programme:          { type: String },
   candidateCourseName:{ type: String },
-  marksType:          { type: String, enum: ['CGPA', 'Percentage'], required: true },
+  marksType:          { type: String, enum: ['CGPA','Percentage'], required: true },
   score:              { type: Number, default: 0 },
   scholarshipSecured: { type: String },
   mobile:             { type: String, required: true },
