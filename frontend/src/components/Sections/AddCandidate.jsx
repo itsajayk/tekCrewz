@@ -7,28 +7,19 @@ import { useNavigate } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
 import getCroppedImg from '../Helper/cropImage';
 
-// Set via .env or fallback
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://tekcrewz.onrender.com';
+const API_BASE_URL = 'https://tekcrewz.onrender.com';
 
 const AddCandidate = () => {
   const navigate = useNavigate();
-
-  const [formData, setFormData] = useState({
-    userId:'', candidateName:'', college:'', candidateDegree:'', candidateCourseName:'',
-    programme:'', marksType:'', score:'', scholarshipSecured:'', mobile:'', parentMobile:'',
-    email:'', coursesEnquired:'', dateOfVisit:'', paymentTerm:'', communicationScore:'', remarks:''
-  });
-
+  const [formData, setFormData] = useState({ userId:'', candidateName:'', college:'', candidateDegree:'', candidateCourseName:'', programme:'', marksType:'', score:'', scholarshipSecured:'', mobile:'', parentMobile:'', email:'', coursesEnquired:'', dateOfVisit:'', paymentTerm:'', communicationScore:'', remarks:'' });
   const [candidatePic, setCandidatePic] = useState(null);
   const [croppedCandidatePic, setCroppedCandidatePic] = useState(null);
   const [markStatement, setMarkStatement] = useState(null);
   const [signatureFile, setSignatureFile] = useState(null);
-
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [showCropper, setShowCropper] = useState(false);
-
   const [programmeOptions, setProgrammeOptions] = useState([]);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -49,37 +40,11 @@ const AddCandidate = () => {
   }, [formData.candidateDegree]);
 
   const handleChange = e => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-
-  const handleCandidatePicChange = e => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setCandidatePic(URL.createObjectURL(file));
-      setShowCropper(true);
-      setCroppedCandidatePic(null);
-    }
-  };
-
-  const handleFileChange = (e, setter) => {
-    const file = e.target.files?.[0];
-    if (file) setter(file);
-  };
-
+  const handleCandidatePicChange = e => { const file = e.target.files?.[0]; if (file) { setCandidatePic(URL.createObjectURL(file)); setShowCropper(true); setCroppedCandidatePic(null); }};
+  const handleFileChange = (e, setter) => { const file = e.target.files?.[0]; if (file) setter(file); };
   const onCropComplete = useCallback((_, pixels) => setCroppedAreaPixels(pixels), []);
-
-  const handleCropImage = async () => {
-    try {
-      const { fileUrl } = await getCroppedImg(candidatePic, croppedAreaPixels, 'candidatePic.jpg');
-      setCroppedCandidatePic(fileUrl);
-      setShowCropper(false);
-    } catch (e) { console.error(e); }
-  };
-
-  const removeCandidatePic = () => {
-    setCandidatePic(null);
-    setCroppedCandidatePic(null);
-    setShowCropper(false);
-    candidatePicRef.current.value = '';
-  };
+  const handleCropImage = async () => { try { const { fileUrl } = await getCroppedImg(candidatePic, croppedAreaPixels, 'candidatePic.jpg'); setCroppedCandidatePic(fileUrl); setShowCropper(false); } catch (e) { console.error(e); }};
+  const removeCandidatePic = () => { setCandidatePic(null); setCroppedCandidatePic(null); setShowCropper(false); candidatePicRef.current.value = ''; };
   const removeMarkStatement = () => { setMarkStatement(null); markStatementRef.current.value = ''; };
   const removeSignature = () => { setSignatureFile(null); signatureRef.current.value = ''; };
 
@@ -95,28 +60,18 @@ const AddCandidate = () => {
     e.preventDefault();
     if (!validate()) return;
     setIsLoading(true);
-
     try {
       const data = new FormData();
       Object.entries(formData).forEach(([k,v]) => data.append(k, v));
-
-      if (croppedCandidatePic) {
-        const resp = await fetch(croppedCandidatePic);
-        const blob = await resp.blob();
-        data.append('candidatePic', blob, 'candidatePic.jpg');
-      }
+      if (croppedCandidatePic) { const resp = await fetch(croppedCandidatePic); const blob = await resp.blob(); data.append('candidatePic', blob, 'candidatePic.jpg'); }
       if (markStatement) data.append('markStatement', markStatement, markStatement.name);
       if (signatureFile) data.append('signature', signatureFile, signatureFile.name);
-
-      // Debug: log form data keys
       for (let pair of data.entries()) console.log(pair[0], pair[1]);
-
       const res = await axios.post(
         `${API_BASE_URL}/api/candidates`,
         data,
         { headers: { 'Content-Type': 'multipart/form-data' } }
       );
-
       setSuccessMessage(res.data.message);
       setFormData({ userId:'',candidateName:'',college:'',candidateDegree:'',candidateCourseName:'',programme:'',marksType:'',score:'',scholarshipSecured:'',mobile:'',parentMobile:'',email:'',coursesEnquired:'',dateOfVisit:'',paymentTerm:'',communicationScore:'',remarks:'' });
       removeCandidatePic(); removeMarkStatement(); removeSignature();
@@ -127,7 +82,8 @@ const AddCandidate = () => {
       setIsLoading(false);
     }
   };
-  
+
+
   return (
     <>
       <Wrapper>

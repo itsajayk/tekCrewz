@@ -1,11 +1,12 @@
+// server.js
 require('dotenv').config();
 
-const express = require('express');
-const cors = require('cors');
-const mongoose = require('mongoose');
+const express    = require('express');
+const cors       = require('cors');
+const mongoose   = require('mongoose');
 const { v2: cloudinary } = require('cloudinary');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const multer = require('multer');
+const multer     = require('multer');
 
 const app = express();
 
@@ -32,9 +33,9 @@ mongoose.connect(process.env.MONGODB_URI, {
 
 // 4) Cloudinary config
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name:   process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:      process.env.CLOUDINARY_API_KEY,
+  api_secret:   process.env.CLOUDINARY_API_SECRET,
 });
 if (!process.env.CLOUDINARY_CLOUD_NAME ||
     !process.env.CLOUDINARY_API_KEY ||
@@ -46,16 +47,23 @@ if (!process.env.CLOUDINARY_CLOUD_NAME ||
 const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => {
-    // PDFs as raw, images as image
+    // Determine resource_type
     const isPdf = file.mimetype === 'application/pdf';
     const resource_type = isPdf ? 'raw' : 'image';
+
+    // Sanitize public_id: remove extension, replace non-word chars with hyphens
     const baseName = file.originalname
       .replace(/\.[^/.]+$/, '')
-      .replace(/\s+/g, '-');
+      .replace(/[^\w\-]+/g, '-');
+
+    const public_id = `${Date.now()}-${baseName}`;
+
+    console.log(`📤 Uploading “${file.originalname}” as ${resource_type}, public_id=${public_id}`);
+
     return {
       folder: 'candidates',
       resource_type,
-      public_id: `${Date.now()}-${baseName}`
+      public_id
     };
   }
 });
@@ -89,6 +97,7 @@ const candidateSchema = new mongoose.Schema({
   status:             { type: String, default: 'Registered' },
   role:               { type: String, default: 'student' }
 }, { timestamps: true });
+
 const Candidate = mongoose.model('Candidate', candidateSchema);
 
 // 7) POST /api/candidates
