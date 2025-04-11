@@ -1,11 +1,11 @@
 require('dotenv').config();
 
-const express    = require('express');
-const cors       = require('cors');
-const mongoose   = require('mongoose');
+const express = require('express');
+const cors = require('cors');
+const mongoose = require('mongoose');
 const { v2: cloudinary } = require('cloudinary');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const multer     = require('multer');
+const multer = require('multer');
 
 const app = express();
 
@@ -27,14 +27,14 @@ mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
-.then(() => console.log('MongoDB connected'))
-.catch(err => console.error('MongoDB connection error:', err));
+  .then(() => console.log('MongoDB connected'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
 // 4) Cloudinary config
 cloudinary.config({
-  cloud_name:   process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:      process.env.CLOUDINARY_API_KEY,
-  api_secret:   process.env.CLOUDINARY_API_SECRET,
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 if (!process.env.CLOUDINARY_CLOUD_NAME ||
     !process.env.CLOUDINARY_API_KEY ||
@@ -45,15 +45,18 @@ if (!process.env.CLOUDINARY_CLOUD_NAME ||
 // 5) Multer + CloudinaryStorage
 const storage = new CloudinaryStorage({
   cloudinary,
-  params: {
-    folder: 'candidates',
-    resource_type: 'auto',
-    public_id: (req, file) => {
-      const name = file.originalname
-        .replace(/\.[^/.]+$/, '')
-        .replace(/\s+/g, '-');
-      return `${Date.now()}-${name}`;
-    }
+  params: async (req, file) => {
+    // PDFs as raw, images as image
+    const isPdf = file.mimetype === 'application/pdf';
+    const resource_type = isPdf ? 'raw' : 'image';
+    const baseName = file.originalname
+      .replace(/\.[^/.]+$/, '')
+      .replace(/\s+/g, '-');
+    return {
+      folder: 'candidates',
+      resource_type,
+      public_id: `${Date.now()}-${baseName}`
+    };
   }
 });
 const upload = multer({ storage });
@@ -86,7 +89,6 @@ const candidateSchema = new mongoose.Schema({
   status:             { type: String, default: 'Registered' },
   role:               { type: String, default: 'student' }
 }, { timestamps: true });
-
 const Candidate = mongoose.model('Candidate', candidateSchema);
 
 // 7) POST /api/candidates
@@ -99,7 +101,7 @@ app.post(
       { name: 'signature',     maxCount: 1 }
     ])(req, res, err => {
       if (err) {
-        console.error('Multer/Cloudinary error:', err);
+        console.error('🛑 Multer/Cloudinary upload error:', err);
         return res.status(400).json({ error: err.message });
       }
       next();

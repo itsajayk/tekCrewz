@@ -14,9 +14,9 @@ const AddCandidate = () => {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    userId: '', candidateName: '', college: '', candidateDegree: '', candidateCourseName: '',
-    programme: '', marksType: '', score: '', scholarshipSecured: '', mobile: '', parentMobile: '',
-    email: '', coursesEnquired: '', dateOfVisit: '', paymentTerm: '', communicationScore: '', remarks: ''
+    userId:'', candidateName:'', college:'', candidateDegree:'', candidateCourseName:'',
+    programme:'', marksType:'', score:'', scholarshipSecured:'', mobile:'', parentMobile:'',
+    email:'', coursesEnquired:'', dateOfVisit:'', paymentTerm:'', communicationScore:'', remarks:''
   });
 
   const [candidatePic, setCandidatePic] = useState(null);
@@ -45,9 +45,7 @@ const AddCandidate = () => {
     else if (deg === 'PG') opts = ['ME','M.Tech','M.Phil','M.A','M.C.A','M.Sc.','M.S.W','M.B.A','M.F.A.'];
     else if (deg === 'Integrated') opts = ['M.Sc','BBA + MBA','BA + Bed','BA+LLB'];
     setProgrammeOptions(opts);
-    if (!opts.includes(formData.programme)) {
-      setFormData(prev => ({ ...prev, programme: '' }));
-    }
+    if (!opts.includes(formData.programme)) setFormData(prev => ({ ...prev, programme: '' }));
   }, [formData.candidateDegree]);
 
   const handleChange = e => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -66,18 +64,14 @@ const AddCandidate = () => {
     if (file) setter(file);
   };
 
-  const onCropComplete = useCallback((_, pixels) => {
-    setCroppedAreaPixels(pixels);
-  }, []);
+  const onCropComplete = useCallback((_, pixels) => setCroppedAreaPixels(pixels), []);
 
   const handleCropImage = async () => {
     try {
       const { fileUrl } = await getCroppedImg(candidatePic, croppedAreaPixels, 'candidatePic.jpg');
       setCroppedCandidatePic(fileUrl);
       setShowCropper(false);
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const removeCandidatePic = () => {
@@ -86,19 +80,13 @@ const AddCandidate = () => {
     setShowCropper(false);
     candidatePicRef.current.value = '';
   };
-  const removeMarkStatement = () => {
-    setMarkStatement(null);
-    markStatementRef.current.value = '';
-  };
-  const removeSignature = () => {
-    setSignatureFile(null);
-    signatureRef.current.value = '';
-  };
+  const removeMarkStatement = () => { setMarkStatement(null); markStatementRef.current.value = ''; };
+  const removeSignature = () => { setSignatureFile(null); signatureRef.current.value = ''; };
 
   const validate = () => {
     const temp = {};
     ['userId','candidateName','college','candidateDegree','programme','marksType','score','mobile','parentMobile','email','coursesEnquired','dateOfVisit','paymentTerm','communicationScore']
-      .forEach(field => { if (!formData[field]) temp[field] = 'Required.'; });
+      .forEach(f => { if (!formData[f]) temp[f] = 'Required.'; });
     setErrors(temp);
     return Object.keys(temp).length === 0;
   };
@@ -113,30 +101,33 @@ const AddCandidate = () => {
       Object.entries(formData).forEach(([k,v]) => data.append(k, v));
 
       if (croppedCandidatePic) {
-        const res = await fetch(croppedCandidatePic);
-        const blob = await res.blob();
+        const resp = await fetch(croppedCandidatePic);
+        const blob = await resp.blob();
         data.append('candidatePic', blob, 'candidatePic.jpg');
       }
-      if (markStatement) data.append('markStatement', markStatement);
-      if (signatureFile) data.append('signature', signatureFile);
+      if (markStatement) data.append('markStatement', markStatement, markStatement.name);
+      if (signatureFile) data.append('signature', signatureFile, signatureFile.name);
 
-      const res = await axios.post(`${API_BASE_URL}/api/candidates`, data);
+      // Debug: log form data keys
+      for (let pair of data.entries()) console.log(pair[0], pair[1]);
+
+      const res = await axios.post(
+        `${API_BASE_URL}/api/candidates`,
+        data,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+
       setSuccessMessage(res.data.message);
-
-      setFormData({
-        userId:'',candidateName:'',college:'',candidateDegree:'',candidateCourseName:'',programme:'',marksType:'',score:'',scholarshipSecured:'',mobile:'',parentMobile:'',email:'',coursesEnquired:'',dateOfVisit:'',paymentTerm:'',communicationScore:'',remarks:''
-      });
-      removeCandidatePic();
-      removeMarkStatement();
-      removeSignature();
+      setFormData({ userId:'',candidateName:'',college:'',candidateDegree:'',candidateCourseName:'',programme:'',marksType:'',score:'',scholarshipSecured:'',mobile:'',parentMobile:'',email:'',coursesEnquired:'',dateOfVisit:'',paymentTerm:'',communicationScore:'',remarks:'' });
+      removeCandidatePic(); removeMarkStatement(); removeSignature();
     } catch (err) {
-      console.error('Submit error:', err);
-      alert(err.response?.data?.error || 'Network error');
+      console.error('Submit error response:', err.response?.data, err.message);
+      alert(err.response?.data?.error || 'Network or server error');
     } finally {
       setIsLoading(false);
     }
   };
-
+  
   return (
     <>
       <Wrapper>
