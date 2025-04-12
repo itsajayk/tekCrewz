@@ -484,7 +484,7 @@ export default function AddCandidate() {
           {successMessage && (
             <SuccessModalOverlay>
               <SuccessModalContent>
-                <SuccessTitle>{successMessage}</SuccessTitle>
+                <SuccessTitle>{successMessage} <i className="fa-solid fa-circle-check fa-bounce" style={{ color: "#14a800" }}></i></SuccessTitle>
                 <ModalCloseButton onClick={() => setSuccessMessage('')}>Close</ModalCloseButton>
               </SuccessModalContent>
             </SuccessModalOverlay>

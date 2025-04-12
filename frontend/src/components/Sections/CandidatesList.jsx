@@ -6,6 +6,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 import TopNavbar from '../Nav/TopNavbar';
 import Footer from '../Sections/Footer';
 import { jsPDF } from "jspdf";
+import { createGlobalStyle } from 'styled-components';
 
 // Utility functions
 function getDownloadUrl(fileUrl) {
@@ -204,7 +205,14 @@ let startX = 10 + doc.getTextWidth("Payment Term: ") + 5;
   if (candidate.paymentTerm === 'Term 1') {
     doc.text('X', startX + 1, y);
   }
-  doc.text("TERM1 FEE PAID", startX + checkboxSize + 2, y);
+  doc.text("TERM-1 FEE PAID", startX + checkboxSize + 2, y);
+
+  startX += checkboxSize + 2 + doc.getTextWidth("Term 2 PAID") + 20;
+  doc.rect(startX, y - 5, checkboxSize, checkboxSize);
+  if (candidate.paymentTerm === 'Term 2') {
+    doc.text('X', startX + 1, y);
+  }
+  doc.text("TERM-2 FEE PAID", startX + checkboxSize + 2, y);
 
   y += 8;
 
@@ -258,6 +266,7 @@ let startX = 10 + doc.getTextWidth("Payment Term: ") + 5;
   return (
     <Wrapper>
       <TopNavbar />
+      <DatepickerOverrides />
       <Content>
         <Filters>
           <FilterGroup>
@@ -307,7 +316,7 @@ let startX = 10 + doc.getTextWidth("Payment Term: ") + 5;
                   <th>Payment Term</th>
                   <th>Status</th>
                   <th>Course Registered</th>
-                  <th>Remarks</th>
+                  {/* <th>Remarks</th> */}
                   <th>Marksheet</th>
                   <th>Actions</th>
                 </tr>
@@ -367,15 +376,20 @@ let startX = 10 + doc.getTextWidth("Payment Term: ") + 5;
                         <option value="">Select Course</option>
                         <option value="Full Stack">Full Stack</option>
                         <option value="Python">Python</option>
-                        <option value="Digital Marketing">Digital Marketing</option>
+                        <option value="SEO & Digital Marketing">SEO & Digital Marketing</option>
+                        <option value="Graphic Designing"> Graphic Designing</option>
+                        <option value="Software Testing">Software Testing</option>
+                        <option value="Business Analyst">Business Analyst</option>
+                        <option value="PHP with Laravel">PHP with Laravel</option>
+                        <option value="Dot Net">Dot Net</option>
                       </SelectField>
                     </td>
-                    <td>
+                    {/* <td>
                       <TextAreaField
                         value={editedCandidates[c._id]?.remarks || ''}
                         onChange={e => handleFieldChange(c._id, 'remarks', e.target.value)}
                       />
-                    </td>
+                    </td> */}
                     <td>
                       {c.markStatement ? (
                         <PDFCard>
@@ -487,6 +501,7 @@ const DateButton = styled.button`
 const TableWrapper = styled.div`
   width: 100%;
   overflow-x: auto;
+  overflow-y: visible;       /* ← allow vertical overflow */
   margin-top: 20px;
 `;
 
@@ -548,6 +563,12 @@ const SelectFilter = styled.select`
   font-size: 16px;
   border: 1px solid #ccc;
   border-radius: 4px;
+`;
+
+const DatepickerOverrides = createGlobalStyle`
+  .react-datepicker-popper {
+    z-index: 9999 !important;
+  }
 `;
 
 const SortButton = styled.button`
