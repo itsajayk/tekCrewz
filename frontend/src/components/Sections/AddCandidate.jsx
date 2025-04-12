@@ -71,7 +71,7 @@ const AddCandidate = () => {
       const res = await axios.post(
         `${API_BASE_URL}/api/candidates`,
         data,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
+        {withCredentials: true}
       );
       setSuccessMessage(res.data.message);
       setFormData({ userId:'',candidateName:'',college:'',candidateDegree:'',candidateCourseName:'',programme:'',marksType:'',score:'',scholarshipSecured:'',mobile:'',parentMobile:'',email:'',coursesEnquired:'',dateOfVisit:'',paymentTerm:'',communicationScore:'',remarks:'' });
