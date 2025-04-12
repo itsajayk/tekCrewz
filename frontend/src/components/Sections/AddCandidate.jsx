@@ -8,19 +8,38 @@ import Cropper from 'react-easy-crop';
 import getCroppedImg from '../Helper/cropImage';
 
 const API_BASE_URL = 'https://tekcrewz.onrender.com';
-// const API_BASE_URL = 'http://localhost:5000';
 
-const AddCandidate = () => {
+export default function AddCandidate() {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({ userId:'', candidateName:'', college:'', candidateDegree:'', candidateCourseName:'', programme:'', marksType:'', score:'', scholarshipSecured:'', mobile:'', parentMobile:'', email:'', coursesEnquired:'', dateOfVisit:'', paymentTerm:'', communicationScore:'', remarks:'' });
+  const [formData, setFormData] = useState({
+    userId: '',
+    candidateName: '',
+    college: '',
+    candidateDegree: '',
+    candidateCourseName: '',
+    programme: '',
+    marksType: '',
+    score: '',
+    scholarshipSecured: '',
+    mobile: '',
+    parentMobile: '',
+    email: '',
+    coursesEnquired: '',
+    dateOfVisit: '',
+    paymentTerm: '',
+    communicationScore: ''
+  });
+
   const [candidatePic, setCandidatePic] = useState(null);
   const [croppedCandidatePic, setCroppedCandidatePic] = useState(null);
   const [markStatement, setMarkStatement] = useState(null);
   const [signatureFile, setSignatureFile] = useState(null);
+
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [showCropper, setShowCropper] = useState(false);
+
   const [programmeOptions, setProgrammeOptions] = useState([]);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -37,22 +56,71 @@ const AddCandidate = () => {
     else if (deg === 'PG') opts = ['ME','M.Tech','M.Phil','M.A','M.C.A','M.Sc.','M.S.W','M.B.A','M.F.A.'];
     else if (deg === 'Integrated') opts = ['M.Sc','BBA + MBA','BA + Bed','BA+LLB'];
     setProgrammeOptions(opts);
-    if (!opts.includes(formData.programme)) setFormData(prev => ({ ...prev, programme: '' }));
+    if (!opts.includes(formData.programme)) {
+      setFormData(prev => ({ ...prev, programme: '' }));
+    }
   }, [formData.candidateDegree]);
 
-  const handleChange = e => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-  const handleCandidatePicChange = e => { const file = e.target.files?.[0]; if (file) { setCandidatePic(URL.createObjectURL(file)); setShowCropper(true); setCroppedCandidatePic(null); }};
-  const handleFileChange = (e, setter) => { const file = e.target.files?.[0]; if (file) setter(file); };
-  const onCropComplete = useCallback((_, pixels) => setCroppedAreaPixels(pixels), []);
-  const handleCropImage = async () => { try { const { fileUrl } = await getCroppedImg(candidatePic, croppedAreaPixels, 'candidatePic.jpg'); setCroppedCandidatePic(fileUrl); setShowCropper(false); } catch (e) { console.error(e); }};
-  const removeCandidatePic = () => { setCandidatePic(null); setCroppedCandidatePic(null); setShowCropper(false); candidatePicRef.current.value = ''; };
-  const removeMarkStatement = () => { setMarkStatement(null); markStatementRef.current.value = ''; };
-  const removeSignature = () => { setSignatureFile(null); signatureRef.current.value = ''; };
+  const handleChange = e =>
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+
+  const handleCandidatePicChange = e => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setCandidatePic(URL.createObjectURL(file));
+      setShowCropper(true);
+      setCroppedCandidatePic(null);
+    }
+  };
+
+  const handleFileChange = (e, setter) => {
+    const file = e.target.files?.[0];
+    if (file) setter(file);
+  };
+
+  const onCropComplete = useCallback((_, pixels) => {
+    setCroppedAreaPixels(pixels);
+  }, []);
+
+  const handleCropImage = async () => {
+    try {
+      const { fileUrl } = await getCroppedImg(
+        candidatePic,
+        croppedAreaPixels,
+        'candidatePic.jpg'
+      );
+      setCroppedCandidatePic(fileUrl);
+      setShowCropper(false);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const removeCandidatePic = () => {
+    setCandidatePic(null);
+    setCroppedCandidatePic(null);
+    setShowCropper(false);
+    candidatePicRef.current.value = '';
+  };
+  const removeMarkStatement = () => {
+    setMarkStatement(null);
+    markStatementRef.current.value = '';
+  };
+  const removeSignature = () => {
+    setSignatureFile(null);
+    signatureRef.current.value = '';
+  };
 
   const validate = () => {
     const temp = {};
-    ['userId','candidateName','college','candidateDegree','programme','marksType','score','mobile','parentMobile','email','coursesEnquired','dateOfVisit','paymentTerm','communicationScore']
-      .forEach(f => { if (!formData[f]) temp[f] = 'Required.'; });
+    [
+      'userId','candidateName','college','candidateDegree',
+      'programme','marksType','score','mobile','parentMobile',
+      'email','coursesEnquired','dateOfVisit','paymentTerm',
+      'communicationScore'
+    ].forEach(f => {
+      if (!formData[f]) temp[f] = 'Required.';
+    });
     setErrors(temp);
     return Object.keys(temp).length === 0;
   };
@@ -61,29 +129,50 @@ const AddCandidate = () => {
     e.preventDefault();
     if (!validate()) return;
     setIsLoading(true);
+
     try {
       const data = new FormData();
-      Object.entries(formData).forEach(([k,v]) => data.append(k, v));
-      if (croppedCandidatePic) { const resp = await fetch(croppedCandidatePic); const blob = await resp.blob(); data.append('candidatePic', blob, 'candidatePic.jpg'); }
-      if (markStatement) data.append('markStatement', markStatement, markStatement.name);
-      if (signatureFile) data.append('signature', signatureFile, signatureFile.name);
-      for (let pair of data.entries()) console.log(pair[0], pair[1]);
+      Object.entries(formData).forEach(([k, v]) => data.append(k, v));
+
+      if (croppedCandidatePic) {
+        const resp = await fetch(croppedCandidatePic);
+        const blob = await resp.blob();
+        data.append('candidatePic', blob, 'candidatePic.jpg');
+      }
+      if (markStatement) {
+        data.append('markStatement', markStatement, markStatement.name);
+      }
+      if (signatureFile) {
+        data.append('signature', signatureFile, signatureFile.name);
+      }
+
+      for (let pair of data.entries()) {
+        console.log(pair[0], pair[1]);
+      }
+
       const res = await axios.post(
         `${API_BASE_URL}/api/candidates`,
         data,
-        {withCredentials: true}
+        { withCredentials: true }
       );
+
       setSuccessMessage(res.data.message);
-      setFormData({ userId:'',candidateName:'',college:'',candidateDegree:'',candidateCourseName:'',programme:'',marksType:'',score:'',scholarshipSecured:'',mobile:'',parentMobile:'',email:'',coursesEnquired:'',dateOfVisit:'',paymentTerm:'',communicationScore:'',remarks:'' });
-      removeCandidatePic(); removeMarkStatement(); removeSignature();
+      setFormData({
+        userId:'', candidateName:'', college:'', candidateDegree:'',
+        candidateCourseName:'', programme:'', marksType:'', score:'',
+        scholarshipSecured:'', mobile:'', parentMobile:'', email:'',
+        coursesEnquired:'', dateOfVisit:'', paymentTerm:'', communicationScore:''
+      });
+      removeCandidatePic();
+      removeMarkStatement();
+      removeSignature();
     } catch (err) {
-      console.error('Submit error response:', err.response?.data, err.message);
+      // console.error('Submit error:', err.response?.data, err.message);
       alert(err.response?.data?.error || 'Network or server error');
     } finally {
       setIsLoading(false);
     }
   };
-
 
   return (
     <>
@@ -92,9 +181,10 @@ const AddCandidate = () => {
         <Content>
           <FormTitle>Add Candidate</FormTitle>
           <Form onSubmit={handleSubmit}>
-            {/* User selection */}
+
+            {/* User */}
             <InputGroup>
-              <Label>Select User (Admin/Referrer)</Label>
+              <Label>User</Label>
               <Select name="userId" value={formData.userId} onChange={handleChange}>
                 <option value="">Select User</option>
                 <option value="admin">Admin</option>
@@ -104,17 +194,31 @@ const AddCandidate = () => {
               {errors.userId && <ErrorText>{errors.userId}</ErrorText>}
             </InputGroup>
 
-            {/* Candidate Details */}
+            {/* Candidate Name */}
             <InputGroup>
               <Label>Candidate Name</Label>
-              <Input type="text" name="candidateName" value={formData.candidateName} onChange={handleChange} placeholder="Enter candidate's name" />
+              <Input
+                name="candidateName"
+                value={formData.candidateName}
+                onChange={handleChange}
+                placeholder="Enter candidate's name"
+              />
               {errors.candidateName && <ErrorText>{errors.candidateName}</ErrorText>}
             </InputGroup>
+
+            {/* College */}
             <InputGroup>
               <Label>College Name</Label>
-              <Input type="text" name="college" value={formData.college} onChange={handleChange} placeholder="Enter college name" />
+              <Input
+                name="college"
+                value={formData.college}
+                onChange={handleChange}
+                placeholder="Enter college name"
+              />
               {errors.college && <ErrorText>{errors.college}</ErrorText>}
             </InputGroup>
+
+            {/* Degree */}
             <InputGroup>
               <Label>Degree</Label>
               <Select name="candidateDegree" value={formData.candidateDegree} onChange={handleChange}>
@@ -125,64 +229,141 @@ const AddCandidate = () => {
               </Select>
               {errors.candidateDegree && <ErrorText>{errors.candidateDegree}</ErrorText>}
             </InputGroup>
+
+            {/* Programme */}
             <InputGroup>
               <Label>Programme</Label>
               <Select name="programme" value={formData.programme} onChange={handleChange}>
                 <option value="">Select Programme</option>
-                {programmeOptions.map((prog,i)=><option key={i} value={prog}>{prog}</option>)}
+                {programmeOptions.map((prog,i) => (
+                  <option key={i} value={prog}>{prog}</option>
+                ))}
               </Select>
               {errors.programme && <ErrorText>{errors.programme}</ErrorText>}
             </InputGroup>
+
+            {/* Course Name (opt) */}
             <InputGroup>
               <Label>Course Name (optional)</Label>
-              <Input type="text" name="candidateCourseName" value={formData.candidateCourseName} onChange={handleChange} placeholder="Enter course name" />
+              <Input
+                name="candidateCourseName"
+                value={formData.candidateCourseName}
+                onChange={handleChange}
+                placeholder="Enter course name"
+              />
             </InputGroup>
 
-            {/* Marks & Score */}
+            {/* Marks Type */}
             <InputGroup>
               <Label>Marks Secured (Type)</Label>
               <RadioGroup>
-                <label><input type="radio" name="marksType" value="CGPA" checked={formData.marksType==='CGPA'} onChange={handleChange}/>CGPA</label>
-                <label><input type="radio" name="marksType" value="Percentage" checked={formData.marksType==='Percentage'} onChange={handleChange}/>Percentage</label>
+                <label>
+                  <input
+                    type="radio"
+                    name="marksType"
+                    value="CGPA"
+                    checked={formData.marksType==='CGPA'}
+                    onChange={handleChange}
+                  /> CGPA
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="marksType"
+                    value="Percentage"
+                    checked={formData.marksType==='Percentage'}
+                    onChange={handleChange}
+                  /> Percentage
+                </label>
               </RadioGroup>
               {errors.marksType && <ErrorText>{errors.marksType}</ErrorText>}
             </InputGroup>
+
+            {/* Score */}
             <InputGroup>
               <Label>Score</Label>
-              <Input type="text" name="score" value={formData.score} onChange={handleChange} placeholder="Enter score" />
+              <Input
+                name="score"
+                value={formData.score}
+                onChange={handleChange}
+                placeholder="Enter score"
+              />
               {errors.score && <ErrorText>{errors.score}</ErrorText>}
             </InputGroup>
+
+            {/* Scholarship */}
             <InputGroup>
               <Label>Scholarship Secured</Label>
-              <Input type="text" name="scholarshipSecured" value={formData.scholarshipSecured} onChange={handleChange} placeholder="Enter scholarship details" />
+              <Input
+                name="scholarshipSecured"
+                value={formData.scholarshipSecured}
+                onChange={handleChange}
+                placeholder="Enter scholarship details"
+              />
             </InputGroup>
 
-            {/* Contact */}
+            {/* Mobile */}
             <InputGroup>
               <Label>Mobile Number</Label>
-              <Input type="text" name="mobile" value={formData.mobile} onChange={handleChange} placeholder="Enter mobile number" />
+              <Input
+                name="mobile"
+                value={formData.mobile}
+                onChange={handleChange}
+                placeholder="Enter mobile number"
+              />
               {errors.mobile && <ErrorText>{errors.mobile}</ErrorText>}
             </InputGroup>
+
+            {/* Parent Mobile */}
             <InputGroup>
               <Label>Parent Mobile Number</Label>
-              <Input type="text" name="parentMobile" value={formData.parentMobile} onChange={handleChange} placeholder="Enter parent's mobile number" />
+              <Input
+                name="parentMobile"
+                value={formData.parentMobile}
+                onChange={handleChange}
+                placeholder="Enter parent's mobile number"
+              />
               {errors.parentMobile && <ErrorText>{errors.parentMobile}</ErrorText>}
             </InputGroup>
+
+            {/* Email */}
             <InputGroup>
               <Label>Email</Label>
-              <Input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="Enter email" />
+              <Input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="Enter email"
+              />
               {errors.email && <ErrorText>{errors.email}</ErrorText>}
             </InputGroup>
+
+            {/* Courses Enquired */}
             <InputGroup>
               <Label>Courses Enquired</Label>
-              <Input type="text" name="coursesEnquired" value={formData.coursesEnquired} onChange={handleChange} placeholder="Enter courses enquired" />
+              <Input
+                name="coursesEnquired"
+                value={formData.coursesEnquired}
+                onChange={handleChange}
+                placeholder="Enter courses enquired"
+              />
               {errors.coursesEnquired && <ErrorText>{errors.coursesEnquired}</ErrorText>}
             </InputGroup>
+
+            {/* Date of Visit */}
             <InputGroup>
               <Label>Date of Visit</Label>
-              <Input type="date" name="dateOfVisit" value={formData.dateOfVisit} onChange={handleChange} />
+              <Input
+                type="date"
+                name="dateOfVisit"
+                value={formData.dateOfVisit}
+                onChange={handleChange}
+              />
               {errors.dateOfVisit && <ErrorText>{errors.dateOfVisit}</ErrorText>}
             </InputGroup>
+
+            {/* Payment Term */}
             <InputGroup>
               <Label>Payment Term</Label>
               <Select name="paymentTerm" value={formData.paymentTerm} onChange={handleChange}>
@@ -193,20 +374,31 @@ const AddCandidate = () => {
               </Select>
               {errors.paymentTerm && <ErrorText>{errors.paymentTerm}</ErrorText>}
             </InputGroup>
+
+            {/* Communication Score */}
             <InputGroup>
               <Label>Communication Score (out of 5)</Label>
-              <Input type="number" name="communicationScore" value={formData.communicationScore} onChange={handleChange} min="1" max="5" placeholder="Enter score" />
+              <Input
+                type="number"
+                name="communicationScore"
+                value={formData.communicationScore}
+                onChange={handleChange}
+                min="1"
+                max="5"
+                placeholder="Enter score"
+              />
               {errors.communicationScore && <ErrorText>{errors.communicationScore}</ErrorText>}
             </InputGroup>
-            <InputGroup>
-              <Label>Remarks</Label>
-              <TextArea name="remarks" value={formData.remarks} onChange={handleChange} placeholder="Enter remarks" />
-            </InputGroup>
 
-           {/* File Uploads */}
+            {/* Candidate Picture */}
             <InputGroup>
-              <Label>Candidate Picture (Passport Size)</Label>
-              <InputFile type="file" accept="image/*" onChange={handleCandidatePicChange} ref={candidatePicRef} />
+              <Label>Candidate Picture</Label>
+              <InputFile
+                type="file"
+                accept="image/*"
+                onChange={handleCandidatePicChange}
+                ref={candidatePicRef}
+              />
               {candidatePic && showCropper && (
                 <>
                   <CropperWrapper>
@@ -218,12 +410,11 @@ const AddCandidate = () => {
                       onCropChange={setCrop}
                       onZoomChange={setZoom}
                       onCropComplete={onCropComplete}
-                      restrictPosition={false}
                     />
                     <RemoveIcon onClick={removeCandidatePic}>×</RemoveIcon>
                   </CropperWrapper>
                   <CropControls>
-                    <CropButton type='button' onClick={handleCropImage}>Crop</CropButton>
+                    <CropButton type="button" onClick={handleCropImage}>Crop</CropButton>
                     <SliderContainer>
                       <SliderLabel>Zoom:</SliderLabel>
                       <SliderInput
@@ -232,7 +423,7 @@ const AddCandidate = () => {
                         max="3"
                         step="0.1"
                         value={zoom}
-                        onChange={(e) => setZoom(Number(e.target.value))}
+                        onChange={e => setZoom(Number(e.target.value))}
                       />
                     </SliderContainer>
                   </CropControls>
@@ -245,9 +436,16 @@ const AddCandidate = () => {
                 </ImagePreviewWrapper>
               )}
             </InputGroup>
+
+            {/* Mark Statement (PDF only) */}
             <InputGroup>
-              <Label>Cumulative Mark Statement (PDF only)</Label>
-              <InputFile type="file" accept="application/pdf" onChange={e=>handleFileChange(e,setMarkStatement)} ref={markStatementRef} />
+              <Label>Mark Statement (PDF only)</Label>
+              <InputFile
+                type="file"
+                accept="application/pdf, .pdf"
+                onChange={e => handleFileChange(e, setMarkStatement)}
+                ref={markStatementRef}
+              />
               {markStatement && (
                 <ImagePreviewWrapper>
                   <PDFPreview>
@@ -258,12 +456,19 @@ const AddCandidate = () => {
                 </ImagePreviewWrapper>
               )}
             </InputGroup>
+
+            {/* Signature (optional) */}
             <InputGroup>
-              <Label>Signature (upload image)</Label>
-              <InputFile type="file" accept="image/*" onChange={e=>handleFileChange(e,setSignatureFile)} ref={signatureRef} />
+              <Label>Signature (optional)</Label>
+              <InputFile
+                type="file"
+                accept="image/*"
+                onChange={e => handleFileChange(e, setSignatureFile)}
+                ref={signatureRef}
+              />
               {signatureFile && (
                 <ImagePreviewWrapper>
-                  <ImagePreview src={URL.createObjectURL(signatureFile)} alt="Signature Preview" />
+                  <ImagePreview src={URL.createObjectURL(signatureFile)} alt="Signature" />
                   <RemoveIcon onClick={removeSignature}>×</RemoveIcon>
                 </ImagePreviewWrapper>
               )}
@@ -272,12 +477,15 @@ const AddCandidate = () => {
             <SubmitButton type="submit">Submit Candidate</SubmitButton>
           </Form>
 
-          {isLoading && (<LoadingOverlay><Spinner /></LoadingOverlay>)}
+          {isLoading && (
+            <LoadingOverlay><Spinner /></LoadingOverlay>
+          )}
+
           {successMessage && (
             <SuccessModalOverlay>
               <SuccessModalContent>
                 <SuccessTitle>{successMessage}</SuccessTitle>
-                <ModalCloseButton onClick={()=>setSuccessMessage('')}>Close</ModalCloseButton>
+                <ModalCloseButton onClick={() => setSuccessMessage('')}>Close</ModalCloseButton>
               </SuccessModalContent>
             </SuccessModalOverlay>
           )}
@@ -286,9 +494,8 @@ const AddCandidate = () => {
       </Wrapper>
     </>
   );
-};
+}
 
-export default AddCandidate;
 
 /* Styled Components below unchanged */
 

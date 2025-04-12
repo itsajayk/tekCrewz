@@ -9,75 +9,59 @@ const multer     = require('multer');
 
 const app = express();
 
-// ── 0) CORS ────────────────────────────────────────────────────────────────
-// Apply to ALL requests, including errors and preflights
+// ── CORS ───────────────────────────────────────────────────────────────
 const allowedOrigins = [
   'http://localhost:3000',
   'https://tekcrewz.com',
   'https://www.tekcrewz.com'
 ];
-app.use(cors({
-  origin: allowedOrigins,
-  credentials: true
-}));
-app.options('*', cors({
-  origin: allowedOrigins,
-  credentials: true
-}));
+app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.options('*', cors({ origin: allowedOrigins, credentials: true }));
 
-// ── 1) Body parsers ─────────────────────────────────────────────────────────
+// ── Body Parsers ───────────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ── 2) MongoDB ──────────────────────────────────────────────────────────────
+// ── MongoDB ────────────────────────────────────────────────────────────
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => console.error('MongoDB connection error:', err));
+.then(() => console.log('✅ MongoDB connected'))
+.catch(err => console.error('❌ MongoDB error:', err));
 
-// ── 3) Cloudinary ───────────────────────────────────────────────────────────
+// ── Cloudinary ─────────────────────────────────────────────────────────
 cloudinary.config({
   cloud_name:   process.env.CLOUDINARY_CLOUD_NAME,
   api_key:      process.env.CLOUDINARY_API_KEY,
   api_secret:   process.env.CLOUDINARY_API_SECRET,
 });
-if (!process.env.CLOUDINARY_CLOUD_NAME ||
-    !process.env.CLOUDINARY_API_KEY ||
-    !process.env.CLOUDINARY_API_SECRET) {
-  console.error('⚠️ Missing Cloudinary environment variables!');
-}
 
-// ── 4) Multer + CloudinaryStorage ───────────────────────────────────────────
+// ── Multer + Cloudinary ────────────────────────────────────────────────
 const storage = new CloudinaryStorage({
   cloudinary,
-  params: async (req, file) => {
-    // PDFs → raw, everything else → image
-    const isPdf = file.mimetype === 'application/pdf';
-    const resource_type = isPdf ? 'raw' : 'image';
-
-    // Sanitize public_id
-    const baseName = file.originalname
-      .replace(/\.[^/.]+$/, '')
-      .replace(/[^\w\-]+/g, '-');
-    const public_id = `${Date.now()}-${baseName}`;
-
-    console.log(`📤 Uploading ${file.originalname} as ${resource_type}, public_id=${public_id}`);
-    return { folder: 'candidates', resource_type, public_id };
+  params: {
+    folder: 'candidates',
+    resource_type: 'auto',
+    public_id: (req, file) => {
+      const base = file.originalname
+        .replace(/\.[^/.]+$/, '')
+        .replace(/[^\w\-]+/g, '-');
+      return `${Date.now()}-${base}`;
+    }
   }
 });
+
 const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
-    // allow images & PDFs only
-    if (/^image\/|application\/pdf/.test(file.mimetype)) cb(null, true);
-    else cb(new Error('Unsupported file type: ' + file.mimetype));
+    if (/^image\/|application\/pdf$/.test(file.mimetype)) cb(null, true);
+    else cb(new Error('Only image or PDF files allowed.'));
   },
-  limits: { fileSize: 5 * 1024 * 1024 } // 5 MB
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 });
 
-// ── 5) Candidate schema & model ─────────────────────────────────────────────
+// ── Schema ─────────────────────────────────────────────────────────────
 const candidateSchema = new mongoose.Schema({
   userId:             { type: String, required: true },
   candidateName:      { type: String, required: true },
@@ -85,29 +69,29 @@ const candidateSchema = new mongoose.Schema({
   candidateDegree:    { type: String, required: true },
   programme:          { type: String },
   candidateCourseName:{ type: String },
-  marksType:          { type: String, enum: ['CGPA','Percentage'], required: true },
+  marksType:          { type: String, enum: ['CGPA', 'Percentage'], required: true },
   score:              { type: Number, default: 0 },
   scholarshipSecured: { type: String },
   mobile:             { type: String, required: true },
   parentMobile:       { type: String, required: true },
   email:              { type: String, required: true },
   coursesEnquired:    { type: String, required: true },
-  dateOfVisit:        { type: Date,   required: true },
+  dateOfVisit:        { type: Date, required: true },
   paymentTerm:        { type: String, required: true },
   communicationScore: { type: Number, required: true },
-  remarks:            { type: String },
   candidatePic:       { type: String },
   markStatement:      { type: String },
-  signature:          { type: String },
+  signature:          { type: String }, // optional
   paidAmount:         { type: Number, default: 0 },
   courseRegistered:   { type: String, default: '' },
   paidDate:           { type: Date },
   status:             { type: String, default: 'Registered' },
   role:               { type: String, default: 'student' }
 }, { timestamps: true });
+
 const Candidate = mongoose.model('Candidate', candidateSchema);
 
-// ── 6) POST /api/candidates ─────────────────────────────────────────────────
+// ── POST: Add Candidate ────────────────────────────────────────────────
 app.post(
   '/api/candidates',
   (req, res, next) => {
@@ -117,7 +101,6 @@ app.post(
       { name: 'signature',     maxCount: 1 }
     ])(req, res, err => {
       if (err) {
-        console.error('🛑 Upload error:', err);
         return res.status(400).json({ error: err.message });
       }
       next();
@@ -125,7 +108,6 @@ app.post(
   },
   async (req, res) => {
     try {
-      // Cast numeric fields
       ['score','communicationScore','paidAmount'].forEach(key => {
         if (req.body[key] != null) req.body[key] = Number(req.body[key]);
       });
@@ -134,20 +116,18 @@ app.post(
         ...req.body,
         candidatePic:  req.files.candidatePic?.[0]?.path,
         markStatement: req.files.markStatement?.[0]?.path,
-        signature:     req.files.signature?.[0]?.path
+        signature:     req.files.signature?.[0]?.path || undefined
       });
 
       await newCandidate.save();
       res.status(201).json({ message: 'Candidate saved', candidate: newCandidate });
     } catch (err) {
-      console.error('Error creating candidate:', err);
       res.status(500).json({ error: err.message });
     }
   }
 );
 
-
-// 8) GET /api/candidates
+// ── GET: All Candidates ────────────────────────────────────────────────
 app.get('/api/candidates', async (req, res) => {
   try {
     const { date, status, sortOrder, userId } = req.query;
@@ -159,19 +139,18 @@ app.get('/api/candidates', async (req, res) => {
         $lte: new Date(year, month, 0, 23,59,59,999)
       };
     }
-    if (status)   filter.status = status;
-    if (userId)   filter.userId = userId;
+    if (status) filter.status = status;
+    if (userId) filter.userId = userId;
 
     const sortDir = sortOrder === 'asc' ? 1 : -1;
     const candidates = await Candidate.find(filter).sort({ dateOfVisit: sortDir });
     res.json(candidates);
   } catch (err) {
-    console.error('Error fetching candidates:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// 9) PUT /api/candidates/:id
+// ── PUT: Update Candidate ──────────────────────────────────────────────
 app.put('/api/candidates/:id', async (req, res) => {
   try {
     const updated = await Candidate.findByIdAndUpdate(
@@ -181,22 +160,20 @@ app.put('/api/candidates/:id', async (req, res) => {
     );
     res.json(updated);
   } catch (err) {
-    console.error('Error updating candidate:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// 10) DELETE /api/candidates/:id
+// ── DELETE: Remove Candidate ───────────────────────────────────────────
 app.delete('/api/candidates/:id', async (req, res) => {
   try {
     await Candidate.findByIdAndDelete(req.params.id);
     res.json({ message: 'Candidate deleted' });
   } catch (err) {
-    console.error('Error deleting candidate:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Start server
+// ── Start Server ───────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
