@@ -8,6 +8,7 @@ import Cropper from 'react-easy-crop';
 import getCroppedImg from '../Helper/cropImage';
 
 const API_BASE_URL = 'https://tekcrewz.onrender.com';
+// const API_BASE_URL = 'http://localhost:5000';
 
 const AddCandidate = () => {
   const navigate = useNavigate();
