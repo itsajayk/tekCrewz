@@ -9,30 +9,27 @@ const multer     = require('multer');
 
 const app = express();
 
-// 0) Universal CORS headers for all responses
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  const whitelist = [
-    'http://localhost:3000',
-    'https://tekcrewz.com',
-    'https://www.tekcrewz.com'
-  ];
-  if (whitelist.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  }
-  next();
-});
+// ── 0) CORS ────────────────────────────────────────────────────────────────
+// Apply to ALL requests, including errors and preflights
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://tekcrewz.com',
+  'https://www.tekcrewz.com'
+];
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
+app.options('*', cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
 
-// 1) Preflight
-app.options('*', (req, res) => res.sendStatus(204));
-
-// 2) Body parsers
+// ── 1) Body parsers ─────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 3) MongoDB
+// ── 2) MongoDB ──────────────────────────────────────────────────────────────
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
@@ -40,7 +37,7 @@ mongoose.connect(process.env.MONGODB_URI, {
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// 4) Cloudinary
+// ── 3) Cloudinary ───────────────────────────────────────────────────────────
 cloudinary.config({
   cloud_name:   process.env.CLOUDINARY_CLOUD_NAME,
   api_key:      process.env.CLOUDINARY_API_KEY,
@@ -52,35 +49,35 @@ if (!process.env.CLOUDINARY_CLOUD_NAME ||
   console.error('⚠️ Missing Cloudinary environment variables!');
 }
 
-// 5) Multer + CloudinaryStorage
+// ── 4) Multer + CloudinaryStorage ───────────────────────────────────────────
 const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => {
-    try {
-      const isPdf = file.mimetype === 'application/pdf';
-      const resource_type = isPdf ? 'raw' : 'image';
-      const baseName = file.originalname
-        .replace(/\.[^/.]+$/, '')
-        .replace(/[^\w\-]+/g, '-');
-      const public_id = `${Date.now()}-${baseName}`;
-      console.log(`📤 Uploading “${file.originalname}” as ${resource_type}, public_id=${public_id}`);
-      return { folder: 'candidates', resource_type, public_id };
-    } catch (e) {
-      console.error('⚠️ CloudinaryStorage params error, falling back to auto:', e);
-      return { folder: 'candidates', resource_type: 'auto', public_id: `${Date.now()}` };
-    }
+    // PDFs → raw, everything else → image
+    const isPdf = file.mimetype === 'application/pdf';
+    const resource_type = isPdf ? 'raw' : 'image';
+
+    // Sanitize public_id
+    const baseName = file.originalname
+      .replace(/\.[^/.]+$/, '')
+      .replace(/[^\w\-]+/g, '-');
+    const public_id = `${Date.now()}-${baseName}`;
+
+    console.log(`📤 Uploading ${file.originalname} as ${resource_type}, public_id=${public_id}`);
+    return { folder: 'candidates', resource_type, public_id };
   }
 });
 const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
-    if (/image\/|application\/pdf/.test(file.mimetype)) cb(null, true);
+    // allow images & PDFs only
+    if (/^image\/|application\/pdf/.test(file.mimetype)) cb(null, true);
     else cb(new Error('Unsupported file type: ' + file.mimetype));
   },
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB
+  limits: { fileSize: 5 * 1024 * 1024 } // 5 MB
 });
 
-// 6) Candidate schema & model
+// ── 5) Candidate schema & model ─────────────────────────────────────────────
 const candidateSchema = new mongoose.Schema({
   userId:             { type: String, required: true },
   candidateName:      { type: String, required: true },
@@ -110,7 +107,7 @@ const candidateSchema = new mongoose.Schema({
 }, { timestamps: true });
 const Candidate = mongoose.model('Candidate', candidateSchema);
 
-// 7) POST /api/candidates
+// ── 6) POST /api/candidates ─────────────────────────────────────────────────
 app.post(
   '/api/candidates',
   (req, res, next) => {
@@ -120,7 +117,7 @@ app.post(
       { name: 'signature',     maxCount: 1 }
     ])(req, res, err => {
       if (err) {
-        console.error('🛑 Multer/Cloudinary upload error:', err);
+        console.error('🛑 Upload error:', err);
         return res.status(400).json({ error: err.message });
       }
       next();
@@ -128,15 +125,18 @@ app.post(
   },
   async (req, res) => {
     try {
+      // Cast numeric fields
       ['score','communicationScore','paidAmount'].forEach(key => {
         if (req.body[key] != null) req.body[key] = Number(req.body[key]);
       });
+
       const newCandidate = new Candidate({
         ...req.body,
         candidatePic:  req.files.candidatePic?.[0]?.path,
         markStatement: req.files.markStatement?.[0]?.path,
         signature:     req.files.signature?.[0]?.path
       });
+
       await newCandidate.save();
       res.status(201).json({ message: 'Candidate saved', candidate: newCandidate });
     } catch (err) {
