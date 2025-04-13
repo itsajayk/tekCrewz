@@ -673,7 +673,7 @@ const SuccessModalOverlay = styled.div`
 
 const SuccessModalContent = styled.div`
   background: #fff;
-  padding: 20px 30px;
+  padding: 20px 15px;
   border-radius: 8px;
   box-shadow: 0 0 10px rgba(0,0,0,0.3);
   text-align: center;

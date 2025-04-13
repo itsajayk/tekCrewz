@@ -54,6 +54,7 @@ const Referrals = () => {
     <>
       <Wrapper>
         <TopNavbar />
+        <Content className="container">
         <HeaderInfo className="container">
           <h1 className="font40 extraBold">Referrals</h1>
           <div>
@@ -71,6 +72,7 @@ const Referrals = () => {
             Create an account for Admin or Referrer ?
           </SwitchLink>
         </HeaderInfo>
+        </Content>
         <Footer />
       </Wrapper>
     </>
@@ -94,9 +96,19 @@ const Wrapper = styled.section`
   animation: ${gradientAnimation} 10s ease infinite;
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
 
   @media (max-width: 600px) {
     padding-top: 60px;
+  }
+`;
+
+const Content = styled.div`
+  flex: 1;   /* takes up all remaining space, pushing footer down */
+  // padding-top: 40px;
+
+  @media (max-width: 600px) {
+    // padding-top: 60px;
   }
 `;
 
