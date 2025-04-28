@@ -1,32 +1,34 @@
 // idGeneratorFirestore.js
 import { getFirestore, runTransaction, doc } from "firebase/firestore";
 
-export const generateUniqueIdFromFirestore = async (accountType) => {
+export async function generateUniqueIdFromFirestore(accountType) {
   const db = getFirestore();
   const counterDocRef = doc(db, "counters", "userCounters");
 
-  try {
-    const newCounter = await runTransaction(db, async (transaction) => {
-      const counterDoc = await transaction.get(counterDocRef);
-      if (!counterDoc.exists()) {
-        throw new Error("Counter document does not exist!");
-      }
-      let currentCount;
-      if (accountType === "Admin") {
-        currentCount = counterDoc.data().adminCounter || 1;
-        transaction.update(counterDocRef, { adminCounter: currentCount + 1 });
-      } else if (accountType === "Referrer") {
-        currentCount = counterDoc.data().referrerCounter || 1;
-        transaction.update(counterDocRef, { referrerCounter: currentCount + 1 });
-      }
-      return currentCount;
-    });
+  // map each accountType → { prefix, counterField }
+  const map = {
+    Admin:     { prefix: "EMPAD", counterField: "adminCounter" },
+    Referrer:  { prefix: "REFSD", counterField: "referrerCounter" },
+    DevTutor:  { prefix: "EMPDT", counterField: "devTutorCounter" },
+    Tutor:     { prefix: "EMPTR", counterField: "tutorCounter" },
+    Developer: { prefix: "EMPDV", counterField: "developerCounter" }
+  };
 
-    return accountType === "Admin"
-      ? `EMPAD${String(newCounter).padStart(3, "0")}`
-      : `REFSD${String(newCounter).padStart(3, "0")}`;
-  } catch (error) {
-    console.error("Transaction failed: ", error);
-    throw error;
-  }
-};
+  const cfg = map[accountType];
+  if (!cfg) throw new Error(`Invalid accountType: ${accountType}`);
+
+  // run a transaction to bump the right counter
+  const newCount = await runTransaction(db, async (tx) => {
+    const snap = await tx.get(counterDocRef);
+    if (!snap.exists()) {
+      throw new Error("Counter document does not exist!");
+    }
+    const current = snap.data()[cfg.counterField] || 0;
+    tx.update(counterDocRef, { [cfg.counterField]: current + 1 });
+    return current + 1;
+  });
+
+  // pad to three digits
+  const num = String(newCount).padStart(3, "0");
+  return cfg.prefix + num;     // e.g. "EMPTR005" or "EMPDT012"
+}

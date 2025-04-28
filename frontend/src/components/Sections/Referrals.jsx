@@ -69,7 +69,7 @@ const Referrals = () => {
             </ModalButton>
           </div>
           <SwitchLink onClick={() => navigate('/signup')}>
-            Create an account for Admin or Referrer ?
+            Create an account ? Add a new Employee ?
           </SwitchLink>
         </HeaderInfo>
         </Content>

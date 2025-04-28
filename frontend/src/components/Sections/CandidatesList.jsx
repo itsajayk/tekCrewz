@@ -193,7 +193,7 @@ let startX = 10 + doc.getTextWidth("Payment Term: ") + 5;
 
 // FULL-TERM PAID checkbox
   doc.rect(startX, y - 5, checkboxSize, checkboxSize);
-  if (candidate.paymentTerm === 'Full Term') {
+  if (candidate.paymentTerm === 'Full term') {
     // draw a checkmark inside the box
     doc.text('X', startX + 1, y);
   }
@@ -218,7 +218,7 @@ let startX = 10 + doc.getTextWidth("Payment Term: ") + 5;
 
   
     // Additional counselor details.
-    doc.text("Term 2 Payment Date: ………………………………    Communication Score: ………………", 10, y);
+    doc.text(`Term 2 Payment Date: ………………………………       Communication Score:   ${candidate.communicationScore ||"Communication Score: ………………"}`, 10, y);
     y += 8;
   
     // --- Remarks Section: Label and Rectangle text area ---

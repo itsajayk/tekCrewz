@@ -58,7 +58,6 @@ export default function Projects() {
 
   const handleChange = (key, value) => {
     setFormData({ ...formData, [key]: value });
-    // Clear error for this field if exists
     if (errors[key]) {
       setErrors({ ...errors, [key]: "" });
     }
@@ -89,19 +88,15 @@ export default function Projects() {
       errorsObj.mode = "Please select a training mode.";
     }
 
-    // If there are errors, update state and do not submit
     if (Object.keys(errorsObj).length > 0) {
       setErrors(errorsObj);
       return;
     }
 
-    // Clear any previous errors before sending
     setErrors({});
 
     setIsLoading(true); 
 
-
-    // Replace these with your EmailJS credentials
     const serviceID = "service_hyxy9rv";
     const templateID = "template_tyht7d6";
     const userID = "t3fbhvx8myxJiqSOC";
@@ -110,8 +105,6 @@ export default function Projects() {
       .send(serviceID, templateID, formData, userID)
       .then((response) => {
         setIsLoading(false);
-        // console.log("SUCCESS!", response.status, response.text);
-        // Optionally, you could reset the formData here
         setFormData({
           name: "",
           email: "",
@@ -234,7 +227,7 @@ export default function Projects() {
                   <FullButton title="Reach to Us" action={scrollToContactForm} />
                 </div>
                 <div style={{ width: "190px", marginLeft: "15px" }}>
-                  <FullButton title="Contact Us" action={() => alert("clicked")} border />
+                  <FullButton title="Contact Us" action={scrollToContactForm} border />
                 </div>
               </ButtonsRow>
             </AddRight>

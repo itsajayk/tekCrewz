@@ -3,11 +3,11 @@ import React, { useState, useContext } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import { auth } from './firebase';
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { getUserEmailFromUsername } from './getUserEmailFromUsername';
 import TopNavbar from '../Nav/TopNavbar';
 import Footer from '../Sections/Footer';
-import { AuthContext } from '../../contexts/AuthContext'; // Import AuthContext
+import { AuthContext } from '../../contexts/AuthContext';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -20,56 +20,86 @@ const LoginPage = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    let tempErrors = {};
+    const tempErrors = {};
 
+    // Validate username format for all account types
     if (!username.trim()) {
       tempErrors.username = 'Username is required';
-    } else if (!/^(EMPAD|REFSD)\d{3}$/.test(username)) {
-      tempErrors.username = 'Username must be in format EMPAD001 or REFSD001';
+    } else if (!/^(EMPAD|REFSD|EMPDT|EMPTR|EMPDV)\d{3}$/.test(username)) {
+      tempErrors.username = 'Username must be in format EMPAD001, REFSD001, EMPDT001, EMPTR001, or EMPDV001';
     }
     if (!password) {
       tempErrors.password = 'Password is required';
     }
 
     setErrors(tempErrors);
+    if (Object.keys(tempErrors).length) return;
 
-    if (Object.keys(tempErrors).length === 0) {
-      try {
-        setIsLoading(true);
-        const email = await getUserEmailFromUsername(username);
-        if (!email) {
-          setModal({ isOpen: true, message: 'Username not found.', type: 'error' });
-          setIsLoading(false);
-          return;
-        }
-        await signInWithEmailAndPassword(auth, email, password);
-        if (username.startsWith('EMPAD')) {
-          setRole('admin');
-          setModal({ isOpen: true, message: 'Login successful as Admin!', type: 'success' });
-          setTimeout(() => {
-            setModal({ isOpen: false, message: '', type: '' });
-            navigate('/admin');
-          }, 2000);
-        } else if (username.startsWith('REFSD')) {
-          setRole('referrer');
-          setModal({ isOpen: true, message: 'Login successful as Referrer!', type: 'success' });
-          setTimeout(() => {
-            setModal({ isOpen: false, message: '', type: '' });
-            navigate('/refCandidList');
-          }, 2000);
-        } else {
-          setModal({ isOpen: true, message: 'Login successful, but role not identified.', type: 'error' });
-          setTimeout(() => {
-            setModal({ isOpen: false, message: '', type: '' });
-            navigate('/dashboard');
-          }, 2000);
-        }
-      } catch (error) {
-        console.error('Login error:', error);
-        setModal({ isOpen: true, message: 'Login failed: ' + error.message, type: 'error' });
-      } finally {
-        setIsLoading(false);
+    try {
+      setIsLoading(true);
+      const email = await getUserEmailFromUsername(username);
+      if (!email) {
+        setModal({ isOpen: true, message: 'Username not found.', type: 'error' });
+        return;
       }
+
+      await signInWithEmailAndPassword(auth, email, password);
+
+      // Determine role and redirect based on username prefix
+      if (username.startsWith('EMPAD')) {
+        setRole('admin');
+        setModal({ isOpen: true, message: 'Login successful as Admin!', type: 'success' });
+        setTimeout(() => {
+          setModal({ isOpen: false, message: '', type: '' });
+          navigate('/admin');
+        }, 2000);
+
+      } else if (username.startsWith('REFSD')) {
+        setRole('referrer');
+        setModal({ isOpen: true, message: 'Login successful as Referrer!', type: 'success' });
+        setTimeout(() => {
+          setModal({ isOpen: false, message: '', type: '' });
+          navigate('/refCandidList');
+        }, 2000);
+
+      } else if (username.startsWith('EMPDT')) {
+        setRole('devTutor');
+        setModal({ isOpen: true, message: 'Login successful as Dev & Tutor!', type: 'success' });
+        setTimeout(() => {
+          setModal({ isOpen: false, message: '', type: '' });
+          navigate('/dashboard');
+        }, 2000);
+
+      } else if (username.startsWith('EMPTR')) {
+        setRole('tutor');
+        setModal({ isOpen: true, message: 'Login successful as Tutor!', type: 'success' });
+        setTimeout(() => {
+          setModal({ isOpen: false, message: '', type: '' });
+          navigate('/dashboard');
+        }, 2000);
+
+      } else if (username.startsWith('EMPDV')) {
+        setRole('developer');
+        setModal({ isOpen: true, message: 'Login successful as Developer!', type: 'success' });
+        setTimeout(() => {
+          setModal({ isOpen: false, message: '', type: '' });
+          navigate('/dashboard');
+        }, 2000);
+
+      } else {
+        // Fallback for any other codes
+        setModal({ isOpen: true, message: 'Login successful!', type: 'success' });
+        setTimeout(() => {
+          setModal({ isOpen: false, message: '', type: '' });
+          navigate('/dashboard');
+        }, 2000);
+      }
+
+    } catch (error) {
+      console.error('Login error:', error);
+      setModal({ isOpen: true, message: 'Login failed: ' + error.message, type: 'error' });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -85,9 +115,10 @@ const LoginPage = () => {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="e.g., EMPAD001 or REFSD001"
+              placeholder="e.g., EMPAD001, REFSD001, EMPDT001, EMPTR001, EMPDV001"
             />
             {errors.username && <ErrorText>{errors.username}</ErrorText>}
+
             <Label>Password</Label>
             <Input
               type="password"
@@ -96,21 +127,25 @@ const LoginPage = () => {
               placeholder="Enter password"
             />
             {errors.password && <ErrorText>{errors.password}</ErrorText>}
+
             <Button type="submit">Login</Button>
           </Form>
+
           {isLoading && (
             <SpinnerOverlay>
               <Spinner />
             </SpinnerOverlay>
           )}
+
           <SwitchLink onClick={() => navigate('/reset-password')}>
             Forgot Password?
           </SwitchLink>
         </FormContainer>
       </Content>
       <Footer />
+
       {modal.isOpen && (
-        <ModalOverlay>
+        <ModalOverlay>  
           <ModalContent>
             <ModalMessage type={modal.type}>{modal.message}</ModalMessage>
             <CloseButton onClick={() => setModal({ isOpen: false, message: '', type: '' })}>
@@ -126,7 +161,6 @@ const LoginPage = () => {
 export default LoginPage;
 
 // Styled Components
-
 const Wrapper = styled.div`
   display: flex;
   flex-direction: column;
@@ -153,9 +187,8 @@ const FormContainer = styled.div`
   position: relative;
 
   @media (max-width: 760px) {
-    width: 300px
+    width: 300px;
   }
-
 `;
 
 const Title = styled.h2`
@@ -167,8 +200,7 @@ const Form = styled.form`
   display: flex;
   flex-direction: column;
   text-align: left;
-  
-  /* Fix autofill text color */
+
   input:-webkit-autofill,
   input:-webkit-autofill:hover,
   input:-webkit-autofill:focus,
@@ -177,7 +209,6 @@ const Form = styled.form`
   textarea:-webkit-autofill:focus {
     -webkit-text-fill-color: black !important;
     transition: background-color 5000s ease-in-out 0s;
-    text-transform: uppercase;
   }
 `;
 
@@ -226,7 +257,6 @@ const ErrorText = styled.span`
   margin-bottom: 10px;
 `;
 
-// Spinner styled components
 const SpinnerOverlay = styled.div`
   position: absolute;
   top: 0;
@@ -253,7 +283,6 @@ const Spinner = styled.div`
   animation: ${spin} 1s linear infinite;
 `;
 
-// Modal styled components
 const ModalOverlay = styled.div`
   position: fixed;
   top: 0;

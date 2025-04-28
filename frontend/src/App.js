@@ -18,6 +18,7 @@ import StudentLogin from './student-pages/StudentLogin.jsx';
 import QuizPage from './components/Sections/QuizPage.jsx';
 import AdminReport from './components/Sections/AdminReport.jsx';
 import StudentRoute from './components/Routes/StudentRoute.jsx';
+import DashboardPage from './components/Sections/DashboardPage.jsx';
 
 export default function App() {
   return (
@@ -49,7 +50,7 @@ export default function App() {
             }/>
             <Route path="/signup" element={
               <AdminRoute>
-                <AdminReport />
+                <SignupPage />
               </AdminRoute>
             }/>
             <Route path="/admin-report" element={
@@ -74,9 +75,8 @@ export default function App() {
             <Route path="/reset-password" element={<ResetPasswordPage />}/>
             <Route path="/s-signUpPage" element={<StudentSignUp />}/>
             <Route path="/s-loginPage" element={<StudentLogin />}/>
-            {/* <Route path="/Quiz" element={<QuizPage />}/> */}
-            {/* <Route path="/admin-report" element={<AdminReport />}/> */}
-            {/* <Route path="/add-candidate" element={<AddCandidate />}/> */}
+            <Route path="/s-loginPage" element={<StudentLogin />}/>
+            <Route path="/dashboard" element={<DashboardPage />} />
           </Routes>
         </Router>
       </AuthProvider>

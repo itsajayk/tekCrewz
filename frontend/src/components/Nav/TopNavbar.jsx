@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import styled from "styled-components";
-import NavbarLink from "./NavbarLink"; // import the helper
+import NavbarLink from "./NavbarLink";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../Nav/Sidebar";
 import Backdrop from "../Elements/Backdrop";

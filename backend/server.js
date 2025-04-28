@@ -164,6 +164,43 @@ app.put('/api/candidates/:id', async (req, res) => {
   }
 });
 
+  app.post('/api/ai/insights', async (req, res) => {
+    try {
+      const { performance, projects, role, month } = req.body;
+      const prompt = `
+  You are a helpful assistant. Here is the ${role} data for ${month}:
+  ${JSON.stringify({ performance, projects }, null, 2)}
+
+  Please provide:
+  1. A 2-sentence summary.
+  2. Top 3 improvement suggestions.
+  3. One follow-up action item.
+  `;
+    // built-in fetch
+    const response = await fetch(
+      'https://gemini.googleapis.com/v1beta2/models/gemini-1.5-flash:generateText',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.GOOGLE_API_KEY}`
+        },
+        body: JSON.stringify({ prompt })
+      }
+    );
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('Gemini error', data);
+      return res.status(500).json({ error: 'Gemini API error' });
+    }
+    const text = data.candidates?.[0]?.output || '';
+    res.json({ text });
+  } catch (err) {
+    console.error('AI insights error:', err);
+    res.status(500).json({ error: 'Failed to generate insights' });
+  }
+});
+
 // ── DELETE: Remove Candidate ───────────────────────────────────────────
 app.delete('/api/candidates/:id', async (req, res) => {
   try {
