@@ -7,6 +7,9 @@ import 'react-datepicker/dist/react-datepicker.css';
 import TopNavbar from '../Nav/TopNavbar';
 import Footer from '../Sections/Footer';
 import { AuthContext } from '../../contexts/AuthContext';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../Pages/firebase';         // wherever you init Firestore
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 const fadeIn = keyframes`
   from { opacity: 0; transform: translateY(10px); }
@@ -21,6 +24,38 @@ const ReferrerCandidatesList = () => {
   const [candidates, setCandidates] = useState([]);
   const [filters, setFilters] = useState({ date: null, status: '' });
   const [isLoading, setIsLoading] = useState(false);
+  
+
+   const [referrerName, setReferrerName] = useState('');
+
+  useEffect(() => {
+    if (!currentReferrerId) return;
+
+    const fetchProfile = async () => {
+      try {
+        // Look up the user document where referralId matches
+        const q = query(
+          collection(db, 'users'),
+          where('referralId', '==', currentReferrerId)
+        );
+        const qs = await getDocs(q);
+
+        if (!qs.empty) {
+          const data = qs.docs[0].data();
+          setReferrerName(data.name || '—');
+        } else {
+          console.warn('No matching user for referralId', currentReferrerId);
+          setReferrerName('Unknown');
+        }
+      } catch (err) {
+        console.error('Error loading user profile:', err);
+        setReferrerName('Error');
+      }
+    };
+
+    fetchProfile();
+  }, [currentReferrerId]);
+
 
   const fetchCandidates = async () => {
     setIsLoading(true);
@@ -56,6 +91,12 @@ const ReferrerCandidatesList = () => {
     <Wrapper>
       <TopNavbar />
       <Content>
+        <HeaderSection>
+          <h2>Referral Candidates List</h2>
+          {referrerName
+            ? <RefName>Referrer's Name: {referrerName}</RefName>
+            : <RefName>Loading name…</RefName>}
+        </HeaderSection>
         <Filters>
           <FilterGroup>
             <FilterLabel>Month of Visit:</FilterLabel>
@@ -84,6 +125,8 @@ const ReferrerCandidatesList = () => {
         </Filters>
         {isLoading ? (
           <LoadingMessage>Loading...</LoadingMessage>
+        ) : candidates.length === 0 ? (
+          <EmptyMessage>Your Referral ID does not have any associated data. Please begin the referral process.</EmptyMessage>
         ) : (
           <TableWrapper>
             <Table>
@@ -144,6 +187,19 @@ const Content = styled.main`
   }
 `;
 
+const HeaderSection = styled.div`
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+`;
+const RefName = styled.span`
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+`;
+
+
 const Filters = styled.div`
   display: flex;
   gap: 20px;
@@ -155,6 +211,13 @@ const Filters = styled.div`
     gap: 10px;
     align-items: flex-start;
   }
+`;
+
+const EmptyMessage = styled.p`
+  text-align: center;
+  font-size: 18px;
+  color: #555;
+  margin: 40px 0;
 `;
 
 const FilterGroup = styled.div`

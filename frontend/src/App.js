@@ -19,6 +19,8 @@ import QuizPage from './components/Sections/QuizPage.jsx';
 import AdminReport from './components/Sections/AdminReport.jsx';
 import StudentRoute from './components/Routes/StudentRoute.jsx';
 import DashboardPage from './components/Sections/DashboardPage.jsx';
+import AdminDashboard from './components/Sections/AdminDashboard.jsx';
+import StudentDashboard from './components/Sections/StudentDashboard.jsx'
 
 export default function App() {
   return (
@@ -77,6 +79,8 @@ export default function App() {
             <Route path="/s-loginPage" element={<StudentLogin />}/>
             <Route path="/s-loginPage" element={<StudentLogin />}/>
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/AdminDashboard" element={<AdminDashboard />} />
+            <Route path="/StudentDashboard" element={<StudentDashboard/>}/>
           </Routes>
         </Router>
       </AuthProvider>

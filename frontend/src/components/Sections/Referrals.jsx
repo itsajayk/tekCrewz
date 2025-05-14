@@ -3,165 +3,146 @@ import styled, { keyframes } from 'styled-components';
 import TopNavbar from '../Nav/TopNavbar';
 import Footer from './Footer';
 import { useNavigate } from 'react-router-dom';
-// Import Firestore functions and db instance
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
 import { db } from '../Pages/firebase';
 
 const Referrals = () => {
   const navigate = useNavigate();
-
-  // State to hold combined dropdown options for users
   const [userOptions, setUserOptions] = useState([]);
 
-  // Fetch available referrers from Firebase and combine with an Admin option
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         const q = query(
-          collection(db, "users"),
-          where(documentId(), ">=", "REFSD"),
-          where(documentId(), "<", "REFSE")
+          collection(db, 'users'),
+          where(documentId(), '>=', 'REFSD'),
+          where(documentId(), '<', 'REFSE')
         );
-        const querySnapshot = await getDocs(q);
-        const referrers = [];
-        querySnapshot.forEach((doc) => {
-          referrers.push({ id: doc.id, label: doc.data().referrerName || doc.id });
-        });
-        const combined = [{ id: 'admin', label: 'Admin' }, ...referrers];
-        setUserOptions(combined);
-      } catch (error) {
-        console.error("Error fetching referrers:", error);
+        const snapshot = await getDocs(q);
+        const refs = snapshot.docs.map(doc => ({ id: doc.id, label: doc.data().referrerName || doc.id }));
+        setUserOptions([{ id: 'admin', label: 'Admin' }, ...refs]);
+      } catch (err) {
+        console.error('Error fetching referrers:', err);
       }
     };
     fetchUsers();
   }, []);
 
-  // Navigate to the Add Candidate page
-  const openAddCandidate = () => {
-    navigate('/add-candidate');
-  };
-
-  // Navigate to the Candidate List page
-  const openCandidateList = () => {
-    navigate('/candidateList');
-  };
-
-  const openQuizList = () => {
-    navigate('/admin-report');
-  };
+  const handleNavigate = path => () => navigate(path);
 
   return (
-    <>
-      <Wrapper>
-        <TopNavbar />
-        <Content className="container">
-        <HeaderInfo className="container">
-          <h1 className="font40 extraBold">Referrals</h1>
-          <div>
-            <ModalButton onClick={openAddCandidate}>
-              Add a Candidate
-            </ModalButton>
-            <ModalButton onClick={openCandidateList}>
-              View Candidate List
-            </ModalButton>
-            <ModalButton onClick={openQuizList}>
-              View Quiz Report
-            </ModalButton>
-          </div>
-          <SwitchLink onClick={() => navigate('/signup')}>
-            Create an account ? Add a new Employee ?
-          </SwitchLink>
-        </HeaderInfo>
-        </Content>
-        <Footer />
-      </Wrapper>
-    </>
+    <PageWrapper>
+      <TopNavbar />
+      <MainContent>
+        <PageTitle>Admin Panel</PageTitle>
+        <MenuGrid>
+          <MenuCard onClick={handleNavigate('/add-candidate')}>
+            <CardIcon>🤝</CardIcon>
+            <CardLabel>Add Candidate</CardLabel>
+          </MenuCard>
+          <MenuCard onClick={handleNavigate('/candidateList')}>
+            <CardIcon>📋</CardIcon>
+            <CardLabel>Candidate List</CardLabel>
+          </MenuCard>
+          <MenuCard onClick={handleNavigate('/admin-report')}>
+            <CardIcon>📊</CardIcon>
+            <CardLabel>Quiz Report</CardLabel>
+          </MenuCard>
+          <MenuCard onClick={handleNavigate('/AdminDashboard')}>
+            <CardIcon>📈</CardIcon>
+            <CardLabel>Dashboard</CardLabel>
+          </MenuCard>
+          <MenuCard onClick={handleNavigate('/signup')}>
+            <CardIcon>➕</CardIcon>
+            <CardLabel>Create Account</CardLabel>
+          </MenuCard>
+        </MenuGrid>
+      </MainContent>
+      <Footer />
+    </PageWrapper>
   );
 };
 
 export default Referrals;
 
-/* Styled Components for Referrals.jsx */
-const gradientAnimation = keyframes`
+// Styled Components
+
+const gradientBG = keyframes`
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 `;
 
-const Wrapper = styled.section`
-  padding-top: 80px;
-  width: 100%;
-  background: linear-gradient(270deg, #f7f7f7, #eaeaea, #f7f7f7);
-  background-size: 600% 600%;
-  animation: ${gradientAnimation} 10s ease infinite;
+const PageWrapper = styled.section`
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-
-  @media (max-width: 600px) {
-    padding-top: 60px;
-  }
+  background: linear-gradient(270deg, #f7f7f7, #eaeaea, #f7f7f7);
+  background-size: 600% 600%;
+  animation: ${gradientBG} 15s ease infinite;
 `;
 
-const Content = styled.div`
-  flex: 1;   /* takes up all remaining space, pushing footer down */
-  // padding-top: 40px;
-
-  @media (max-width: 600px) {
-    // padding-top: 60px;
-  }
+const MainContent = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 90px 30px;
 `;
 
-const HeaderInfo = styled.div`
+const PageTitle = styled.h1`
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin-bottom: 40px;
+  background: linear-gradient(90deg, #7620ff, #ff9900);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
   text-align: center;
-  padding: 50px 20px;
 
-  h1 {
-    font-size: 3.5rem;
-    font-weight: 800;
+  @media (max-width: 600px) {
+    font-size: 2rem;
     margin-bottom: 20px;
-    color: #333;
-  }
-
-  @media (max-width: 860px) {
-    h1 {
-      font-size: 2.5rem;
-    }
-  }
-
-  @media (max-width: 480px) {
-    h1 {
-      font-size: 2rem;
-    }
   }
 `;
 
-const ModalButton = styled.button`
-  padding: 12px 25px;
-  background: #ff9900;
-  color: #fff;
-  border: none;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 16px;
-  transition: background 0.3s ease;
-  margin-right: 20px;
-
-  &:hover {
-    background: #e68a00;
-  }
+const MenuGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 30px;
+  width: 100%;
+  max-width: 800px;
 
   @media (max-width: 480px) {
-    width: 100%;
-    margin: 0 0 10px 0;
+    gap: 20px;
   }
 `;
 
-const SwitchLink = styled.p`
-  margin-top: 15px;
-  color: #7620ff;
+const MenuCard = styled.div`
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  padding: 30px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
   cursor: pointer;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+
   &:hover {
-    text-decoration: underline;
+    transform: translateY(-5px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
   }
+`;
+
+const CardIcon = styled.div`
+  font-size: 2.5rem;
+  margin-bottom: 15px;
+`;
+
+const CardLabel = styled.div`
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #333;
 `;

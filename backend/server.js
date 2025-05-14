@@ -211,6 +211,111 @@ app.delete('/api/candidates/:id', async (req, res) => {
   }
 });
 
+// ── New Student Dashboard Routes ────────────────────────────────────────
+
+// 1. Profile
+app.get('/api/students/:userId/profile', async (req, res) => {
+  try {
+    const profile = await StudentProfile.findOne({ userId: req.params.userId });
+    res.json(profile);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. Attendance
+app.get('/api/students/:userId/attendance', async (req, res) => {
+  try {
+    const records = await Attendance
+      .find({ userId: req.params.userId })
+      .sort({ date: 1 });
+    res.json(records);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Course Documents
+app.get('/api/courses/:courseId/docs', async (req, res) => {
+  try {
+    const docs = await CourseDoc.find({ courseId: req.params.courseId });
+    // return { syllabus: url, schedule: url }
+    const out = {};
+    docs.forEach(d => out[d.type] = d.url);
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. List Assignments
+app.get('/api/assignments/:userId', async (req, res) => {
+  try {
+    const all = await Assignment.find({ userId: req.params.userId });
+    // compute closed flag based on closedAt + compute unlocked by unlockedUntil
+    const now = new Date();
+    const mapped = all.map(a => ({
+      unit: a.unit,
+      studyMaterialUrl: a.studyMaterialUrl,
+      closed: a.closedAt && now > a.closedAt,
+      unlocked: a.unlockedUntil && now < a.unlockedUntil,
+      submissionCode: a.submissionCode,
+      results: a.results,
+      feedback: a.feedback
+    }));
+    res.json(mapped);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 5. Submit Code
+app.post('/api/assignments/:userId/submit', async (req, res) => {
+  try {
+    const { unit, code } = req.body;
+    const upd = await Assignment.findOneAndUpdate(
+      { userId: req.params.userId, unit },
+      { submissionCode: code },
+      { new: true }
+    );
+    res.json(upd);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 6. Request Unlock
+app.post('/api/assignments/:userId/unlock', async (req, res) => {
+  try {
+    const { unit } = req.body;
+    // allow +2 days
+    const until = new Date(Date.now() + 2*24*60*60*1000);
+    const upd = await Assignment.findOneAndUpdate(
+      { userId: req.params.userId, unit },
+      { unlockedUntil: until },
+      { new: true }
+    );
+    res.json(upd);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7. Submit Feedback
+app.post('/api/assignments/:userId/feedback', async (req, res) => {
+  try {
+    const { unit, feedback } = req.body;
+    const upd = await Assignment.findOneAndUpdate(
+      { userId: req.params.userId, unit },
+      { feedback },
+      { new: true }
+    );
+    res.json(upd);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Start Server ───────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

@@ -43,51 +43,44 @@ const uploadToCloudinary = async (fileOrUrl, folder) => {
 
 const SignupPage = () => {
   const navigate = useNavigate();
-
-  // 0) Block non-admins
   const [modal, setModal] = useState({ isOpen: false, message: '', type: '' });
-  // useEffect(() => {
-  //   onAuthStateChanged(auth, (user) => {
-  //     if (!user) {
-  //       navigate('/login');
-  //     } else if (!user.displayName?.startsWith('EMPAD')) {
-  //       setModal({ isOpen: true, type: 'error', message: 'Only Admins may create new accounts.' });
-  //       setTimeout(() => navigate('/'), 2000);
-  //     }
-  //   });
-  // }, [navigate]);
-
-  // 1) Form state
   const [accountType, setAccountType] = useState('Admin');
   const [formData, setFormData] = useState({
-    name: '', email: '', password: '', confirmPassword: '', referralId: '', designation: '', college: '', mobile: '',
-    degree: '', courseName: '', collegeName: '', certifications: '', experience: '', proof1: null, proof2: null, address: ''
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    referralId: '',
+    designation: '',
+    college: '',
+    mobile: '',
+    degree: '',
+    courseName: '',
+    collegeName: '',
+    certifications: '',
+    experience: '',
+    proof1: null,
+    proof2: null,
+    address: ''
   });
-
-  // 2) Image states
+  // Image & cropper states...
   const [origPassportFile, setOrigPassportFile] = useState(null);
   const [passportPic, setPassportPic] = useState(null);
   const [croppedPassportPic, setCroppedPassportPic] = useState(null);
   const [croppedPassportFile, setCroppedPassportFile] = useState(null);
-
-  // 3) Signature & misc
   const [signatureFile, setSignatureFile] = useState(null);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-
-  // 4) Cropper
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [showCropper, setShowCropper] = useState(false);
 
-  // 5) Refs
   const EmpPicRef = useRef();
   const signatureRef = useRef();
   const proof1Ref = useRef();
   const proof2Ref = useRef();
 
-  // Generic change
   const handleChange = e => {
     const { name, files, value } = e.target;
     if ((name === 'proof1' || name === 'proof2') && files) {
@@ -97,7 +90,6 @@ const SignupPage = () => {
     }
   };
 
-  // Passport handlers
   const handlePassportImageChange = e => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -127,7 +119,6 @@ const SignupPage = () => {
     EmpPicRef.current.value = '';
   };
 
-  // Signature & proofs
   const handleSignatureChange = e => {
     const file = e.target.files?.[0];
     if (file) setSignatureFile(file);
@@ -141,7 +132,6 @@ const SignupPage = () => {
     return re.test(String(email).toLowerCase());
   };
 
-  // Signup
   const handleSignup = async e => {
     e.preventDefault();
     const errs = {};
@@ -166,15 +156,21 @@ const SignupPage = () => {
 
     try {
       setIsLoading(true);
-      // 1) Auth
+      // Firebase signup + Firestore logic...
       const cred = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const firebaseUid = cred.user.uid;
-      // 2) Generate ID
       const businessId = await generateUniqueIdFromFirestore(accountType);
       await updateProfile(cred.user, { displayName: businessId });
-      // 3) Build data
+
       const dataToSave = { id: businessId, type: accountType, name: formData.name, email: formData.email };
-      if (accountType==='Referrer') Object.assign(dataToSave, { referralId: businessId, designation: formData.designation, college: formData.college, mobile: formData.mobile });
+      if (accountType==='Referrer') {
+        Object.assign(dataToSave, {
+          referralId: businessId,
+          designation: formData.designation,
+          college: formData.college,
+          mobile: formData.mobile
+        });
+      }
       if (['DevTutor','Tutor','Developer'].includes(accountType)) {
         Object.assign(dataToSave, {
           designation: formData.designation,
@@ -184,18 +180,17 @@ const SignupPage = () => {
           collegeName: formData.collegeName,
           certifications: formData.certifications,
           experience: formData.experience,
-          address:formData.address
+          address: formData.address
         });
-        const photoSource = croppedPassportFile||origPassportFile;
-        dataToSave.photoURL     = await uploadToCloudinary(photoSource,'photos');
-        dataToSave.signatureURL = await uploadToCloudinary(signatureFile,'signatures');
-        dataToSave.proof1URL    = await uploadToCloudinary(formData.proof1,'proofs');
-        dataToSave.proof2URL    = await uploadToCloudinary(formData.proof2,'proofs');
+        const photoSource = croppedPassportFile || origPassportFile;
+        dataToSave.photoURL     = await uploadToCloudinary(photoSource, 'photos');
+        dataToSave.signatureURL = await uploadToCloudinary(signatureFile, 'signatures');
+        dataToSave.proof1URL    = await uploadToCloudinary(formData.proof1, 'proofs');
+        dataToSave.proof2URL    = await uploadToCloudinary(formData.proof2, 'proofs');
       }
-      // 4) Firestore write
-      await setDoc(doc(db,'users',businessId), dataToSave);
+
+      await setDoc(doc(db, 'users', businessId), dataToSave);
       setModal({ isOpen:true, message:`${accountType} registered: ${businessId}`, type:'success' });
-      setTimeout(() => navigate('/login'), 2500);
     } catch (err) {
       setModal({ isOpen:true, message:err.message, type:'error' });
     } finally {
@@ -211,19 +206,16 @@ const SignupPage = () => {
           <Title>Sign Up</Title>
           <RoleSelector>
             {["Admin", "Referrer", "DevTutor", "Tutor", "Developer"].map(
-              (role) => (
+              role => (
                 <ButtonTab
                   key={role}
                   active={accountType === role}
                   onClick={() => setAccountType(role)}
                 >
-                  {role === "DevTutor"
-                    ? "Dev & Tutor"
-                    : role === "Tutor"
-                    ? "Tutor Only"
-                    : role === "Developer"
-                    ? "Developer Only"
-                    : role}
+                  {role === "DevTutor" ? "Dev & Tutor"
+                   : role === "Tutor"   ? "Tutor Only"
+                   : role === "Developer" ? "Developer Only"
+                   : role}
                 </ButtonTab>
               )
             )}
@@ -231,112 +223,82 @@ const SignupPage = () => {
 
           <Form onSubmit={handleSignup}>
             {/* Name */}
-            <Label>Name</Label>
-            <Input name="name" value={formData.name} onChange={handleChange} />
-            <ErrorText>{errors.name}</ErrorText>
+            <FormField>
+              <Label>Name</Label>
+              <Input name="name" value={formData.name} onChange={handleChange} />
+              <ErrorText>{errors.name}</ErrorText>
+            </FormField>
 
             {/* Email */}
-            <Label>Email</Label>
-            <Input
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-            />
-            <ErrorText>{errors.email}</ErrorText>
+            <FormField>
+              <Label>Email</Label>
+              <Input name="email" value={formData.email} onChange={handleChange} />
+              <ErrorText>{errors.email}</ErrorText>
+            </FormField>
 
-            {/* Referrer fields */}
-            {accountType === "Referrer" && (
-              <>
+            {/* Referrer Fields */}
+            {accountType === "Referrer" && <>
+              <FormField>
                 <Label>Referral ID</Label>
-                <Input
-                  name="referralId"
-                  value={formData.referralId || "Auto-generated"}
-                  readOnly
-                />
+                <Input name="referralId" value={formData.referralId||"Auto-generated"} readOnly />
+              </FormField>
+              <FormField>
                 <Label>Designation</Label>
-                <Input
-                  name="designation"
-                  value={formData.designation}
-                  onChange={handleChange}
-                />
+                <Input name="designation" value={formData.designation} onChange={handleChange} />
                 <ErrorText>{errors.designation}</ErrorText>
+              </FormField>
+              <FormField>
                 <Label>College / Office</Label>
-                <Input
-                  name="college"
-                  value={formData.college}
-                  onChange={handleChange}
-                />
+                <Input name="college" value={formData.college} onChange={handleChange} />
                 <ErrorText>{errors.college}</ErrorText>
+              </FormField>
+              <FormField>
                 <Label>Mobile Number</Label>
-                <Input
-                  name="mobile"
-                  value={formData.mobile}
-                  onChange={handleChange}
-                />
+                <Input name="mobile" value={formData.mobile} onChange={handleChange} />
                 <ErrorText>{errors.mobile}</ErrorText>
-              </>
-            )}
+              </FormField>
+            </>}
 
-            {/* DevTutor, Tutor, Developer */}
-            {["DevTutor", "Tutor", "Developer"].includes(accountType) && (
-              <>
+            {/* DevTutor / Tutor / Developer Fields */}
+            {["DevTutor","Tutor","Developer"].includes(accountType) && <>
+              <FormField>
                 <Label>Designation</Label>
-                <Input
-                  name="designation"
-                  value={formData.designation}
-                  onChange={handleChange}
-                />
+                <Input name="designation" value={formData.designation} onChange={handleChange} />
                 <ErrorText>{errors.designation}</ErrorText>
+              </FormField>
+              <FormField>
                 <Label>Mobile Number</Label>
-                <Input
-                  name="mobile"
-                  value={formData.mobile}
-                  onChange={handleChange}
-                />
+                <Input name="mobile" value={formData.mobile} onChange={handleChange} />
                 <ErrorText>{errors.mobile}</ErrorText>
+              </FormField>
+              <FormField>
                 <Label>Degree</Label>
-                <Input
-                  name="degree"
-                  value={formData.degree}
-                  onChange={handleChange}
-                />
+                <Input name="degree" value={formData.degree} onChange={handleChange} />
                 <ErrorText>{errors.degree}</ErrorText>
+              </FormField>
+              <FormField>
                 <Label>Course Name</Label>
-                <Input
-                  name="courseName"
-                  value={formData.courseName}
-                  onChange={handleChange}
-                />
+                <Input name="courseName" value={formData.courseName} onChange={handleChange} />
                 <ErrorText>{errors.courseName}</ErrorText>
+              </FormField>
+              <FormField>
                 <Label>College/University</Label>
-                <Input
-                  name="collegeName"
-                  value={formData.collegeName}
-                  onChange={handleChange}
-                />
+                <Input name="collegeName" value={formData.collegeName} onChange={handleChange} />
                 <ErrorText>{errors.collegeName}</ErrorText>
+              </FormField>
+              <FormField>
                 <Label>Certifications</Label>
-                <Input
-                  name="certifications"
-                  value={formData.certifications}
-                  onChange={handleChange}
-                />
+                <Input name="certifications" value={formData.certifications} onChange={handleChange} />
                 <ErrorText>{errors.certifications}</ErrorText>
+              </FormField>
+              <FormField>
                 <Label>Experience</Label>
-                <Input
-                  name="experience"
-                  value={formData.experience}
-                  onChange={handleChange}
-                />
+                <Input name="experience" value={formData.experience} onChange={handleChange} />
                 <ErrorText>{errors.experience}</ErrorText>
-
+              </FormField>
+              <FormField>
                 <Label>Govt Proof 1</Label>
-                <Input
-                  type="file"
-                  name="proof1"
-                  onChange={handleChange}
-                  ref={proof1Ref}
-                />
+                <Input type="file" name="proof1" onChange={handleChange} ref={proof1Ref} />
                 <ErrorText>{errors.proof1}</ErrorText>
                 {formData.proof1 && (
                   <FileWrapper>
@@ -356,14 +318,10 @@ const SignupPage = () => {
                     <RemoveIcon onClick={removeProof1}>×</RemoveIcon>
                   </FileWrapper>
                 )}
-
+              </FormField>
+              <FormField>
                 <Label>Govt Proof 2</Label>
-                <Input
-                  type="file"
-                  name="proof2"
-                  onChange={handleChange}
-                  ref={proof2Ref}
-                />
+                <Input type="file" name="proof2" onChange={handleChange} ref={proof2Ref} />
                 <ErrorText>{errors.proof2}</ErrorText>
                 {formData.proof2 && (
                   <FileWrapper>
@@ -383,15 +341,13 @@ const SignupPage = () => {
                     <RemoveIcon onClick={removeProof2}>×</RemoveIcon>
                   </FileWrapper>
                 )}
-
+              </FormField>
+              <FormField>
                 <Label>Address</Label>
-                <Input
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                />
+                <Input name="address" value={formData.address} onChange={handleChange} />
                 <ErrorText>{errors.address}</ErrorText>
-
+              </FormField>
+              <FormField>
                 <Label>Passport Photo</Label>
                 <Input
                   type="file"
@@ -416,10 +372,7 @@ const SignupPage = () => {
                       <RemoveIcon onClick={removePassportImage}>×</RemoveIcon>
                     </CropperWrapper>
                     <CropControls>
-                      <CropButton
-                        type="button"
-                        onClick={handleCropPassportImage}
-                      >
+                      <CropButton type="button" onClick={handleCropPassportImage}>
                         Crop
                       </CropButton>
                       <ZoomSlider
@@ -428,7 +381,7 @@ const SignupPage = () => {
                         max={3}
                         step={0.1}
                         value={zoom}
-                        onChange={(e) => setZoom(Number(e.target.value))}
+                        onChange={e => setZoom(Number(e.target.value))}
                       />
                     </CropControls>
                   </>
@@ -439,7 +392,8 @@ const SignupPage = () => {
                     <RemoveIcon onClick={removePassportImage}>×</RemoveIcon>
                   </ImagePreviewWrapper>
                 )}
-
+              </FormField>
+              <FormField>
                 <Label>Signature</Label>
                 <Input
                   type="file"
@@ -458,26 +412,20 @@ const SignupPage = () => {
                     <RemoveIcon onClick={removeSignature}>×</RemoveIcon>
                   </ImagePreviewWrapper>
                 )}
-              </>
-            )}
+              </FormField>
+            </>}
 
             {/* Password */}
-            <Label>Password</Label>
-            <Input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-            />
-            <ErrorText>{errors.password}</ErrorText>
-            <Label>Confirm Password</Label>
-            <Input
-              type="password"
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-            />
-            <ErrorText>{errors.confirmPassword}</ErrorText>
+            <FormField>
+              <Label>Password</Label>
+              <Input type="password" name="password" value={formData.password} onChange={handleChange} />
+              <ErrorText>{errors.password}</ErrorText>
+            </FormField>
+            <FormField>
+              <Label>Confirm Password</Label>
+              <Input type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} />
+              <ErrorText>{errors.confirmPassword}</ErrorText>
+            </FormField>
 
             <Button type="submit">Sign Up</Button>
           </Form>
@@ -498,7 +446,13 @@ const SignupPage = () => {
       {modal.isOpen && (
         <ModalOverlay>
           <ModalContent>
-            <ModalMessage type={modal.type}>{modal.message} <i className="fa-solid fa-circle-check fa-bounce" style={{ color: "#14a800" }}></i></ModalMessage>
+            <ModalMessage type={modal.type}>
+              {modal.message}
+              <i
+                className="fa-solid fa-circle-check fa-bounce"
+                style={{ color: "#14a800" }}
+              ></i>
+            </ModalMessage>
             <CloseButton
               onClick={() => setModal({ isOpen: false, message: "", type: "" })}
             >
@@ -513,40 +467,50 @@ const SignupPage = () => {
 
 export default SignupPage;
 
-// Styled Components (unchanged)
+// Styled Components
 const Wrapper = styled.div`
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   background: linear-gradient(90deg, #f7f7f7, #eaeaea);
 `;
+
 const Content = styled.div`
   flex: 1;
   display: flex;
   justify-content: center;
   align-items: center;
-  background: #f7f7f7;
   padding-top: 80px;
 `;
+
 const FormContainer = styled.div`
   background: #fff;
   padding: 40px;
   margin: 40px 0;
   border-radius: 10px;
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
-  width: 400px;
+  width: 800px;
+  max-width: 95vw;
   text-align: center;
   position: relative;
+  @media (max-width: 768px) {
+    padding:20px;
+    margin:20px 0;
+    width: 100%;
+  }
 `;
+
 const Title = styled.h2`
   margin-bottom: 20px;
   color: #333;
 `;
+
 const RoleSelector = styled.div`
   display: flex;
   justify-content: center;
   margin-bottom: 20px;
 `;
+
 const ButtonTab = styled.button`
   flex: 1;
   padding: 10px;
@@ -556,26 +520,43 @@ const ButtonTab = styled.button`
   cursor: pointer;
   &:not(:last-child) {
     margin-right: 10px;
+    @media (max-width: 768px) {
+    margin-right: 5px;
+  }
   }
 `;
+
 const Form = styled.form`
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
   text-align: left;
+
   input:-webkit-autofill,
   input:-webkit-autofill:hover,
   input:-webkit-autofill:focus {
     -webkit-text-fill-color: black !important;
     transition: background-color 5000s ease-in-out 0s;
   }
+    @media (max-width: 600px) {
+    grid-template-columns:1fr !important;
+    gap:12px;
+  }
 `;
+
+const FormField = styled.div`
+  display: flex;
+  flex-direction: column;
+`;
+
 const Label = styled.label`
   margin-bottom: 5px;
   font-weight: bold;
 `;
+
 const Input = styled.input`
   padding: 10px;
-  margin-bottom: 15px;
+  margin-bottom: 5px;
   border: 1px solid #ccc;
   border-radius: 4px;
   &:focus {
@@ -583,7 +564,16 @@ const Input = styled.input`
     outline: none;
   }
 `;
+
+const ErrorText = styled.span`
+  color: red;
+  font-size: 14px;
+  margin-bottom: 10px;
+`;
+
+// Span full width
 const Button = styled.button`
+  grid-column: 1 / -1;
   padding: 12px;
   background: #7620ff;
   color: #fff;
@@ -596,6 +586,7 @@ const Button = styled.button`
     transition: 0.5s;
   }
 `;
+
 const SwitchLink = styled.p`
   margin-top: 15px;
   color: #7620ff;
@@ -604,26 +595,21 @@ const SwitchLink = styled.p`
     text-decoration: underline;
   }
 `;
-const ErrorText = styled.span`
-  color: red;
-  font-size: 14px;
-  margin-bottom: 10px;
-`;
+
 const SpinnerOverlay = styled.div`
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(255, 255, 255, 0.8);
   display: flex;
   justify-content: center;
   align-items: center;
 `;
+
 const spin = keyframes`
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 `;
+
 const Spinner = styled.div`
   border: 4px solid #f3f3f3;
   border-top: 4px solid #7620ff;
@@ -632,99 +618,63 @@ const Spinner = styled.div`
   height: 40px;
   animation: ${spin} 1s linear infinite;
 `;
+
+// Modal, cropper, previews, etc. (unchanged)
 const ModalOverlay = styled.div`
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  display: flex; justify-content: center; align-items: center;
 `;
 const ModalContent = styled.div`
-  background: #fff;
-  padding: 20px;
-  border-radius: 8px;
-  position: relative;
-  width: 300px;
-  text-align: center;
+  background: #fff; padding: 20px; border-radius: 8px;
+  position: relative; width: 300px; text-align: center;
 `;
 const ModalMessage = styled.p`
   color: ${({ type }) => (type === "success" ? "green" : "red")};
   font-weight: bold;
 `;
 const CloseButton = styled.button`
-  position: absolute;
-  top: 5px;
-  right: 10px;
-  background: transparent;
-  border: none;
-  font-size: 18px;
+  position: absolute; top: 5px; right: 10px;
+  background: transparent; border: none; font-size: 18px;
   cursor: pointer;
 `;
+
 const CropperWrapper = styled.div`
-  position: relative;
-  width: 100%;
-  height: 300px;
-  background: #333;
-  margin-top: 10px;
+  position: relative; width: 100%; height: 300px;
+  background: #333; margin-top: 10px;
 `;
 const CropControls = styled.div`
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  display: flex; justify-content: center; align-items: center;
   margin-top: 10px;
 `;
 const CropButton = styled.button`
-  padding: 8px 16px;
-  background: #7620ff;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  margin-right: 10px;
+  padding: 8px 16px; background: #7620ff; color: #fff;
+  border: none; border-radius: 4px; margin-right: 10px;
   cursor: pointer;
-  &:hover {
-    background: #580cd2;
-  }
+  &:hover { background: #580cd2; }
 `;
 const ZoomSlider = styled.input`
   width: 150px;
 `;
 const RemoveIcon = styled.span`
-  position: absolute;
-  top: 5px;
-  left: 5px;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  position: absolute; top: 5px; left: 5px;
+  background: rgba(0, 0, 0, 0.6); color: #fff;
+  border-radius: 50%; width: 24px; height: 24px;
+  display: flex; justify-content: center; align-items: center;
   cursor: pointer;
 `;
 const ImagePreviewWrapper = styled.div`
-  position: relative;
-  display: inline-block;
-  margin-top: 10px;
+  position: relative; display: inline-block; margin-top: 10px;
 `;
 const ImagePreview = styled.img`
-  width: 150px;
-  height: auto;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  width: 150px; height: auto;
+  border: 1px solid #ccc; border-radius: 4px;
 `;
 const FilePreviewLink = styled.a`
-  display: block;
-  margin: 8px 0;
-  color: #7620ff;
-  text-decoration: underline;
+  display: block; margin: 8px 0;
+  color: #7620ff; text-decoration: underline;
 `;
 const FileWrapper = styled.div`
-  position: relative;
-  display: inline-block;
-  margin-top: 10px;
+  position: relative; display: inline-block; margin-top: 10px;
 `;

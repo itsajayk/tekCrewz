@@ -1,14 +1,28 @@
-import React from "react";
+import React, { useContext } from "react";
 import styled from "styled-components";
 import { FaFacebookF, FaTwitter, FaInstagram, FaLinkedinIn, FaWhatsapp } from "react-icons/fa";
 // Assets
 import LogoImg from "../../assets/svg/Logo";
 import { Link } from "react-router-dom";
 import { Link as ScrollLink } from "react-scroll";
+import { AuthContext } from '../../contexts/AuthContext';
 
 export default function Contact() {
   const getCurrentYear = () => new Date().getFullYear();
+  const { currentUser } = useContext(AuthContext);
+  // Fallback to localStorage if needed
+  const userId = currentUser?.displayName || localStorage.getItem('userId') || '';
+  const isEmployee = /^(EMPDT|EMPTR|EMPDV|EMPAD|REFSD)/.test(userId);
 
+if (isEmployee) {
+    return (
+      <MinimalWrapper>
+        <MinimalText>Copyrights {getCurrentYear()} TekCrewz Infotech All rights reserved</MinimalText>
+      </MinimalWrapper>
+    );
+  }
+
+  // Default full footer
   return (
     <Wrapper>
       <div className="darkBg">
@@ -47,15 +61,12 @@ export default function Contact() {
                 <FaLinkedinIn />
               </SocialIcon>
             </SocialSection>
-            
           </InnerWrapper>
 
           <LinksSection>
             <StyledLink href="/about">About</StyledLink>
             <StyledLink href="/privacy">Terms &amp; Conditions</StyledLink>
-            <StyledLink href="/privacy">      
-                Privacy Policy
-            </StyledLink>
+            <StyledLink href="/privacy">Privacy Policy</StyledLink>
             <StyledLink href="#contact-form">Contact</StyledLink>
             <StyledLink href="mailto:info.tekcrewz@gmail.com">
               <strong>info.tekcrewz@gmail.com</strong>
@@ -69,19 +80,9 @@ export default function Contact() {
             <ScrollLink to="home" smooth={true} offset={-80} duration={500} className="whiteColor animate pointer font13">
               Back to top
             </ScrollLink>
-
           </BottomWrapper>
         </div>
       </div>
-    
-      <FixedWhatsapp
-        href="https://api.whatsapp.com/send?phone=919655466339&text=Hello%2C%20I%27m%20interested%20in%20your%20services%20need%20some%20assistance"
-        target="_blank"
-      >
-        <FaWhatsapp size={38} />
-      </FixedWhatsapp>
-
-
     </Wrapper>
   );
 }
@@ -100,6 +101,18 @@ const InnerWrapper = styled.div`
     text-align: center;
     padding: 0 10px;
   }
+`;
+
+const MinimalWrapper = styled.div`
+  width: 100%;
+  padding: 10px 0;
+  background: #0b093b;
+  text-align: center;
+`;
+const MinimalText = styled.p`
+  margin: 0;
+  color: #fff;
+  font-size: 14px;
 `;
 const LogoSection = styled.div`
   display: flex;

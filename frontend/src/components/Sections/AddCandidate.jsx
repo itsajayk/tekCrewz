@@ -6,28 +6,29 @@ import Footer from '../Sections/Footer';
 import { useNavigate } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
 import getCroppedImg from '../Helper/cropImage';
+import { getFirestore, collection, addDoc, getDocs } from 'firebase/firestore';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth, app } from '../Pages/firebase';
 
 const API_BASE_URL = 'https://tekcrewz.onrender.com';
+const COURSE_CODES = {
+  'full-stack': 'FS',
+  'python': 'PY',
+  'php with laravel': 'PL',
+  'dot net': 'DT',
+  'business analyst': 'BA',
+  'graphic designing': 'GD',
+  'digital marketing': 'DM',
+  'software testing': 'ST'
+};
 
 export default function AddCandidate() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    userId: '',
-    candidateName: '',
-    college: '',
-    candidateDegree: '',
-    candidateCourseName: '',
-    programme: '',
-    marksType: '',
-    score: '',
-    scholarshipSecured: '',
-    mobile: '',
-    parentMobile: '',
-    email: '',
-    coursesEnquired: '',
-    dateOfVisit: '',
-    paymentTerm: '',
-    communicationScore: ''
+    userId:'', batchNumber:'', studentId:'', candidateName:'', college:'',
+    candidateDegree:'', programme:'', candidateCourseName:'', marksType:'',
+    score:'', scholarshipSecured:'', mobile:'', parentMobile:'', email:'',
+    coursesEnquired:'', dateOfVisit:'', paymentTerm:'', communicationScore:''
   });
 
   const [candidatePic, setCandidatePic] = useState(null);
@@ -49,6 +50,33 @@ export default function AddCandidate() {
   const markStatementRef = useRef();
   const signatureRef = useRef();
 
+  const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState(null)
+
+  useEffect(() => {
+    const db = getFirestore(app)
+    const usersCol = collection(db, 'users')
+
+    async function fetchUsers() {
+      try {
+        const snapshot = await getDocs(usersCol)
+        const userList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        setUsers(userList)
+      } catch (err) {
+        console.error('Error fetching users:', err)
+        setFetchError('Failed to load users')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchUsers()
+  }, [])
+
   useEffect(() => {
     const deg = formData.candidateDegree;
     let opts = [];
@@ -60,6 +88,17 @@ export default function AddCandidate() {
       setFormData(prev => ({ ...prev, programme: '' }));
     }
   }, [formData.candidateDegree]);
+
+  // Generate studentId when batch or course selected or users change
+  useEffect(() => {
+    const { coursesEnquired, batchNumber } = formData;
+    if (!coursesEnquired || !batchNumber) return;
+    const codeKey = coursesEnquired.toLowerCase();
+    const courseCode = COURSE_CODES[codeKey] || 'XX';
+    const rollNum = String(users.length + 1).padStart(3, '0');
+    const studentId = `BT${batchNumber}${courseCode}${rollNum}`;
+    setFormData(prev => ({ ...prev, studentId }));
+  }, [formData.coursesEnquired, formData.batchNumber, users]);
 
   const handleChange = e =>
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -114,10 +153,9 @@ export default function AddCandidate() {
   const validate = () => {
     const temp = {};
     [
-      'userId','candidateName','college','candidateDegree',
-      'programme','marksType','score','mobile','parentMobile',
-      'email','coursesEnquired','dateOfVisit','paymentTerm',
-      'communicationScore'
+      'userId','batchNumber','candidateName','college','candidateDegree','programme',
+      'marksType','score','mobile','parentMobile','email','coursesEnquired',
+      'dateOfVisit','paymentTerm','communicationScore'
     ].forEach(f => {
       if (!formData[f]) temp[f] = 'Required.';
     });
@@ -129,50 +167,39 @@ export default function AddCandidate() {
     e.preventDefault();
     if (!validate()) return;
     setIsLoading(true);
-
     try {
+      // 1) MongoDB save
       const data = new FormData();
-      Object.entries(formData).forEach(([k, v]) => data.append(k, v));
+      Object.entries(formData).forEach(([k,v])=>data.append(k,v));
+      // append files/blobs...
+      const res = await axios.post(`${API_BASE_URL}/api/candidates`, data, { withCredentials:true });
+      
+      // 2) Firebase Auth & Firestore
+      const pwd = formData.studentId; // default password
+      const cred = await createUserWithEmailAndPassword(auth, formData.email, pwd);
+      const fs = getFirestore(app);
+      await addDoc(collection(fs, `batches/${formData.batchNumber}/students`), {
+        uid: cred.user.uid,
+        email: formData.email,
+        role: 'student'
+      });
 
-      if (croppedCandidatePic) {
-        const resp = await fetch(croppedCandidatePic);
-        const blob = await resp.blob();
-        data.append('candidatePic', blob, 'candidatePic.jpg');
-      }
-      if (markStatement) {
-        data.append('markStatement', markStatement, markStatement.name);
-      }
-      if (signatureFile) {
-        data.append('signature', signatureFile, signatureFile.name);
-      }
-
-      for (let pair of data.entries()) {
-        console.log(pair[0], pair[1]);
-      }
-
-      const res = await axios.post(
-        `${API_BASE_URL}/api/candidates`,
-        data,
-        { withCredentials: true }
-      );
-
-      setSuccessMessage(res.data.message);
+      setSuccessMessage('Candidate added successfully');
+      // reset form and previews
       setFormData({
-        userId:'', candidateName:'', college:'', candidateDegree:'',
-        candidateCourseName:'', programme:'', marksType:'', score:'',
-        scholarshipSecured:'', mobile:'', parentMobile:'', email:'',
+        userId:'', batchNumber:'', studentId:'', candidateName:'', college:'',
+        candidateDegree:'', programme:'', candidateCourseName:'', marksType:'',
+        score:'', scholarshipSecured:'', mobile:'', parentMobile:'', email:'',
         coursesEnquired:'', dateOfVisit:'', paymentTerm:'', communicationScore:''
       });
-      removeCandidatePic();
-      removeMarkStatement();
-      removeSignature();
+      removeCandidatePic(); removeMarkStatement(); removeSignature();
     } catch (err) {
-      // console.error('Submit error:', err.response?.data, err.message);
-      alert(err.response?.data?.error || 'Network or server error');
+      alert(err.message || 'Error saving candidate');
     } finally {
       setIsLoading(false);
     }
   };
+  
 
   return (
     <>
@@ -184,14 +211,41 @@ export default function AddCandidate() {
 
             {/* User */}
             <InputGroup>
-              <Label>User</Label>
-              <Select name="userId" value={formData.userId} onChange={handleChange}>
-                <option value="">Select User</option>
-                <option value="admin">Admin</option>
-                <option value="REFSD001">REFSD001</option>
-                <option value="REFSD002">REFSD002</option>
-              </Select>
-              {errors.userId && <ErrorText>{errors.userId}</ErrorText>}
+      <Label htmlFor="userId">User</Label>
+      <Select
+        id="userId"
+        name="userId"
+        value={formData.userId}
+        onChange={handleChange}
+        disabled={loading || !!fetchError}
+      >
+        <option value="">Select User</option>
+        {loading && <option>Loading…</option>}
+        {fetchError && <option disabled>{fetchError}</option>}
+        {!loading && !fetchError && users.map(user => (
+          <option key={user.id} value={user.id}>
+            {user.displayName || user.id}
+          </option>
+        ))}
+      </Select>
+      {errors.userId && <ErrorText>{errors.userId}</ErrorText>}
+    </InputGroup>
+
+             {/* Batch Number */}
+            <InputGroup>
+              <Label>Batch Number</Label>
+              <Input
+                name="batchNumber"
+                value={formData.batchNumber}
+                onChange={handleChange}
+                placeholder="Enter batch number"
+              />
+            </InputGroup>
+
+            {/* Student ID (readonly) */}
+            <InputGroup>
+              <Label>Student ID</Label>
+              <Input name="studentId" value={formData.studentId} readOnly />
             </InputGroup>
 
             {/* Candidate Name */}
