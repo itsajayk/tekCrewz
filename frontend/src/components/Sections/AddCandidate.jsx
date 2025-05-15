@@ -1,4 +1,9 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, {
+  useState,
+  useRef,
+  useCallback,
+  useEffect
+} from 'react';
 import axios from 'axios';
 import styled, { keyframes } from 'styled-components';
 import TopNavbar from '../Nav/TopNavbar';
@@ -6,15 +11,22 @@ import Footer from '../Sections/Footer';
 import { useNavigate } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
 import getCroppedImg from '../Helper/cropImage';
-import { getFirestore, collection, addDoc, getDocs, setDoc, doc } from 'firebase/firestore';
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  setDoc,
+  doc
+} from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, app } from '../Pages/firebase';
-import { generateUniqueIdFromFirestore } from '.././Pages/idGenerator';
+import { generateUniqueIdFromFirestore } from '../Pages/idGenerator';
 
 const API_BASE_URL = 'https://tekcrewz.onrender.com';
 const COURSE_CODES = {
   'full-stack': 'FS',
-  'python': 'PY',
+  python: 'PY',
   'php with laravel': 'PL',
   'dot net': 'DT',
   'business analyst': 'BA',
@@ -25,11 +37,26 @@ const COURSE_CODES = {
 
 export default function AddCandidate() {
   const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
-    userId:'', batchNumber:'', studentId:'', candidateName:'', college:'',
-    candidateDegree:'', programme:'', candidateCourseName:'', marksType:'',
-    score:'', scholarshipSecured:'', mobile:'', parentMobile:'', email:'',
-    coursesEnquired:'', dateOfVisit:'', paymentTerm:'', communicationScore:''
+    referrerId: '',
+    batchNumber: '',
+    studentId: '',
+    candidateName: '',
+    college: '',
+    candidateDegree: '',
+    programme: '',
+    candidateCourseName: '',
+    marksType: '',
+    score: '',
+    scholarshipSecured: '',
+    mobile: '',
+    parentMobile: '',
+    email: '',
+    coursesEnquired: '',
+    dateOfVisit: '',
+    paymentTerm: '',
+    communicationScore: ''
   });
 
   // Files + cropping
@@ -44,19 +71,22 @@ export default function AddCandidate() {
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [showCropper, setShowCropper] = useState(false);
 
+  // Programme dropdown
   const [programmeOptions, setProgrammeOptions] = useState([]);
+
+  // Validation & loading
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Refs for resetting inputs
-  const candidatePicRef    = useRef();
-  const markStatementRef   = useRef();
-  const signatureRef       = useRef();
+  // Refs for file inputs
+  const candidatePicRef  = useRef();
+  const markStatementRef = useRef();
+  const signatureRef     = useRef();
 
-  // Fetch existing users (unchanged)
-  const [users, setUsers]       = useState([]);
-  const [loading, setLoading]   = useState(true);
+  // Fetch existing users for the “User” dropdown
+  const [users, setUsers]         = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
   const [fetchError, setFetchError] = useState(null);
 
   useEffect(() => {
@@ -69,18 +99,18 @@ export default function AddCandidate() {
       } catch (err) {
         setFetchError('Failed to load users');
       } finally {
-        setLoading(false);
+        setLoadingUsers(false);
       }
     }
     fetchUsers();
   }, []);
 
-  // Programme options based on degree (unchanged)
+  // Programme options based on degree
   useEffect(() => {
     const deg = formData.candidateDegree;
     let opts = [];
     if (deg === 'UG') opts = ['BE','B.Sc.','B. Com','BBA','BCA','BA','B.Lit.','B.S.W','B.Ed','B.F.A'];
-    else if (deg === 'PG') opts = ['ME','M.Tech','M.Phil','M.A','M.C.A','M.Sc.','M.S.W','M.B.A','M.F.A.'];
+    else if (deg === 'PG') opts = ['ME','M.Tech','M.Phil','M.A','M.C.A','M.Sc.','M.S.W','M.B.A','M.F.A'];
     else if (deg === 'Integrated') opts = ['M.Sc','BBA + MBA','BA + Bed','BA+LLB'];
     setProgrammeOptions(opts);
     if (!opts.includes(formData.programme)) {
@@ -88,7 +118,7 @@ export default function AddCandidate() {
     }
   }, [formData.candidateDegree]);
 
-  // **New: generate Student ID using Firestore counter + your BT... code**
+  // Auto‑generate studentId from Firestore counter + your batch/course code
   useEffect(() => {
     const { coursesEnquired, batchNumber } = formData;
     if (!coursesEnquired || !batchNumber) return;
@@ -105,7 +135,7 @@ export default function AddCandidate() {
       .catch(console.error);
   }, [formData.coursesEnquired, formData.batchNumber]);
 
-  // Standard handlers (unchanged)...
+  // Handlers
   const handleChange = e =>
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
@@ -117,6 +147,7 @@ export default function AddCandidate() {
       setCroppedCandidatePic(null);
     }
   };
+
   const handleFileChange = (e, setter) => {
     const file = e.target.files?.[0];
     if (file) setter(file);
@@ -158,7 +189,7 @@ export default function AddCandidate() {
   const validate = () => {
     const temp = {};
     [
-      'userId','batchNumber','candidateName','college','candidateDegree','programme',
+      'referrerId','batchNumber','candidateName','college','candidateDegree','programme',
       'marksType','score','mobile','parentMobile','email','coursesEnquired',
       'dateOfVisit','paymentTerm','communicationScore'
     ].forEach(f => {
@@ -174,48 +205,55 @@ export default function AddCandidate() {
     setIsLoading(true);
 
     try {
+      // 1) Upload to your backend (Mongo + Cloudinary)
       const data = new FormData();
-      // 1) append form fields
-      Object.entries(formData).forEach(([k,v]) => data.append(k, v));
-
-      // 2) append the cropped pic as a real File blob
+      Object.entries(formData).forEach(([k, v]) => data.append(k, v));
       if (croppedCandidatePic) {
         const blob = await fetch(croppedCandidatePic).then(r => r.blob());
         data.append('candidatePic', blob, 'candidatePic.jpg');
       }
-      // 3) append PDF & signature if present
       if (markStatement) data.append('markStatement', markStatement);
       if (signatureFile) data.append('signature', signatureFile);
-
-      // → MongoDB + Cloudinary
 
       const resp = await axios.post(
         `${API_BASE_URL}/api/candidates`,
         data,
-        { withCredentials:true }
+        { withCredentials: true }
       );
 
-      // → Firebase Auth & Firestore
-      // Default password: first 3 letters of name + '@' + last 3 digits of mobile
-      const namePart = formData.candidateName.replace(/\s+/g, '').slice(0,3).toLowerCase();
+      // 2) Create Auth user + Firestore writes
+      const namePart   = formData.candidateName.replace(/\s+/g, '').slice(0,3).toLowerCase();
       const mobilePart = formData.mobile.slice(-3);
-      const pwd = `${namePart}@${mobilePart}`;
+      const pwd        = `${namePart}@${mobilePart}`;
 
-      const cred = await createUserWithEmailAndPassword(auth, formData.email, pwd);
-      const fs   = getFirestore(app);
-            await setDoc(
+      const cred = await createUserWithEmailAndPassword(
+        auth,
+        formData.email,
+        pwd
+      );
+      const fs = getFirestore(app);
+
+      // 2a) Batch‑scoped student record (unchanged) :contentReference[oaicite:0]{index=0}:contentReference[oaicite:1]{index=1}
+      await setDoc(
         doc(fs, `batch/${formData.batchNumber}/students`, formData.studentId),
         { uid: formData.studentId, email: formData.email, role: 'student' }
       );
 
+      // 2b) ── ALSO REGISTER IN TOP‑LEVEL “users” COLLECTION ── CHANGED
+      await setDoc(
+        doc(fs, 'users', formData.studentId),             // CHANGED
+        { email: formData.email, role: 'student' }         // CHANGED
+      );
+
+      // Success feedback
       const createdId = resp.data.candidate.studentId;
       setSuccessMessage(`Candidate ${createdId} added successfully`);
-      // reset everything
+      // Reset form + files
       setFormData({
         referrerId:'', batchNumber:'', studentId:'', candidateName:'', college:'',
-    candidateDegree:'', programme:'', candidateCourseName:'', marksType:'',
-    score:'', scholarshipSecured:'', mobile:'', parentMobile:'', email:'',
-    coursesEnquired:'', dateOfVisit:'', paymentTerm:'', communicationScore:''
+        candidateDegree:'', programme:'', candidateCourseName:'', marksType:'',
+        score:'', scholarshipSecured:'', mobile:'', parentMobile:'', email:'',
+        coursesEnquired:'', dateOfVisit:'', paymentTerm:'', communicationScore:''
       });
       removeCandidatePic();
       removeMarkStatement();
@@ -237,18 +275,18 @@ export default function AddCandidate() {
 
             {/* User */}
             <InputGroup>
-      <Label htmlFor="referrerId">User</Label>
-      <Select
-        id="referrerId"
-        name="referrerId"
-        value={formData.referrerId}
-        onChange={handleChange}
-        disabled={loading || !!fetchError}
-      >
+              <Label htmlFor="referrerId">User</Label>
+              <Select
+                id="referrerId"
+                name="referrerId"
+                value={formData.referrerId}
+                onChange={handleChange}
+                disabled={loadingUsers || !!fetchError}
+              >
         <option value="">Select User</option>
-        {loading && <option>Loading…</option>}
+        {loadingUsers  && <option>Loading…</option>}
         {fetchError && <option disabled>{fetchError}</option>}
-        {!loading && !fetchError && users.map(user => (
+        {!loadingUsers  && !fetchError && users.map(user => (
           <option key={user.id} value={user.id}>
             {user.displayName || user.id}
           </option>

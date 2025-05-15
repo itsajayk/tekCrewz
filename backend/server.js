@@ -63,14 +63,14 @@ const upload = multer({
 
 // ── Schema ─────────────────────────────────────────────────────────────
 const candidateSchema = new mongoose.Schema({
-  referrerId:         { type: String, required: true }, // renamed from userId
-  studentId:          { type: String, required: true }, // added
+  referrerId:         { type: String, required: true },
+  studentId:          { type: String, required: true },
   candidateName:      { type: String, required: true },
   college:            { type: String, required: true },
   candidateDegree:    { type: String, required: true },
   programme:          { type: String },
   candidateCourseName:{ type: String },
-  marksType:          { type: String, enum: ['CGPA', 'Percentage'], required: true },
+  marksType:          { type: String, enum: ['CGPA','Percentage'], required: true },
   score:              { type: Number, default: 0 },
   scholarshipSecured: { type: String },
   mobile:             { type: String, required: true },
@@ -92,7 +92,7 @@ const candidateSchema = new mongoose.Schema({
 
 const Candidate = mongoose.model('Candidate', candidateSchema);
 
-// ── POST: Add Candidate ────────────────────────────────────────────────
+// ── POST: Add Candidate
 app.post(
   '/api/candidates',
   (req, res, next) => {
@@ -101,57 +101,55 @@ app.post(
       { name: 'markStatement', maxCount: 1 },
       { name: 'signature',     maxCount: 1 }
     ])(req, res, err => {
-      if (err) {
-        return res.status(400).json({ error: err.message });
-      }
+      if (err) return res.status(400).json({ error: err.message });
       next();
     });
   },
   async (req, res) => {
     try {
-      ['score','communicationScore','paidAmount'].forEach(key => {
-        if (req.body[key] != null) req.body[key] = Number(req.body[key]);
+      ['score','communicationScore','paidAmount'].forEach(k => {
+        if (req.body[k] != null) req.body[k] = Number(req.body[k]);
       });
-
       const newCandidate = new Candidate({
         ...req.body,
         candidatePic:  req.files.candidatePic?.[0]?.path,
         markStatement: req.files.markStatement?.[0]?.path,
         signature:     req.files.signature?.[0]?.path || undefined
       });
-
       await newCandidate.save();
-      res.status(201).json({ message: 'Candidate saved', candidate: newCandidate });
+      res.status(201).json({
+        message: 'Candidate saved',
+        candidate: newCandidate
+      });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   }
 );
 
-// ── GET: All Candidates ────────────────────────────────────────────────
+// ── GET: All Candidates (filter by date, status, referrerId) :contentReference[oaicite:8]{index=8}:contentReference[oaicite:9]{index=9}
 app.get('/api/candidates', async (req, res) => {
   try {
-    const { date, status, sortOrder, userId } = req.query;
+    const { date, status, referrerId, sortOrder } = req.query;
     const filter = {};
     if (date) {
-      const [year, month] = date.split('-').map(Number);
+      const [y, m] = date.split('-').map(Number);
       filter.dateOfVisit = {
-        $gte: new Date(year, month - 1, 1),
-        $lte: new Date(year, month, 0, 23,59,59,999)
+        $gte: new Date(y, m-1, 1),
+        $lte: new Date(y, m, 0, 23,59,59,999)
       };
     }
-    if (status) filter.status = status;
-    if (userId) filter.userId = userId;
-
-    const sortDir = sortOrder === 'asc' ? 1 : -1;
-    const candidates = await Candidate.find(filter).sort({ dateOfVisit: sortDir });
-    res.json(candidates);
+    if (status)      filter.status     = status;
+    if (referrerId)  filter.referrerId = referrerId;
+    const dir = sortOrder === 'asc' ? 1 : -1;
+    const list = await Candidate.find(filter).sort({ dateOfVisit: dir });
+    res.json(list);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ── PUT: Update Candidate ──────────────────────────────────────────────
+// ── PUT: Update Candidate by ID :contentReference[oaicite:10]{index=10}:contentReference[oaicite:11]{index=11}
 app.put('/api/candidates/:id', async (req, res) => {
   try {
     const updated = await Candidate.findByIdAndUpdate(

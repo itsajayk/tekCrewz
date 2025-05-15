@@ -51,7 +51,7 @@ const loadImageAsDataURL = (url) => {
 
 const CandidatesList = () => {
   const [candidates, setCandidates] = useState([]);
-  const [filters, setFilters] = useState({ date: null, status: '', sortOrder: 'desc', userId: '' });
+  const [filters, setFilters] = useState({ date: null, status: '', sortOrder: 'desc', referrerId: '' });
   const [isLoading, setIsLoading] = useState(false);
   const [editedCandidates, setEditedCandidates] = useState({});
 
@@ -66,7 +66,7 @@ const CandidatesList = () => {
         const month = String(filters.date.getMonth() + 1).padStart(2, '0');
         params.date = `${year}-${month}`;
       }
-      if (filters.userId) params.userId = filters.userId;
+      if (filters.referrerId) params.referrerId = filters.referrerId;
 
       const response = await axios.get(`${API_BASE_URL}/api/candidates`, { params });
       setCandidates(response.data);
@@ -274,7 +274,7 @@ let startX = 10 + doc.getTextWidth("Payment Term: ") + 5;
             <DatePicker
               selected={filters.date}
               onChange={handleDateChange}
-              dateFormat="yyyy-MM"
+              dateFormat="MM-YYYY"
               placeholderText="Select Month"
               showMonthYearPicker
               customInput={<DateButton />}
@@ -325,7 +325,7 @@ let startX = 10 + doc.getTextWidth("Payment Term: ") + 5;
                 {candidates.map((c, i) => (
                   <tr key={c._id}>
                     <td>{i + 1}</td>
-                    <td>{c.userId}</td>
+                    <td>{c.referrerId}</td>
                     <td>{c.candidateName}</td>
                     <td>{c.candidateDegree} – {c.programme}</td>
                     <td>{c.college}</td>

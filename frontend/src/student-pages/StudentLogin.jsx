@@ -10,37 +10,31 @@ import { auth } from '../components/Pages/firebase';
 import TopNavbar from '../components/Nav/TopNavbar';
 import Footer from '../components/Sections/Footer';
 import { AuthContext } from '../contexts/AuthContext';
-import axios from 'axios';
+import { getUserEmailFromUsername } from '../components/Pages/getUserEmailFromUsername';
+
 
 const StudentLoginPage = () => {
   const navigate = useNavigate();
   const { setRole, setCurrentUser, setUserId } = useContext(AuthContext); // CHANGED: Added setCurrentUser & setUserId
 
-  const API_BASE_URL = 'https://tekcrewz.onrender.com';
 
-  const [identifier, setIdentifier] = useState(''); // User ID or Email
-  const [password, setPassword]       = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg]       = useState('');
   const [isLoading, setIsLoading]     = useState(false);
 
-  const resolveEmail = async idOrEmail => {
-    try {
-      if (idOrEmail.includes('@')) return idOrEmail;
-      const resp = await axios.get(`${API_BASE_URL}/api/students/${idOrEmail}/profile`);
-      if (resp.data.email) return resp.data.email;
-      throw new Error();
-    } catch {
-      throw new Error('User not found');
-    }
-  };
 
   const handleLogin = async e => {
     e.preventDefault();
     setErrorMsg('');
     setIsLoading(true);
     try {
-      const email = await resolveEmail(identifier.trim());
+      // look up the student's email by their user ID
+      const email = await getUserEmailFromUsername(username.trim());
+      if (!email) throw new Error('User not found');
       const cred = await signInWithEmailAndPassword(auth, email, password);
+
+      // set context and redirect
       setRole('student');
       setCurrentUser(cred.user);
       setUserId(cred.user.uid);
@@ -55,13 +49,14 @@ const StudentLoginPage = () => {
   
   const handleForgot = async () => {
     setErrorMsg('');
-    if (!identifier) {
-      setErrorMsg('Enter your User ID or Email to reset.');
+    if (!username.trim()) {
+      setErrorMsg('Please enter your User ID to reset password.');
       return;
     }
     setIsLoading(true);
     try {
-      const email = await resolveEmail(identifier.trim());
+      const email = await getUserEmailFromUsername(username.trim());
+      if (!email) throw new Error('User not found');
       await sendPasswordResetEmail(auth, email);
       setErrorMsg('Password reset email sent.');
     } catch (err) {
@@ -79,12 +74,12 @@ const StudentLoginPage = () => {
         {errorMsg && <ErrorText>{errorMsg}</ErrorText>}
         <Form onSubmit={handleLogin}>
           <InputGroup>
-            <Label>User ID/Email</Label>
+            <Label>User ID</Label>
             <Input
               type="text"
-              value={identifier}
-              onChange={e => setIdentifier(e.target.value)}
-              placeholder="Enter your User ID or Email"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              placeholder="Enter your User ID"
             />
           </InputGroup>
           <InputGroup>
