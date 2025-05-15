@@ -63,7 +63,8 @@ const upload = multer({
 
 // ── Schema ─────────────────────────────────────────────────────────────
 const candidateSchema = new mongoose.Schema({
-  userId:             { type: String, required: true },
+  referrerId:         { type: String, required: true }, // renamed from userId
+  studentId:          { type: String, required: true }, // added
   candidateName:      { type: String, required: true },
   college:            { type: String, required: true },
   candidateDegree:    { type: String, required: true },
@@ -81,7 +82,7 @@ const candidateSchema = new mongoose.Schema({
   communicationScore: { type: Number, required: true },
   candidatePic:       { type: String },
   markStatement:      { type: String },
-  signature:          { type: String }, // optional
+  signature:          { type: String },
   paidAmount:         { type: Number, default: 0 },
   courseRegistered:   { type: String, default: '' },
   paidDate:           { type: Date },
@@ -214,9 +215,9 @@ app.delete('/api/candidates/:id', async (req, res) => {
 // ── New Student Dashboard Routes ────────────────────────────────────────
 
 // 1. Profile
-app.get('/api/students/:userId/profile', async (req, res) => {
+app.get('/api/students/:studentId/profile', async (req, res) => {
   try {
-    const profile = await StudentProfile.findOne({ userId: req.params.userId });
+    const profile = await StudentProfile.findOne({ studentId: req.params.studentId });
     res.json(profile);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -224,10 +225,10 @@ app.get('/api/students/:userId/profile', async (req, res) => {
 });
 
 // 2. Attendance
-app.get('/api/students/:userId/attendance', async (req, res) => {
+app.get('/api/students/:studentId/attendance', async (req, res) => {
   try {
     const records = await Attendance
-      .find({ userId: req.params.userId })
+      .find({ studentId: req.params.studentId })
       .sort({ date: 1 });
     res.json(records);
   } catch (err) {
@@ -249,9 +250,9 @@ app.get('/api/courses/:courseId/docs', async (req, res) => {
 });
 
 // 4. List Assignments
-app.get('/api/assignments/:userId', async (req, res) => {
+app.get('/api/assignments/:studentId', async (req, res) => {
   try {
-    const all = await Assignment.find({ userId: req.params.userId });
+    const all = await Assignment.find({ studentId: req.params.studentId });
     // compute closed flag based on closedAt + compute unlocked by unlockedUntil
     const now = new Date();
     const mapped = all.map(a => ({
@@ -270,11 +271,11 @@ app.get('/api/assignments/:userId', async (req, res) => {
 });
 
 // 5. Submit Code
-app.post('/api/assignments/:userId/submit', async (req, res) => {
+app.post('/api/assignments/:studentId/submit', async (req, res) => {
   try {
     const { unit, code } = req.body;
     const upd = await Assignment.findOneAndUpdate(
-      { userId: req.params.userId, unit },
+      { studentId: req.params.studentId, unit },
       { submissionCode: code },
       { new: true }
     );
@@ -285,13 +286,13 @@ app.post('/api/assignments/:userId/submit', async (req, res) => {
 });
 
 // 6. Request Unlock
-app.post('/api/assignments/:userId/unlock', async (req, res) => {
+app.post('/api/assignments/:studentId/unlock', async (req, res) => {
   try {
     const { unit } = req.body;
     // allow +2 days
     const until = new Date(Date.now() + 2*24*60*60*1000);
     const upd = await Assignment.findOneAndUpdate(
-      { userId: req.params.userId, unit },
+      { studentId: req.params.studentId, unit },
       { unlockedUntil: until },
       { new: true }
     );
@@ -302,11 +303,11 @@ app.post('/api/assignments/:userId/unlock', async (req, res) => {
 });
 
 // 7. Submit Feedback
-app.post('/api/assignments/:userId/feedback', async (req, res) => {
+app.post('/api/assignments/:studentId/feedback', async (req, res) => {
   try {
     const { unit, feedback } = req.body;
     const upd = await Assignment.findOneAndUpdate(
-      { userId: req.params.userId, unit },
+      { studentId: req.params.studentId, unit },
       { feedback },
       { new: true }
     );

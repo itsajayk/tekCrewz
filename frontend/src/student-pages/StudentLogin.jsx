@@ -10,37 +10,41 @@ import { auth } from '../components/Pages/firebase';
 import TopNavbar from '../components/Nav/TopNavbar';
 import Footer from '../components/Sections/Footer';
 import { AuthContext } from '../contexts/AuthContext';
+import axios from 'axios';
 
 const StudentLoginPage = () => {
   const navigate = useNavigate();
-  const { setRole } = useContext(AuthContext);
+  const { setRole, setCurrentUser, setUserId } = useContext(AuthContext); // CHANGED: Added setCurrentUser & setUserId
+
+  const API_BASE_URL = 'https://tekcrewz.onrender.com';
 
   const [identifier, setIdentifier] = useState(''); // User ID or Email
   const [password, setPassword]       = useState('');
   const [errorMsg, setErrorMsg]       = useState('');
   const [isLoading, setIsLoading]     = useState(false);
 
-  // Helper: if identifier is not an email, look up email by userId
-  const resolveEmail = async (idOrEmail) => {
-    if (idOrEmail.includes('@')) return idOrEmail;
-    // fetch profile to get email
-    const resp = await fetch(`/api/students/${idOrEmail}/profile`);
-    if (!resp.ok) throw new Error('Invalid User ID');
-    const data = await resp.json();
-    if (!data.email) throw new Error('No email on record');
-    return data.email;
+  const resolveEmail = async idOrEmail => {
+    try {
+      if (idOrEmail.includes('@')) return idOrEmail;
+      const resp = await axios.get(`${API_BASE_URL}/api/students/${idOrEmail}/profile`);
+      if (resp.data.email) return resp.data.email;
+      throw new Error();
+    } catch {
+      throw new Error('User not found');
+    }
   };
 
-  const handleLogin = async (e) => {
+  const handleLogin = async e => {
     e.preventDefault();
     setErrorMsg('');
     setIsLoading(true);
     try {
       const email = await resolveEmail(identifier.trim());
-      await signInWithEmailAndPassword(auth, email, password);
+      const cred = await signInWithEmailAndPassword(auth, email, password);
       setRole('student');
-      // after login you can redirect to Quiz or Dashboard:
-      navigate('/StudentDashboard');
+      setCurrentUser(cred.user);
+      setUserId(cred.user.uid);
+      navigate('/studentdashboard');
     } catch (err) {
       setErrorMsg(err.message);
     } finally {
@@ -48,10 +52,11 @@ const StudentLoginPage = () => {
     }
   };
 
+  
   const handleForgot = async () => {
     setErrorMsg('');
     if (!identifier) {
-      setErrorMsg('Enter your Email and click the reset.');
+      setErrorMsg('Enter your User ID or Email to reset.');
       return;
     }
     setIsLoading(true);
@@ -74,15 +79,14 @@ const StudentLoginPage = () => {
         {errorMsg && <ErrorText>{errorMsg}</ErrorText>}
         <Form onSubmit={handleLogin}>
           <InputGroup>
-            <Label>User ID</Label>
+            <Label>User ID/Email</Label>
             <Input
               type="text"
               value={identifier}
               onChange={e => setIdentifier(e.target.value)}
-              placeholder="Enter your User ID"
+              placeholder="Enter your User ID or Email"
             />
           </InputGroup>
-
           <InputGroup>
             <Label>Password</Label>
             <Input
@@ -92,19 +96,14 @@ const StudentLoginPage = () => {
               placeholder="Enter your password"
             />
           </InputGroup>
-
           <SubmitButton type="submit" disabled={isLoading}>
             {isLoading ? 'Logging in…' : 'Login'}
           </SubmitButton>
         </Form>
-
         <AuxLinks>
-          <LinkButton type="button" onClick={handleForgot} disabled={isLoading}>
+          <LinkButton onClick={handleForgot} disabled={isLoading}>
             Forgot password?
           </LinkButton>
-          {/* <LinkButton type="button" onClick={() => navigate('/s-signUpPage')}>
-            Create new account
-          </LinkButton> */}
         </AuxLinks>
       </FormWrapper>
       <Footer />

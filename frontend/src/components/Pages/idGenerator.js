@@ -1,4 +1,4 @@
-// idGeneratorFirestore.js
+// src/Helper/idGeneratorFirestore.js
 import { getFirestore, runTransaction, doc } from "firebase/firestore";
 
 export async function generateUniqueIdFromFirestore(accountType) {
@@ -11,13 +11,13 @@ export async function generateUniqueIdFromFirestore(accountType) {
     Referrer:  { prefix: "REFSD", counterField: "referrerCounter" },
     DevTutor:  { prefix: "EMPDT", counterField: "devTutorCounter" },
     Tutor:     { prefix: "EMPTR", counterField: "tutorCounter" },
-    Developer: { prefix: "EMPDV", counterField: "developerCounter" }
+    Developer: { prefix: "EMPDV", counterField: "developerCounter" },
+    Student:   { prefix: "STUD", counterField: "studentCounter" }  // ← NEW!
   };
 
   const cfg = map[accountType];
   if (!cfg) throw new Error(`Invalid accountType: ${accountType}`);
 
-  // run a transaction to bump the right counter
   const newCount = await runTransaction(db, async (tx) => {
     const snap = await tx.get(counterDocRef);
     if (!snap.exists()) {
@@ -28,7 +28,6 @@ export async function generateUniqueIdFromFirestore(accountType) {
     return current + 1;
   });
 
-  // pad to three digits
   const num = String(newCount).padStart(3, "0");
-  return cfg.prefix + num;     // e.g. "EMPTR005" or "EMPDT012"
+  return cfg.prefix + num;     // e.g. "STUD005"
 }

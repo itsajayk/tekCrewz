@@ -6,9 +6,10 @@ import Footer from '../Sections/Footer';
 import { useNavigate } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
 import getCroppedImg from '../Helper/cropImage';
-import { getFirestore, collection, addDoc, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, getDocs, setDoc, doc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, app } from '../Pages/firebase';
+import { generateUniqueIdFromFirestore } from '.././Pages/idGenerator';
 
 const API_BASE_URL = 'https://tekcrewz.onrender.com';
 const COURSE_CODES = {
@@ -31,11 +32,13 @@ export default function AddCandidate() {
     coursesEnquired:'', dateOfVisit:'', paymentTerm:'', communicationScore:''
   });
 
+  // Files + cropping
   const [candidatePic, setCandidatePic] = useState(null);
   const [croppedCandidatePic, setCroppedCandidatePic] = useState(null);
   const [markStatement, setMarkStatement] = useState(null);
   const [signatureFile, setSignatureFile] = useState(null);
 
+  // Cropper state
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
@@ -46,37 +49,33 @@ export default function AddCandidate() {
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
-  const candidatePicRef = useRef();
-  const markStatementRef = useRef();
-  const signatureRef = useRef();
+  // Refs for resetting inputs
+  const candidatePicRef    = useRef();
+  const markStatementRef   = useRef();
+  const signatureRef       = useRef();
 
-  const [users, setUsers] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [fetchError, setFetchError] = useState(null)
+  // Fetch existing users (unchanged)
+  const [users, setUsers]       = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [fetchError, setFetchError] = useState(null);
 
   useEffect(() => {
-    const db = getFirestore(app)
-    const usersCol = collection(db, 'users')
-
+    const db = getFirestore(app);
+    const usersCol = collection(db, 'users');
     async function fetchUsers() {
       try {
-        const snapshot = await getDocs(usersCol)
-        const userList = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }))
-        setUsers(userList)
+        const snap = await getDocs(usersCol);
+        setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (err) {
-        console.error('Error fetching users:', err)
-        setFetchError('Failed to load users')
+        setFetchError('Failed to load users');
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
+    fetchUsers();
+  }, []);
 
-    fetchUsers()
-  }, [])
-
+  // Programme options based on degree (unchanged)
   useEffect(() => {
     const deg = formData.candidateDegree;
     let opts = [];
@@ -89,17 +88,24 @@ export default function AddCandidate() {
     }
   }, [formData.candidateDegree]);
 
-  // Generate studentId when batch or course selected or users change
+  // **New: generate Student ID using Firestore counter + your BT... code**
   useEffect(() => {
     const { coursesEnquired, batchNumber } = formData;
     if (!coursesEnquired || !batchNumber) return;
-    const codeKey = coursesEnquired.toLowerCase();
-    const courseCode = COURSE_CODES[codeKey] || 'XX';
-    const rollNum = String(users.length + 1).padStart(3, '0');
-    const studentId = `BT${batchNumber}${courseCode}${rollNum}`;
-    setFormData(prev => ({ ...prev, studentId }));
-  }, [formData.coursesEnquired, formData.batchNumber, users]);
+    const key = coursesEnquired.toLowerCase();
+    const courseCode = COURSE_CODES[key] || 'XX';
+    generateUniqueIdFromFirestore('Student')
+      .then(prefixed => {
+        const roll = prefixed.slice(-3);
+        setFormData(prev => ({
+          ...prev,
+          studentId: `BT${batchNumber}${courseCode}${roll}`
+        }));
+      })
+      .catch(console.error);
+  }, [formData.coursesEnquired, formData.batchNumber]);
 
+  // Standard handlers (unchanged)...
   const handleChange = e =>
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
@@ -111,7 +117,6 @@ export default function AddCandidate() {
       setCroppedCandidatePic(null);
     }
   };
-
   const handleFileChange = (e, setter) => {
     const file = e.target.files?.[0];
     if (file) setter(file);
@@ -167,39 +172,60 @@ export default function AddCandidate() {
     e.preventDefault();
     if (!validate()) return;
     setIsLoading(true);
-    try {
-      // 1) MongoDB save
-      const data = new FormData();
-      Object.entries(formData).forEach(([k,v])=>data.append(k,v));
-      // append files/blobs...
-      const res = await axios.post(`${API_BASE_URL}/api/candidates`, data, { withCredentials:true });
-      
-      // 2) Firebase Auth & Firestore
-      const pwd = formData.studentId; // default password
-      const cred = await createUserWithEmailAndPassword(auth, formData.email, pwd);
-      const fs = getFirestore(app);
-      await addDoc(collection(fs, `batches/${formData.batchNumber}/students`), {
-        uid: cred.user.uid,
-        email: formData.email,
-        role: 'student'
-      });
 
-      setSuccessMessage('Candidate added successfully');
-      // reset form and previews
+    try {
+      const data = new FormData();
+      // 1) append form fields
+      Object.entries(formData).forEach(([k,v]) => data.append(k, v));
+
+      // 2) append the cropped pic as a real File blob
+      if (croppedCandidatePic) {
+        const blob = await fetch(croppedCandidatePic).then(r => r.blob());
+        data.append('candidatePic', blob, 'candidatePic.jpg');
+      }
+      // 3) append PDF & signature if present
+      if (markStatement) data.append('markStatement', markStatement);
+      if (signatureFile) data.append('signature', signatureFile);
+
+      // → MongoDB + Cloudinary
+
+      const resp = await axios.post(
+        `${API_BASE_URL}/api/candidates`,
+        data,
+        { withCredentials:true }
+      );
+
+      // → Firebase Auth & Firestore
+      // Default password: first 3 letters of name + '@' + last 3 digits of mobile
+      const namePart = formData.candidateName.replace(/\s+/g, '').slice(0,3).toLowerCase();
+      const mobilePart = formData.mobile.slice(-3);
+      const pwd = `${namePart}@${mobilePart}`;
+
+      const cred = await createUserWithEmailAndPassword(auth, formData.email, pwd);
+      const fs   = getFirestore(app);
+            await setDoc(
+        doc(fs, `batch/${formData.batchNumber}/students`, formData.studentId),
+        { uid: formData.studentId, email: formData.email, role: 'student' }
+      );
+
+      const createdId = resp.data.candidate.studentId;
+      setSuccessMessage(`Candidate ${createdId} added successfully`);
+      // reset everything
       setFormData({
-        userId:'', batchNumber:'', studentId:'', candidateName:'', college:'',
-        candidateDegree:'', programme:'', candidateCourseName:'', marksType:'',
-        score:'', scholarshipSecured:'', mobile:'', parentMobile:'', email:'',
-        coursesEnquired:'', dateOfVisit:'', paymentTerm:'', communicationScore:''
+        referrerId:'', batchNumber:'', studentId:'', candidateName:'', college:'',
+    candidateDegree:'', programme:'', candidateCourseName:'', marksType:'',
+    score:'', scholarshipSecured:'', mobile:'', parentMobile:'', email:'',
+    coursesEnquired:'', dateOfVisit:'', paymentTerm:'', communicationScore:''
       });
-      removeCandidatePic(); removeMarkStatement(); removeSignature();
+      removeCandidatePic();
+      removeMarkStatement();
+      removeSignature();
     } catch (err) {
       alert(err.message || 'Error saving candidate');
     } finally {
       setIsLoading(false);
     }
   };
-  
 
   return (
     <>
@@ -211,11 +237,11 @@ export default function AddCandidate() {
 
             {/* User */}
             <InputGroup>
-      <Label htmlFor="userId">User</Label>
+      <Label htmlFor="referrerId">User</Label>
       <Select
-        id="userId"
-        name="userId"
-        value={formData.userId}
+        id="referrerId"
+        name="referrerId"
+        value={formData.referrerId}
         onChange={handleChange}
         disabled={loading || !!fetchError}
       >
@@ -538,7 +564,7 @@ export default function AddCandidate() {
           {successMessage && (
             <SuccessModalOverlay>
               <SuccessModalContent>
-                <SuccessTitle>{successMessage} <i className="fa-solid fa-circle-check fa-bounce" style={{ color: "#14a800" }}></i></SuccessTitle>
+                <SuccessTitle>{successMessage} <i className="fa-solid fa-circle-check fa-bounce" style={{ color: "#14a800" }}></i> </SuccessTitle>
                 <ModalCloseButton onClick={() => setSuccessMessage('')}>Close</ModalCloseButton>
               </SuccessModalContent>
             </SuccessModalOverlay>

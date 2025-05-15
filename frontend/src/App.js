@@ -72,6 +72,12 @@ export default function App() {
                 <QuizPage />
               </StudentRoute>
             }/>
+            {/* Student Protected Route */}
+            <Route path="/StudentDashboard" element={
+              <StudentRoute>
+                <StudentDashboard />
+              </StudentRoute>
+            }/>
             
             <Route path="/login" element={<LoginPage />}/>
             <Route path="/reset-password" element={<ResetPasswordPage />}/>
@@ -80,7 +86,7 @@ export default function App() {
             <Route path="/s-loginPage" element={<StudentLogin />}/>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/AdminDashboard" element={<AdminDashboard />} />
-            <Route path="/StudentDashboard" element={<StudentDashboard/>}/>
+            {/* <Route path="/StudentDashboard" element={<StudentDashboard/>}/> */}
           </Routes>
         </Router>
       </AuthProvider>
