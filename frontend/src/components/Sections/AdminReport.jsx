@@ -19,13 +19,13 @@ const AdminReport = () => {
         const students = [];
         querySnapshot.forEach((docSnap) => {
           const data = docSnap.data();
-          console.log("Fetched student data:", data); // Debug log
+          // console.log("Fetched student data:", data); 
           // Only include students who have completed the quiz
           if (data.quizCompleted) {
             students.push({ id: docSnap.id, ...data });
           }
         });
-        console.log("Students with quizCompleted:", students); // Debug log
+        // console.log("Students with quizCompleted:", students); 
         setReportData(students);
       } catch (error) {
         console.error("Error fetching student data:", error);

@@ -242,7 +242,7 @@ export default function AddCandidate() {
       // 2b) ── ALSO REGISTER IN TOP‑LEVEL “users” COLLECTION ── CHANGED
       await setDoc(
         doc(fs, 'users', formData.studentId),             // CHANGED
-        { email: formData.email, role: 'student' }         // CHANGED
+        { email: formData.email, role: 'student',uid: formData.studentId }         // CHANGED
       );
 
       // Success feedback

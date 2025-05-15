@@ -15,8 +15,7 @@ import { getUserEmailFromUsername } from '../components/Pages/getUserEmailFromUs
 
 const StudentLoginPage = () => {
   const navigate = useNavigate();
-  const { setRole, setCurrentUser, setUserId } = useContext(AuthContext); // CHANGED: Added setCurrentUser & setUserId
-
+  const { setRole, setUserId } = useContext(AuthContext); // CHANGED: Added setCurrentUser & setUserId
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -36,7 +35,6 @@ const StudentLoginPage = () => {
 
       // set context and redirect
       setRole('student');
-      setCurrentUser(cred.user);
       setUserId(cred.user.uid);
       navigate('/studentdashboard');
     } catch (err) {
