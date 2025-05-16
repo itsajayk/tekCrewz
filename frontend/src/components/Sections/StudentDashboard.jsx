@@ -13,7 +13,6 @@ export default function StudentDashboard() {
   const navigate = useNavigate();
   const { userId: studentId } = useContext(AuthContext);
   const [profile, setProfile]           = useState(null);
-  const [loading, setLoading]           = useState(true);
   const [attendance, setAttendance]     = useState([]);
   const [docs, setDocs]                 = useState({ syllabus: '', schedule: '' });
   const [assignments, setAssignments]   = useState([]);
@@ -24,23 +23,17 @@ export default function StudentDashboard() {
   useEffect(() => {
     if (!studentId) return navigate('/s-loginPage');
 
-    Promise.all([
-      fetch(`/api/students/${studentId}/profile`).then(r=>r.json()),
-      fetch(`/api/students/${studentId}/attendance`).then(r=>r.json()),
-      fetch(`/api/courses/COURSE1/docs`).then(r=>r.json()),
-      fetch(`/api/assignments/${studentId}`).then(r=>r.json())
-    ])
-    .then(([prof, att, docsData, assigns]) => {
-      setProfile(prof);
-      setAttendance(att);
-      setDocs(docsData);
-      setAssignments(assigns);
-    })
-    .catch(err => {
-      console.error('Dashboard data fetch error:', err);
-      // you could set an error state here to show to user
-    })
-    .finally(() => setLoading(false));
+    fetch(`/api/students/${studentId}/profile`)
+      .then(r => r.json()).then(setProfile);
+
+    fetch(`/api/students/${studentId}/attendance`)
+      .then(r => r.json()).then(setAttendance);
+
+    fetch(`/api/courses/COURSE1/docs`)
+      .then(r => r.json()).then(setDocs);
+
+    fetch(`/api/assignments/${studentId}`)
+      .then(r => r.json()).then(setAssignments);
   }, [studentId, navigate]);
 
   const submitCode = async unit => {
@@ -79,7 +72,7 @@ export default function StudentDashboard() {
     navigate('/s-loginPage');
   };
 
-  if (loading) return <Loading>Loading...</Loading>;
+  if (!profile) return <Loading>Loading...</Loading>;
 
   const renderContent = () => {
     switch(activeTab) {

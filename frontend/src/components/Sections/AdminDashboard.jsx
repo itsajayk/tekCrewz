@@ -31,6 +31,10 @@ export default function AdminDashboard() {
   const [newTasksText, setNewTasksText] = useState('');
   const [taskProjIdx, setTaskProjIdx] = useState(null);
 
+  const [students, setStudents]   = useState([])
+  const [selected, setSelected]   = useState(null)
+  const [action, setAction]       = useState('')
+  const [formData, setFormData]   = useState({})
 
   // State: Payroll
   const [newPayroll, setNewPayroll] = useState({
@@ -152,6 +156,24 @@ export default function AdminDashboard() {
     });
     resetModals();
   };
+
+   const openModal = (stu, act) => {
+    setSelected(stu)
+    setAction(act)
+    setFormData(stu[act] || {})
+  }
+
+  const handleSave = async () => {
+    await fetch(`/api/admin/students/${selected.studentId}/${action}`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(formData)
+    })
+    // refresh
+    fetch('/api/admin/students').then(r=>r.json()).then(setStudents)
+    setSelected(null); setAction(''); setFormData({})
+  }
+
 
   return (
     <Page>
@@ -420,7 +442,104 @@ export default function AdminDashboard() {
   );
 }
 
+function renderAdminForm(action, student, data, setData) {
+  switch(action) {
+    case 'viewProfile':
+      return (
+        <ProfileView>
+          <p><strong>Name:</strong> {student.candidateName}</p>
+          <p><strong>Email:</strong> {student.email}</p>
+          <p><strong>Mobile:</strong> {student.mobile}</p>
+          <p>…all other fields…</p>
+        </ProfileView>
+      )
+    case 'viewAttendance':
+      return (
+        <div>
+          {student.attendance?.map((r,i)=>(
+            <p key={i}>{new Date(r.date).toLocaleDateString()}: {r.status}</p>
+          ))||'No records'}
+        </div>
+      )
+    case 'uploadDocs':
+      return (
+        <div className="space-y-4">
+          <label>Syllabus PDF URL</label>
+          <Input
+            value={data.syllabus||''}
+            onChange={e=>setData({...data, syllabus:e.target.value})}
+          />
+          <label>Schedule PDF URL</label>
+          <Input
+            value={data.schedule||''}
+            onChange={e=>setData({...data, schedule:e.target.value})}
+          />
+        </div>
+      )
+    case 'manageAssignments':
+      return (
+        <div className="space-y-4">
+          <label>Unit</label>
+          <Input
+            value={data.unit||''}
+            onChange={e=>setData({...data, unit:e.target.value})}
+          />
+          <label>Material PDF URL</label>
+          <Input
+            value={data.studyMaterialUrl||''}
+            onChange={e=>setData({...data, studyMaterialUrl:e.target.value})}
+          />
+          <label>Close After (days)</label>
+          <Input
+            type="number"
+            value={data.closeDays||3}
+            onChange={e=>setData({...data, closeDays:+e.target.value})}
+          />
+        </div>
+      )
+    case 'enterResults':
+      return (
+        <div className="space-y-4">
+          <label>Unit</label>
+          <Input
+            value={data.unit||''}
+            onChange={e=>setData({...data, unit:e.target.value})}
+          />
+          <label>Score</label>
+          <Input
+            type="number"
+            value={data.results?.score||0}
+            onChange={e=>setData({...data, results:{...data.results,score:+e.target.value}})}
+          />
+          <label>Passed?</label>
+          <select
+            value={data.results?.passed? 'yes':'no'}
+            onChange={e=>setData({...data, results:{...data.results,passed: e.target.value==='yes'}})}
+          >
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+      )
+    case 'approveUnlock':
+      return (
+        <p>Student has requested unlock for {student.unitRequested}. Click “Save” to grant 2 more days.</p>
+      )
+    case 'reviewFeedback':
+      return (
+        <div>
+          <p><strong>Feedback:</strong></p>
+          <p>{student.feedback}</p>
+        </div>
+      )
+    default:
+      return null
+  }
+}
+
+
 // Styled Components
+const ProfileView = styled.div`& p{margin:0.5rem 0;}`
 const Page = styled.div`
   display: flex;
   flex-direction: column;

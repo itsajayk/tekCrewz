@@ -210,153 +210,123 @@ app.delete('/api/candidates/:id', async (req, res) => {
   }
 });
 
-// ── StudentProfile Schema
-const studentProfileSchema = new mongoose.Schema({
-  studentId:    { type: String, required: true, unique: true },
-  candidateName:{ type: String, required: true },
-  email:        { type: String, required: true },
-  mobile:       { type: String, required: true },
-  // …any other profile fields
-}, { timestamps: true });
-const StudentProfile = mongoose.model('StudentProfile', studentProfileSchema);
-
-// ── Attendance Schema
-const attendanceSchema = new mongoose.Schema({
-  studentId: { type: String, required: true },
-  date:      { type: Date,   required: true },
-  status:    { type: String, enum:['Present','Absent'], required: true },
-}, { timestamps: true });
-const Attendance = mongoose.model('Attendance', attendanceSchema);
-
-// ── CourseDoc Schema
-const courseDocSchema = new mongoose.Schema({
-  courseId: { type: String, required: true },
-  type:     { type: String, enum:['syllabus','schedule'], required: true },
-  url:      { type: String, required: true },
-}, { timestamps: true });
-const CourseDoc = mongoose.model('CourseDoc', courseDocSchema);
-
-// ── Assignment Schema
-const assignmentSchema = new mongoose.Schema({
-  studentId:       { type: String, required: true },
-  unit:            { type: String, required: true },
-  studyMaterialUrl:{ type: String },
-  closedAt:        { type: Date },
-  unlockedUntil:   { type: Date },
-  submissionCode:  { type: String },
-  results: {
-    score:  { type: Number },
-    passed: { type: Boolean }
-  },
-  feedback:        { type: String },
-}, { timestamps: true });
-const Assignment = mongoose.model('Assignment', assignmentSchema);
-
-
 // ── New Student Dashboard Routes ────────────────────────────────────────
 
+// ── Student Dashboard Routes (existing) ────────────────────────────
 // 1. Profile
-app.get('/api/students/:studentId/profile', async (req, res) => {
-  try {
-    const profile = await StudentProfile.findOne({ studentId: req.params.studentId });
-    res.json(profile);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
+app.get('/api/students/:studentId/profile', async (req,res)=>{
+  res.json(await StudentProfile.findOne({ studentId:req.params.studentId }))
+})
 // 2. Attendance
-app.get('/api/students/:studentId/attendance', async (req, res) => {
-  try {
-    const records = await Attendance
-      .find({ studentId: req.params.studentId })
-      .sort({ date: 1 });
-    res.json(records);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 3. Course Documents
-app.get('/api/courses/:courseId/docs', async (req, res) => {
-  try {
-    const docs = await CourseDoc.find({ courseId: req.params.courseId });
-    // return { syllabus: url, schedule: url }
-    const out = {};
-    docs.forEach(d => out[d.type] = d.url);
-    res.json(out);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
+app.get('/api/students/:studentId/attendance', async (req,res)=>{
+  res.json(await Attendance.find({ studentId:req.params.studentId }).sort('date'))
+})
+// 3. Course Docs
+app.get('/api/courses/:courseId/docs', async (req,res)=>{
+  const docs = await CourseDoc.find({ courseId:req.params.courseId })
+  const out  = {}
+  docs.forEach(d=>out[d.type]=d.url)
+  res.json(out)
+})
 // 4. List Assignments
-app.get('/api/assignments/:studentId', async (req, res) => {
-  try {
-    const all = await Assignment.find({ studentId: req.params.studentId });
-    // compute closed flag based on closedAt + compute unlocked by unlockedUntil
-    const now = new Date();
-    const mapped = all.map(a => ({
-      unit: a.unit,
-      studyMaterialUrl: a.studyMaterialUrl,
-      closed: a.closedAt && now > a.closedAt,
-      unlocked: a.unlockedUntil && now < a.unlockedUntil,
-      submissionCode: a.submissionCode,
-      results: a.results,
-      feedback: a.feedback
-    }));
-    res.json(mapped);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
+app.get('/api/assignments/:studentId', async (req,res)=>{
+  const all = await Assignment.find({ studentId:req.params.studentId })
+  const now = new Date()
+  res.json(all.map(a=>({
+    unit:a.unit,
+    studyMaterialUrl:a.studyMaterialUrl,
+    closed: a.closedAt && now>a.closedAt,
+    unlocked: a.unlockedUntil && now<a.unlockedUntil,
+    submissionCode:a.submissionCode,
+    results:a.results,
+    feedback:a.feedback
+  })))
+})
 // 5. Submit Code
-app.post('/api/assignments/:studentId/submit', async (req, res) => {
-  try {
-    const { unit, code } = req.body;
-    const upd = await Assignment.findOneAndUpdate(
-      { studentId: req.params.studentId, unit },
-      { submissionCode: code },
-      { new: true }
-    );
-    res.json(upd);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
+app.post('/api/assignments/:studentId/submit', async (req,res)=>{
+  await Assignment.findOneAndUpdate(
+    { studentId:req.params.studentId, unit:req.body.unit },
+    { submissionCode:req.body.code }
+  )
+  res.sendStatus(204)
+})
 // 6. Request Unlock
-app.post('/api/assignments/:studentId/unlock', async (req, res) => {
-  try {
-    const { unit } = req.body;
-    // allow +2 days
-    const until = new Date(Date.now() + 2*24*60*60*1000);
-    const upd = await Assignment.findOneAndUpdate(
-      { studentId: req.params.studentId, unit },
-      { unlockedUntil: until },
-      { new: true }
-    );
-    res.json(upd);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
+app.post('/api/assignments/:studentId/unlock', async (req,res)=>{
+  await Assignment.findOneAndUpdate(
+    { studentId:req.params.studentId, unit:req.body.unit },
+    { unlockedUntil: new Date(Date.now()+2*86400000) }
+  )
+  res.sendStatus(204)
+})
 // 7. Submit Feedback
-app.post('/api/assignments/:studentId/feedback', async (req, res) => {
-  try {
-    const { unit, feedback } = req.body;
-    const upd = await Assignment.findOneAndUpdate(
-      { studentId: req.params.studentId, unit },
-      { feedback },
-      { new: true }
-    );
-    res.json(upd);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+app.post('/api/assignments/:studentId/feedback', async (req,res)=>{
+  await Assignment.findOneAndUpdate(
+    { studentId:req.params.studentId, unit:req.body.unit },
+    { feedback:req.body.feedback }
+  )
+  res.sendStatus(204)
+})
+
+// ── Admin Routes: aggregate & CRUD ──────────────────────────────────
+// Get everything joined
+app.get('/api/admin/students', async (req,res)=>{
+  const profiles = await StudentProfile.find()
+  const atts     = await Attendance.find()
+  const docs     = await CourseDoc.find()
+  const asns     = await Assignment.find()
+  // map each profile to include sub-docs
+  const out = profiles.map(p=>({
+    ...p.toObject(),
+    attendance: atts.filter(a=>a.studentId===p.studentId),
+    docs: docs.filter(d=>d.courseId==='COURSE1'),
+    assignments: asns.filter(a=>a.studentId===p.studentId)
+  }))
+  res.json(out)
+})
+// Upload syllabus & schedule
+app.post('/api/admin/students/:id/uploadDocs', async (req,res)=>{
+  const { syllabus, schedule } = req.body
+  await CourseDoc.findOneAndUpdate(
+    { courseId:'COURSE1', type:'syllabus' }, { url:syllabus }, { upsert:true }
+  )
+  await CourseDoc.findOneAndUpdate(
+    { courseId:'COURSE1', type:'schedule' }, { url:schedule }, { upsert:true }
+  )
+  res.sendStatus(204)
+})
+// Manage assignment creation/closing
+app.post('/api/admin/students/:id/manageAssignments', async (req,res)=>{
+  const { unit, studyMaterialUrl, closeDays } = req.body
+  await Assignment.findOneAndUpdate(
+    { studentId:req.params.id, unit },
+    {
+      studyMaterialUrl,
+      closedAt: new Date(Date.now()+closeDays*86400000)
+    },
+    { upsert:true }
+  )
+  res.sendStatus(204)
+})
+// Enter results
+app.post('/api/admin/students/:id/enterResults', async (req,res)=>{
+  await Assignment.findOneAndUpdate(
+    { studentId:req.params.id, unit:req.body.unit },
+    { results:req.body.results }
+  )
+  res.sendStatus(204)
+})
+// Approve unlock
+app.post('/api/admin/students/:id/approveUnlock', async (req,res)=>{
+  await Assignment.findOneAndUpdate(
+    { studentId:req.params.id, unit:req.body.unit },
+    { unlockedUntil: new Date(Date.now()+2*86400000) }
+  )
+  res.sendStatus(204)
+})
+// Review feedback (no changes)
+app.post('/api/admin/students/:id/reviewFeedback', async (_req,res)=>{
+  res.sendStatus(204)
+})
 
 // ── Start Server ───────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
