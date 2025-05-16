@@ -11,9 +11,9 @@ import { AuthContext } from '../../contexts/AuthContext';
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
-  const { userId } = useContext(AuthContext);
-
+  const { userId: studentId } = useContext(AuthContext);
   const [profile, setProfile]           = useState(null);
+  const [loading, setLoading]           = useState(true);
   const [attendance, setAttendance]     = useState([]);
   const [docs, setDocs]                 = useState({ syllabus: '', schedule: '' });
   const [assignments, setAssignments]   = useState([]);
@@ -22,23 +22,29 @@ export default function StudentDashboard() {
   const [activeTab, setActiveTab]       = useState('Profile');
 
   useEffect(() => {
-    if (!userId) return navigate('/login');
+    if (!studentId) return navigate('/s-loginPage');
 
-    fetch(`/api/students/${userId}/profile`)
-      .then(r => r.json()).then(setProfile);
-
-    fetch(`/api/students/${userId}/attendance`)
-      .then(r => r.json()).then(setAttendance);
-
-    fetch(`/api/courses/COURSE1/docs`)
-      .then(r => r.json()).then(setDocs);
-
-    fetch(`/api/assignments/${userId}`)
-      .then(r => r.json()).then(setAssignments);
-  }, [userId, navigate]);
+    Promise.all([
+      fetch(`/api/students/${studentId}/profile`).then(r=>r.json()),
+      fetch(`/api/students/${studentId}/attendance`).then(r=>r.json()),
+      fetch(`/api/courses/COURSE1/docs`).then(r=>r.json()),
+      fetch(`/api/assignments/${studentId}`).then(r=>r.json())
+    ])
+    .then(([prof, att, docsData, assigns]) => {
+      setProfile(prof);
+      setAttendance(att);
+      setDocs(docsData);
+      setAssignments(assigns);
+    })
+    .catch(err => {
+      console.error('Dashboard data fetch error:', err);
+      // you could set an error state here to show to user
+    })
+    .finally(() => setLoading(false));
+  }, [studentId, navigate]);
 
   const submitCode = async unit => {
-    await fetch(`/api/assignments/${userId}/submit`, {
+    await fetch(`/api/assignments/${studentId}/submit`, {
       method: 'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ unit, code: codeInput })
@@ -49,7 +55,7 @@ export default function StudentDashboard() {
   };
 
   const requestUnlock = async unit => {
-    await fetch(`/api/assignments/${userId}/unlock`, {
+    await fetch(`/api/assignments/${studentId}/unlock`, {
       method: 'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ unit })
@@ -58,7 +64,7 @@ export default function StudentDashboard() {
   };
 
   const submitFeedback = async unit => {
-    await fetch(`/api/assignments/${userId}/feedback`, {
+    await fetch(`/api/assignments/${studentId}/feedback`, {
       method: 'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ unit, feedback: feedbackInput })
@@ -70,10 +76,10 @@ export default function StudentDashboard() {
 
   const handleLogout = async () => {
     await signOut(auth);
-    navigate('/login');
+    navigate('/s-loginPage');
   };
 
-  if (!profile) return <Loading>Loading...</Loading>;
+  if (loading) return <Loading>Loading...</Loading>;
 
   const renderContent = () => {
     switch(activeTab) {

@@ -83,7 +83,6 @@ export default function App() {
             <Route path="/reset-password" element={<ResetPasswordPage />}/>
             <Route path="/s-signUpPage" element={<StudentSignUp />}/>
             <Route path="/s-loginPage" element={<StudentLogin />}/>
-            <Route path="/s-loginPage" element={<StudentLogin />}/>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/AdminDashboard" element={<AdminDashboard />} />
             {/* <Route path="/StudentDashboard" element={<StudentDashboard/>}/> */}

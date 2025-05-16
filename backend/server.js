@@ -210,6 +210,49 @@ app.delete('/api/candidates/:id', async (req, res) => {
   }
 });
 
+// ── StudentProfile Schema
+const studentProfileSchema = new mongoose.Schema({
+  studentId:    { type: String, required: true, unique: true },
+  candidateName:{ type: String, required: true },
+  email:        { type: String, required: true },
+  mobile:       { type: String, required: true },
+  // …any other profile fields
+}, { timestamps: true });
+const StudentProfile = mongoose.model('StudentProfile', studentProfileSchema);
+
+// ── Attendance Schema
+const attendanceSchema = new mongoose.Schema({
+  studentId: { type: String, required: true },
+  date:      { type: Date,   required: true },
+  status:    { type: String, enum:['Present','Absent'], required: true },
+}, { timestamps: true });
+const Attendance = mongoose.model('Attendance', attendanceSchema);
+
+// ── CourseDoc Schema
+const courseDocSchema = new mongoose.Schema({
+  courseId: { type: String, required: true },
+  type:     { type: String, enum:['syllabus','schedule'], required: true },
+  url:      { type: String, required: true },
+}, { timestamps: true });
+const CourseDoc = mongoose.model('CourseDoc', courseDocSchema);
+
+// ── Assignment Schema
+const assignmentSchema = new mongoose.Schema({
+  studentId:       { type: String, required: true },
+  unit:            { type: String, required: true },
+  studyMaterialUrl:{ type: String },
+  closedAt:        { type: Date },
+  unlockedUntil:   { type: Date },
+  submissionCode:  { type: String },
+  results: {
+    score:  { type: Number },
+    passed: { type: Boolean }
+  },
+  feedback:        { type: String },
+}, { timestamps: true });
+const Assignment = mongoose.model('Assignment', assignmentSchema);
+
+
 // ── New Student Dashboard Routes ────────────────────────────────────────
 
 // 1. Profile

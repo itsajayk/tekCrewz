@@ -305,7 +305,8 @@ let startX = 10 + doc.getTextWidth("Payment Term: ") + 5;
               <thead>
                 <tr>
                   <th>S.No</th>
-                  <th>User ID</th>
+                  <th>Admin/Referrer ID</th>
+                  <th>Student ID</th>
                   <th>Name</th>
                   <th>Degree – Course</th>
                   <th>College</th>
@@ -326,6 +327,7 @@ let startX = 10 + doc.getTextWidth("Payment Term: ") + 5;
                   <tr key={c._id}>
                     <td>{i + 1}</td>
                     <td>{c.referrerId}</td>
+                    <td>{c.studentId}</td>
                     <td>{c.candidateName}</td>
                     <td>{c.candidateDegree} – {c.programme}</td>
                     <td>{c.college}</td>
