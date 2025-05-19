@@ -2,9 +2,8 @@
 import React, { useEffect, useState, useContext } from 'react';
 import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
-import { doc, getDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
-import { auth, db } from '../Pages/firebase';
+import { auth } from '../Pages/firebase';
 import TopNavbar from '../Nav/TopNavbar';
 import Footer from './Footer';
 import { AuthContext } from '../../contexts/AuthContext';
@@ -23,48 +22,62 @@ export default function StudentDashboard() {
   useEffect(() => {
     if (!studentId) return navigate('/s-loginPage');
 
+    // 1. Profile
     fetch(`/api/students/${studentId}/profile`)
       .then(r => r.json()).then(setProfile);
 
+    // 2. Attendance
     fetch(`/api/students/${studentId}/attendance`)
       .then(r => r.json()).then(setAttendance);
 
+    // 3 & 4. Course docs
     fetch(`/api/courses/COURSE1/docs`)
       .then(r => r.json()).then(setDocs);
 
+    // 5. Assignments list
     fetch(`/api/assignments/${studentId}`)
       .then(r => r.json()).then(setAssignments);
   }, [studentId, navigate]);
 
   const submitCode = async unit => {
+    if (!codeInput.trim()) return;
     await fetch(`/api/assignments/${studentId}/submit`, {
       method: 'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{ 'Content-Type':'application/json' },
       body: JSON.stringify({ unit, code: codeInput })
     });
+    setAssignments(a =>
+      a.map(x =>
+        x.unit === unit ? { ...x, submissionCode: codeInput } : x
+      )
+    );
     setCodeInput('');
-    setAssignments(a => a.map(x => x.unit===unit ? { ...x, submissionCode: codeInput } : x));
-    setActiveTab(unit);
   };
 
   const requestUnlock = async unit => {
     await fetch(`/api/assignments/${studentId}/unlock`, {
       method: 'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{ 'Content-Type':'application/json' },
       body: JSON.stringify({ unit })
     });
-    setAssignments(a => a.map(x => x.unit===unit ? { ...x, unlocked:true } : x));
+    setAssignments(a =>
+      a.map(x => x.unit === unit ? { ...x, unlocked: true } : x)
+    );
   };
 
   const submitFeedback = async unit => {
+    if (!feedbackInput.trim()) return;
     await fetch(`/api/assignments/${studentId}/feedback`, {
       method: 'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{ 'Content-Type':'application/json' },
       body: JSON.stringify({ unit, feedback: feedbackInput })
     });
+    setAssignments(a =>
+      a.map(x =>
+        x.unit === unit ? { ...x, feedback: feedbackInput } : x
+      )
+    );
     setFeedbackInput('');
-    setAssignments(a => a.map(x => x.unit===unit ? { ...x, feedback: feedbackInput } : x));
-    setActiveTab(unit);
   };
 
   const handleLogout = async () => {
@@ -75,7 +88,7 @@ export default function StudentDashboard() {
   if (!profile) return <Loading>Loading...</Loading>;
 
   const renderContent = () => {
-    switch(activeTab) {
+    switch (activeTab) {
       case 'Profile':
         return (
           <Card>
@@ -91,10 +104,15 @@ export default function StudentDashboard() {
           <Card>
             <h3>Attendance</h3>
             <Table>
-              <thead><tr><th>Date</th><th>Status</th></tr></thead>
+              <thead>
+                <tr><th>Date</th><th>Status</th></tr>
+              </thead>
               <tbody>
                 {attendance.map((r,i) => (
-                  <tr key={i}><td>{r.date}</td><td>{r.status}</td></tr>
+                  <tr key={i}>
+                    <td>{new Date(r.date).toLocaleDateString()}</td>
+                    <td>{r.status}</td>
+                  </tr>
                 ))}
               </tbody>
             </Table>
@@ -116,7 +134,7 @@ export default function StudentDashboard() {
           </Card>
         );
       default:
-        // unit-wise assignment
+        // Unit‑wise assignment
         const a = assignments.find(x => x.unit === activeTab);
         if (!a) return null;
         return (
@@ -133,14 +151,20 @@ export default function StudentDashboard() {
               onChange={e => setCodeInput(e.target.value)}
               disabled={a.closed}
             />
-            <Button disabled={a.closed} onClick={() => submitCode(a.unit)}>
+            <Button
+              disabled={a.closed}
+              onClick={() => submitCode(a.unit)}
+            >
               {a.closed ? 'Closed' : 'Submit'}
             </Button>
 
             {!a.unlocked && (
               <>
                 <SectionSmall>Request Unlock</SectionSmall>
-                <UnlockForm onSubmit={e => { e.preventDefault(); requestUnlock(a.unit); }}>
+                <UnlockForm onSubmit={e => {
+                  e.preventDefault();
+                  requestUnlock(a.unit);
+                }}>
                   <Button type="submit">Request Re-open (2 days)</Button>
                 </UnlockForm>
               </>
@@ -150,7 +174,9 @@ export default function StudentDashboard() {
               <>
                 <SectionSmall>Result</SectionSmall>
                 <Table>
-                  <thead><tr><th>Score</th><th>Passed</th></tr></thead>
+                  <thead>
+                    <tr><th>Score</th><th>Passed</th></tr>
+                  </thead>
                   <tbody>
                     <tr>
                       <td>{a.results.score}</td>
@@ -167,7 +193,9 @@ export default function StudentDashboard() {
               value={feedbackInput}
               onChange={e => setFeedbackInput(e.target.value)}
             />
-            <Button onClick={() => submitFeedback(a.unit)}>Send Feedback</Button>
+            <Button onClick={() => submitFeedback(a.unit)}>
+              Send Feedback
+            </Button>
           </Card>
         );
     }
@@ -175,21 +203,35 @@ export default function StudentDashboard() {
 
   return (
     <Page>
-      <TopNavbar onLogout={handleLogout}/>
+      <TopNavbar onLogout={handleLogout} />
       <Layout>
         <Sidebar>
           <Section>Student Details</Section>
-          <NavItem active={activeTab==='Profile'} onClick={()=>setActiveTab('Profile')}>Profile</NavItem>
-          <NavItem active={activeTab==='Attendance'} onClick={()=>setActiveTab('Attendance')}>Attendance</NavItem>
+          <NavItem
+            active={activeTab==='Profile'}
+            onClick={() => setActiveTab('Profile')}
+          >Profile</NavItem>
+          <NavItem
+            active={activeTab==='Attendance'}
+            onClick={() => setActiveTab('Attendance')}
+          >Attendance</NavItem>
+
           <Section>Course Details</Section>
-          <NavItem active={activeTab==='Syllabus'} onClick={()=>setActiveTab('Syllabus')}>Syllabus</NavItem>
-          <NavItem active={activeTab==='Schedule'} onClick={()=>setActiveTab('Schedule')}>Schedule</NavItem>
+          <NavItem
+            active={activeTab==='Syllabus'}
+            onClick={() => setActiveTab('Syllabus')}
+          >Syllabus</NavItem>
+          <NavItem
+            active={activeTab==='Schedule'}
+            onClick={() => setActiveTab('Schedule')}
+          >Schedule</NavItem>
+
           <Section>Assignments</Section>
           {assignments.map(a => (
             <NavItem
               key={a.unit}
               active={activeTab===a.unit}
-              onClick={()=>setActiveTab(a.unit)}
+              onClick={() => setActiveTab(a.unit)}
             >
               {a.unit}
             </NavItem>
@@ -204,7 +246,7 @@ export default function StudentDashboard() {
   );
 }
 
-// Styled Components (palette & layout adjusted to match design)
+// Styled Components
 const Page = styled.div`
   display: flex; flex-direction: column; min-height:100vh;
 `;

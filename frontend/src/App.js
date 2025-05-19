@@ -3,7 +3,7 @@ import { Helmet } from "react-helmet";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Landing from "./screens/Landing.jsx";
 import Privacy from "./components/Sections/Privacy.jsx";
-import Referrals from "./components/Sections/Referrals.jsx";
+import AdminPanel from "./components/Sections/AdminPanel.jsx";
 import LoginPage from "./components/Pages/LoginPage.jsx";
 import SignupPage from "./components/Pages/SignupPage.jsx";
 import ResetPasswordPage from "./components/Pages/ResetPasswordPage.jsx";
@@ -19,7 +19,7 @@ import QuizPage from './components/Sections/QuizPage.jsx';
 import AdminReport from './components/Sections/AdminReport.jsx';
 import StudentRoute from './components/Routes/StudentRoute.jsx';
 import DashboardPage from './components/Sections/DashboardPage.jsx';
-import AdminDashboard from './components/Sections/AdminDashboard.jsx';
+import EmpDashboard from './components/Sections/EmpDashboard.jsx';
 import StudentDashboard from './components/Sections/StudentDashboard.jsx'
 
 export default function App() {
@@ -37,7 +37,7 @@ export default function App() {
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/admin" element={
               <AdminRoute>
-                <Referrals />
+                <AdminPanel />
               </AdminRoute>
             }/>
             <Route path="/candidateList" element={
@@ -84,7 +84,7 @@ export default function App() {
             <Route path="/s-signUpPage" element={<StudentSignUp />}/>
             <Route path="/s-loginPage" element={<StudentLogin />}/>
             <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/AdminDashboard" element={<AdminDashboard />} />
+            <Route path="/EmpDashboard" element={<EmpDashboard />} />
             {/* <Route path="/StudentDashboard" element={<StudentDashboard/>}/> */}
           </Routes>
         </Router>
