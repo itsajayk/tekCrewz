@@ -4,7 +4,12 @@ import TopNavbar from '../Nav/TopNavbar';
 import Footer from './Footer';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
-import { auth, db } from '../Pages/firebase';
+import { db } from '../Pages/firebase';
+import axios from 'axios';
+
+// Base URL for API requests
+const API_BASE_URL = 'https://tekcrewz.onrender.com';
+axios.defaults.baseURL = API_BASE_URL;
 
 const AdminPanel = () => {
   const navigate = useNavigate();
@@ -13,17 +18,18 @@ const AdminPanel = () => {
   const [modalType, setModalType] = useState('');
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
-  const [courseDocs, setCourseDocs] = useState([]);
+  const [courseDocs, setCourseDocs] = useState({ syllabus: '', schedule: '' });
+  const [docType, setDocType] = useState('syllabus');
   const [assignments, setAssignments] = useState([]);
   const [results, setResults] = useState([]);
   const [feedbackList, setFeedbackList] = useState([]);
   const [newAssignment, setNewAssignment] = useState({ unit: '', studyMaterialUrl: '' });
   const [feedbackText, setFeedbackText] = useState('');
   const [loading, setLoading] = useState(false);
-  const [selected, setSelected] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [profileData, setProfileData] = useState({});
 
+  // fetch referrers
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -35,26 +41,22 @@ const AdminPanel = () => {
         const snapshot = await getDocs(q);
         const refs = snapshot.docs.map(doc => ({ id: doc.id, label: doc.data().referrerName || doc.id }));
         setUserOptions([{ id: 'admin', label: 'Admin' }, ...refs]);
-      } catch (err) {
-        console.error('Error fetching referrers:', err);
-      }
+      } catch (err) { console.error(err); }
     };
     fetchUsers();
   }, []);
 
-    const saveProfile = async () => {
+  const saveProfile = async () => {
     setLoading(true);
-    await fetch(`/api/candidates/${selectedStudent._id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(profileData)
-    });
-    setStudents(students.map(s => s._id === selectedStudent._id ? profileData : s));
-    setSelectedStudent(profileData);
-    setEditMode(false);
-    setLoading(false);
+    try {
+      const { data } = await axios.put(`/api/candidates/${selectedStudent._id}`, profileData);
+      setStudents(prev => prev.map(s => s._id === data._id ? data : s));
+      setSelectedStudent(data);
+      setEditMode(false);
+    } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
+  // load modal data
   useEffect(() => {
     if (!showModal) return;
     setLoading(true);
@@ -63,52 +65,50 @@ const AdminPanel = () => {
         if (modalType === 'StudentDetails') {
           const snap = await getDocs(collection(db, 'users'));
           const creds = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          const res = await fetch('/api/candidates');
-          if (!res.ok) throw new Error(`API error: ${res.status}`);
-          const cands = await res.json();
-          setStudents(creds.map(c => ({ ...c, ...cands.find(x => x.studentId === c.id) || {} })));        
-        } else if (modalType === 'CourseDocs') {
-          const res = await fetch('/api/courses/COURSE1/docs');
-          if (!res.ok) throw new Error(`API error: ${res.status}`);
-          setCourseDocs(await res.json());
-        } else if (modalType === 'ManageAssignments') {
-          const res = await fetch('/api/assignments/all'); if (!res.ok) throw new Error(`API error: ${res.status}`);
-          setAssignments(await res.json());
-        } else if (modalType === 'AssignmentResults') {
-          const res = await fetch('/api/admin/assignments/results'); if (!res.ok) throw new Error(`API error: ${res.status}`);
-          setResults(await res.json());
-        } else if (modalType === 'ReviewFeedback') {
-          const res = await fetch('/api/admin/feedback'); if (!res.ok) throw new Error(`API error: ${res.status}`);
-          setFeedbackList(await res.json());
+          const { data: cands } = await axios.get('/api/candidates');
+          setStudents(creds.map(c => ({ ...c, ...cands.find(x => x.studentId === c.id) })));   
         }
-      } catch (err) {
-        console.error('Failed loading data for', modalType, err);
-        alert('Error loading data: ' + err.message);
-      } finally {
-        setLoading(false);
-      }
+        if (modalType === 'CourseDocs') {
+          const { data } = await axios.get('/api/courses/COURSE1/docs');
+          setCourseDocs(data);
+        }
+        if (modalType === 'ManageAssignments') {
+          const { data } = await axios.get('/api/admin/assignments');
+          setAssignments(data);
+        }
+        if (modalType === 'AssignmentResults') {
+          const { data } = await axios.get('/api/admin/assignments/results');
+          setResults(data);
+        }
+        if (modalType === 'ReviewFeedback') {
+          const { data } = await axios.get('/api/admin/feedback');
+          setFeedbackList(data);
+        }
+      } catch (err) { console.error(err); } finally { setLoading(false); }
     };
     loadData();
   }, [showModal, modalType]);
 
-const openModal = type => { setModalType(type); setShowModal(true); setEditMode(false); };
+  const openModal = type => { setModalType(type); setShowModal(true); setEditMode(false); };
   const closeModal = () => { setShowModal(false); setSelectedStudent(null); setEditMode(false); };
   const selectStudent = s => { setSelectedStudent(s); setProfileData(s); setEditMode(false); };
 
-  const createAssignment = () => {
+  const createAssignment = async () => {
     setLoading(true);
-    fetch('/api/assignments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newAssignment) })
-      .then(() => fetch('/api/admin/assignments'))
-      .then(r => r.json())
-      .then(data => { setAssignments(data); setLoading(false); });
+    try {
+      await axios.post('/api/admin/assignments', newAssignment);
+      const { data } = await axios.get('/api/admin/assignments');
+      setAssignments(data);
+    } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
-  const submitFeedback = () => {
+  const submitFeedback = async () => {
     setLoading(true);
-    fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ studentId: selectedStudent.id, feedback: feedbackText }) })
-      .then(() => fetch('/api/admin/feedback'))
-      .then(r => r.json())
-      .then(data => { setFeedbackList(data); setLoading(false); });
+    try {
+      await axios.post('/api/admin/feedback', { studentId: selectedStudent.id, feedback: feedbackText });
+      const { data } = await axios.get('/api/admin/feedback');
+      setFeedbackList(data);
+    } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
   const uploadDocs = async e => {
@@ -116,12 +116,15 @@ const openModal = type => { setModalType(type); setShowModal(true); setEditMode(
     if (e.target.files[0]) form.append('syllabus', e.target.files[0]);
     if (e.target.files[1]) form.append('schedule', e.target.files[1]);
     setLoading(true);
-    const res = await fetch('/api/admin/course-docs/upload', { method: 'POST', body: form });
-    setCourseDocs(await res.json());
-    setLoading(false);
+    try {
+      const { data } = await axios.post('/api/admin/course-docs/upload', form);
+      setCourseDocs(data);
+    } catch (err) { console.error(err); } finally { setLoading(false); }
   };
 
-  const handleNavigate = path => () => navigate(path);
+  // mapping for modals
+  const modalTypes = ['StudentDetails','CourseDocs','ManageAssignments','AssignmentResults','ReviewFeedback'];
+  const routes = ['/add-candidate','/candidateList','/admin-report','/EmpDashboard','/signup'];
 
   return (
     <PageWrapper>
@@ -129,88 +132,129 @@ const openModal = type => { setModalType(type); setShowModal(true); setEditMode(
       <MainContent>
         <PageTitle>Admin Panel</PageTitle>
         <MenuGrid>
-          <MenuCard onClick={handleNavigate('/add-candidate')}><CardIcon>🤝</CardIcon><CardLabel>Add Candidate</CardLabel></MenuCard>
-          <MenuCard onClick={handleNavigate('/candidateList')}><CardIcon>📋</CardIcon><CardLabel>Candidate List</CardLabel></MenuCard>
-          <MenuCard onClick={handleNavigate('/admin-report')}><CardIcon>📊</CardIcon><CardLabel>Quiz Report</CardLabel></MenuCard>
-          <MenuCard onClick={handleNavigate('/EmpDashboard')}><CardIcon>📈</CardIcon><CardLabel>Employee Dashboard</CardLabel></MenuCard>
-          <MenuCard onClick={handleNavigate('/signup')}><CardIcon>➕</CardIcon><CardLabel>Create Account</CardLabel></MenuCard>
-          <MenuCard onClick={() => openModal('StudentDetails')}><CardIcon>👤</CardIcon><CardLabel>Student Details</CardLabel></MenuCard>
-          <MenuCard onClick={() => openModal('CourseDocs')}><CardIcon>📚</CardIcon><CardLabel>Course Documents</CardLabel></MenuCard>
-          <MenuCard onClick={() => openModal('ManageAssignments')}><CardIcon>📝</CardIcon><CardLabel>Manage Assignments</CardLabel></MenuCard>
-          <MenuCard onClick={() => openModal('AssignmentResults')}><CardIcon>📈</CardIcon><CardLabel>Assignment Results</CardLabel></MenuCard>
-          <MenuCard onClick={() => openModal('ReviewFeedback')}><CardIcon>💬</CardIcon><CardLabel>Review Feedback</CardLabel></MenuCard>
-        </MenuGrid>
+  {[
+    { label: 'Add Candidate', icon: '🤝', route: '/add-candidate' },
+    { label: 'Candidate List', icon: '📋', route: '/candidateList' },
+    { label: 'Quiz Report', icon: '📊', route: '/admin-report' },
+    { label: 'Employee Dashboard', icon: '📈', route: '/EmpDashboard' },
+    { label: 'Create Account', icon: '➕', route: '/signup' },
+    { label: 'Student Details', icon: '👤', modal: 'StudentDetails' },
+    { label: 'Course Documents', icon: '📚', modal: 'CourseDocs' },
+    { label: 'Manage Assignments', icon: '📝', modal: 'ManageAssignments' },
+    { label: 'Assignment Results', icon: '📈', modal: 'AssignmentResults' },
+    { label: 'Review Feedback', icon: '💬', modal: 'ReviewFeedback' }
+  ].map(({ label, icon, route, modal }, idx) => (
+    <MenuCard key={idx} onClick={() => {
+      if (route) navigate(route);
+      else if (modal) openModal(modal);
+    }}>
+      <CardIcon>{icon}</CardIcon>
+      <CardLabel>{label}</CardLabel>
+    </MenuCard>
+  ))}
+</MenuGrid>
       </MainContent>
       <Footer />
 
       {showModal && (
         <ModalOverlay onClick={closeModal}>
-          <ModalContent onClick={e => e.stopPropagation()}>
-            <ModalHeader><h2>{modalType.replace(/([A-Z])/g,' $1').trim()}</h2><CloseButton onClick={closeModal}>&times;</CloseButton></ModalHeader>
+          <ModalContent onClick={e=>e.stopPropagation()}>
+            <ModalHeader>
+              <h2>{modalType.replace(/([A-Z])/g,' $1').trim()}</h2>
+              <CloseButton onClick={closeModal}>&times;</CloseButton>
+            </ModalHeader>
             <ModalBody>
-              {loading ? <Spinner>Loading...</Spinner> : (
-                <>
-                  {modalType === 'StudentDetails' && (
-                    <ModalInner>
-                      <StudentList>{students.map(s => <StudentItem key={s._id} onClick={() => selectStudent(s)}>{s.candidateName}</StudentItem>)}</StudentList>
-                      {selected && (
+              {loading ? 
+              <SpinnerOverlay>
+                <Spinner/>
+              </SpinnerOverlay>
+                : (
+                <> 
+                  {modalType==='StudentDetails' && (
+                    <ModalGrid>
+                      <StudentList>
+                        {students.map(s=>(
+                          <StudentItem key={s._id} onClick={()=>selectStudent(s)}>
+                            {s.candidateName}
+                          </StudentItem>
+                        ))}
+                      </StudentList>
+                      {selectedStudent && (
                         <DetailSection>
                           {!editMode ? (
-                            <> <ProfileGrid>
-                              <Field><strong>Name:</strong> {selected.candidateName}</Field>
-                              <Field><strong>Email:</strong> {selected.email}</Field>
-                              <Field><strong>Mobile:</strong> {selected.mobile}</Field>
-                              {/* add more fields as needed */}
-                            </ProfileGrid>
-                              <button onClick={() => setEditMode(true)}>Edit</button>
+                            <>
+                              <ProfileGrid>
+                                <Field><strong>Name:</strong> {selectedStudent.candidateName}</Field>
+                                <Field><strong>Email:</strong> {selectedStudent.email}</Field>
+                                <Field><strong>Mobile:</strong> {selectedStudent.mobile}</Field>
+                              </ProfileGrid>
+                              <Button onClick={()=>setEditMode(true)}>Edit</Button>
                             </>
                           ) : (
-                            <> <ProfileGrid>
-                              <Field><strong>Name:</strong> <input value={profileData.candidateName} onChange={e => setProfileData({ ...profileData, candidateName: e.target.value })} /></Field>
-                              <Field><strong>Email:</strong> <input value={profileData.email} onChange={e => setProfileData({ ...profileData, email: e.target.value })} /></Field>
-                              <Field><strong>Mobile:</strong> <input value={profileData.mobile} onChange={e => setProfileData({ ...profileData, mobile: e.target.value })} /></Field>
-                            </ProfileGrid>
-                              <ActionButton onClick={saveProfile}>Save</ActionButton>
+                            <>
+                              <ProfileGrid>
+                                {['candidateName','email','mobile'].map(key=>(
+                                  <Field key={key}>
+                                    <strong>{key.replace('candidateName','Name').replace('mobile','Mobile')}:</strong>
+                                    <input
+                                      value={profileData[key]||''}
+                                      onChange={e=>setProfileData(prev=>({...prev,[key]:e.target.value}))}
+                                    />
+                                  </Field>
+                                ))}
+                              </ProfileGrid>
+                              <Button onClick={saveProfile}>Save</Button>
                             </>
                           )}
                         </DetailSection>
                       )}
-                    </ModalInner>
+                    </ModalGrid>
                   )}
-                  {modalType === 'CourseDocs' && (
+
+                  {modalType==='CourseDocs' && (
                     <DocSection>
-                      <DocLink href={courseDocs.syllabus} target="_blank">Syllabus</DocLink>
-                      <DocLink href={courseDocs.schedule} target="_blank">Schedule</DocLink>
-                      <FileInput type="file" multiple accept="application/pdf" onChange={uploadDocs} />
+                      <Select value={docType} onChange={e=>setDocType(e.target.value)}>
+                        <option value="syllabus">Syllabus</option>
+                        <option value="schedule">Schedule</option>
+                      </Select>
+                      <DocLink href={courseDocs[docType]} target="_blank">
+                        View {docType.charAt(0).toUpperCase()+docType.slice(1)}
+                      </DocLink>
+                      <FileInput type="file" accept="application/pdf" onChange={uploadDocs} />
                     </DocSection>
                   )}
-                  {modalType === 'ManageAssignments' && (
-                    <>
-                      <FormSection>
-                        <input placeholder="Unit" value={newAssignment.unit} onChange={e => setNewAssignment({ ...newAssignment, unit: e.target.value })} />
-                        <input placeholder="Study Material URL" value={newAssignment.studyMaterialUrl} onChange={e => setNewAssignment({ ...newAssignment, studyMaterialUrl: e.target.value })} />
-                        <button onClick={createAssignment}>Create Assignment</button>
-                      </FormSection>
-                      <AssignList>{assignments.map(a => <AssignItem key={a._id}>{a.unit}</AssignItem>)}</AssignList>
-                    </>
+
+                  {modalType==='ManageAssignments' && (
+                    <FormSection>
+                      <input placeholder="Unit" value={newAssignment.unit} onChange={e=>setNewAssignment(prev=>({...prev,unit:e.target.value}))} />
+                      <input placeholder="Study Material URL" value={newAssignment.studyMaterialUrl} onChange={e=>setNewAssignment(prev=>({...prev,studyMaterialUrl:e.target.value}))} />
+                      <Button onClick={createAssignment}>Create Assignment</Button>
+                      <AssignList>
+                        {assignments.map(a=><AssignItem key={a._id}>{a.unit}</AssignItem>)}
+                      </AssignList>
+                    </FormSection>
                   )}
-                  {modalType === 'AssignmentResults' && (
+
+                  {modalType==='AssignmentResults' && (
                     <ResultsTable>
                       <thead><tr><th>Student</th><th>Unit</th><th>Score</th></tr></thead>
-                      <tbody>{results.map(r => <tr key={r._id}><td>{r.studentName}</td><td>{r.unit}</td><td>{r.score}</td></tr>)}</tbody>
+                      <tbody>{results.map(r=><tr key={r._id}><td>{r.studentName}</td><td>{r.unit}</td><td>{r.results?.score}</td></tr>)}</tbody>
                     </ResultsTable>
                   )}
-                  {modalType === 'ReviewFeedback' && (
+
+                  {modalType==='ReviewFeedback' && (
                     <>
-                      <StudentList>{students.map(s => <StudentItem key={s._id || s.id} onClick={() => selectStudent(s)}>{s.candidateName}</StudentItem>)}</StudentList>
+                      <StudentList>
+                        {students.map(s=><StudentItem key={s._id||s.id} onClick={()=>selectStudent(s)}>{s.candidateName}</StudentItem>)}
+                      </StudentList>
                       {selectedStudent && (
                         <FeedbackSection>
                           <h3>Feedback for {selectedStudent.candidateName}</h3>
-                          <textarea value={feedbackText} onChange={e => setFeedbackText(e.target.value)} />
-                          <button onClick={submitFeedback}>Submit</button>
+                          <textarea value={feedbackText} onChange={e=>setFeedbackText(e.target.value)} />
+                          <Button onClick={submitFeedback}>Submit</Button>
                         </FeedbackSection>
                       )}
-                      <FeedbackList>{feedbackList.map(f => <FeedbackItem key={f._id}>{f.studentName}: {f.feedback}</FeedbackItem>)}</FeedbackList>
+                      <FeedbackList>{feedbackList.map(f=><FeedbackItem key={f._id}>{f.studentId}: {f.feedback}</FeedbackItem>)}</FeedbackList>
                     </>
                   )}
                 </>
@@ -231,6 +275,7 @@ const gradientBG = keyframes`
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 `;
+
 const PageWrapper = styled.section`
   display: flex;
   flex-direction: column;
@@ -239,103 +284,190 @@ const PageWrapper = styled.section`
   background-size: 600% 600%;
   animation: ${gradientBG} 15s ease infinite;
 `;
-const ModalInner = styled.div`
-  display: flex; gap: 16px;
-`;
+
 const MainContent = styled.div`
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 90px 30px;
+  padding: 80px 20px;
 `;
-const Field = styled.div`display:flex;flex-direction:column;`;
-const ActionButton = styled.button`padding:8px 16px;background:#4caf50;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-top:8px;`;
 
 const PageTitle = styled.h1`
-  font-size: 2.5rem;
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
   font-weight: 800;
-  margin-bottom: 40px;
+  margin-bottom: 24px;
   background: linear-gradient(90deg, #7620ff, #ff9900);
   -webkit-background-clip: text;
   color: transparent;
   text-align: center;
 `;
+
 const MenuGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 30px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
   width: 100%;
-  max-width: 800px;
+  max-width: 1200px;
 `;
+
 const MenuCard = styled.div`
   background: #fff;
-  border-radius: 12px;
-  padding: 20px;
+  border-radius: 16px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   cursor: pointer;
-  transition: transform 0.3s;
-  &:hover { transform: translateY(-5px); }
+  transition: transform 0.2s;
+  &:hover { transform: translateY(-4px); }
 `;
-const DocSection = styled.div`display:flex;flex-direction:column;gap:12px;`;
-const DocLink = styled.a`color:#007acc;text-decoration:underline;`;
-const FileInput = styled.input`margin-top:12px;`;
+
 const CardIcon = styled.div`
   font-size: 2rem;
   margin-bottom: 8px;
 `;
+
 const CardLabel = styled.div`
   font-weight: 600;
+  text-align: center;
 `;
+
+// Modal Styles
 const ModalOverlay = styled.div`
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.5);
   display: flex; justify-content: center; align-items: center;
+  padding: 16px;
 `;
+
 const ModalContent = styled.div`
   background: #fff;
-  border-radius: 8px;
-  width: 90%; max-width: 800px;
+  border-radius: 12px;
+  width: 100%; max-width: 900px;
   max-height: 90%; overflow-y: auto;
+  display: flex; flex-direction: column;
 `;
+
 const ModalHeader = styled.div`
   display: flex; justify-content: space-between; align-items: center;
   padding: 16px; border-bottom: 1px solid #eee;
 `;
+
 const CloseButton = styled.button`
-  background: none; border: none; font-size: 1.2rem; cursor: pointer;
+  background: none; border: none; font-size: 1.5rem; cursor: pointer;
 `;
+
 const ModalBody = styled.div`
   padding: 16px;
 `;
+
+const SpinnerOverlay = styled.div`
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+`;
+
+const spin = keyframes`
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+`;
+
 const Spinner = styled.div`
-  text-align: center; padding: 20px; font-size: 1.2rem;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #7620ff;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: ${spin} 1s linear infinite;
 `;
+
+const ModalGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 16px;
+  @media(max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
 const StudentList = styled.ul`
-  list-style: none; padding: 0; max-height: 200px; overflow-y: auto;
+  list-style: none; margin: 0; padding: 0; max-height: 300px; overflow-y: auto;
 `;
+
 const StudentItem = styled.li`
   padding: 8px; border-bottom: 1px solid #ddd; cursor: pointer;
+  &:hover { background: #f9f9f9; }
 `;
+
 const DetailSection = styled.div`
-  margin-top: 16px;
+  display: flex; flex-direction: column;
 `;
+
 const ProfileGrid = styled.div`
-  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+  @media(max-width: 600px) { grid-template-columns: 1fr; }
 `;
-const ProfileRow = styled.div``;
-const DocList = styled.ul`list-style: none; padding: 0;`;
-const DocItem = styled.li`margin: 4px 0;`;
-const FormSection = styled.div`margin-bottom: 16px; display: flex; gap: 8px;`;
-const AssignList = styled.ul`list-style: none; padding: 0;`;
-const AssignItem = styled.li`margin: 4px 0;`;
+
+const Field = styled.div`
+  display: flex; flex-direction: column;
+`;
+
+const Button = styled.button`
+  align-self: flex-start;
+  padding: 8px 16px;
+  border: none; border-radius: 8px;
+  background: #4caf50; color: #fff; cursor: pointer;
+  transition: background 0.2s;
+  &:hover { background: #45a047; }
+`;
+
+const DocSection = styled.div`
+  display: flex; flex-direction: column; gap: 12px;
+`;
+
+const Select = styled.select`
+  padding: 8px; border-radius: 8px; border: 1px solid #ccc;
+`;
+
+const DocLink = styled.a`
+  font-weight: 600; text-decoration: underline;
+`;
+
+const FileInput = styled.input``;
+
+const FormSection = styled.div`
+  display: flex; flex-direction: column; gap: 12px;
+`;
+
+const AssignList = styled.ul`
+  list-style: none; padding: 0;
+`;
+
+const AssignItem = styled.li`
+  padding: 8px; border-bottom: 1px solid #eee;
+`;
+
 const ResultsTable = styled.table`
   width: 100%; border-collapse: collapse;
-  th,td { border: 1px solid #ddd; padding: 8px; }
-  th { background: #f0f0f0; }
+  th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
 `;
-const FeedbackSection = styled.div`margin: 16px 0;`;
-const FeedbackList = styled.ul`list-style: none; padding: 0;`;
-const FeedbackItem = styled.li`margin: 4px 0;`;
+
+const FeedbackSection = styled.div`
+  margin-bottom: 16px; display: flex; flex-direction: column; gap: 8px;
+`;
+
+const FeedbackList = styled.ul`
+  list-style: none; padding: 0;
+`;
+
+const FeedbackItem = styled.li`
+  padding: 8px; border-bottom: 1px solid #ddd;
+`;
