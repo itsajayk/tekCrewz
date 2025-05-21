@@ -70,31 +70,31 @@ const uploadCourseDoc = multer({
 
 // ── Schemas & Models ──────────────────────────────────────────────────
 const candidateSchema = new mongoose.Schema({
-  referrerId:         { type: String, required: true },
-  studentId:          { type: String, required: true, unique: true },
-  candidateName:      { type: String, required: true },
-  college:            { type: String, required: true },
-  candidateDegree:    { type: String, required: true },
-  programme:          { type: String },
-  candidateCourseName:{ type: String },
-  marksType:          { type: String, enum: ['CGPA','Percentage'], required: true },
-  score:              { type: Number, default: 0 },
-  scholarshipSecured: { type: String },
-  mobile:             { type: String, required: true },
-  parentMobile:       { type: String, required: true },
-  email:              { type: String, required: true },
-  coursesEnquired:    { type: String, required: true },
-  dateOfVisit:        { type: Date, required: true },
-  paymentTerm:        { type: String, required: true },
-  communicationScore: { type: Number, required: true },
-  candidatePic:       { type: String },
-  markStatement:      { type: String },
-  signature:          { type: String },
-  paidAmount:         { type: Number, default: 0 },
-  courseRegistered:   { type: String, default: '' },
-  paidDate:           { type: Date },
-  status:             { type: String, default: 'Registered' },
-  role:               { type: String, default: 'student' }
+  referrerId:         String,
+  studentId:          { type: String, unique: true },
+  candidateName:      String,
+  college:            String,
+  candidateDegree:    String,
+  programme:          String,
+  candidateCourseName:String,
+  marksType:          { type: String, enum: ['CGPA','Percentage'] },
+  score:              Number,
+  scholarshipSecured: String,
+  mobile:             String,
+  parentMobile:       String,
+  email:              String,
+  coursesEnquired:    String,
+  dateOfVisit:        Date,
+  paymentTerm:        String,
+  communicationScore: Number,
+  candidatePic:       String,
+  markStatement:      String,
+  signature:          String,
+  paidAmount:         Number,
+  courseRegistered:   String,
+  paidDate:           Date,
+  status:             String,
+  role:               String
 }, { timestamps: true });
 const Candidate = mongoose.model('Candidate', candidateSchema);
 
@@ -172,19 +172,7 @@ app.post(
 // Read Candidates
 app.get('/api/candidates', async (req, res) => {
   try {
-    const { date, status, referrerId, sortOrder } = req.query;
-    const filter = {};
-    if (date) {
-      const [y, m] = date.split('-').map(Number);
-      filter.dateOfVisit = {
-        $gte: new Date(y, m - 1, 1),
-        $lte: new Date(y, m, 0, 23,59,59,999)
-      };
-    }
-    if (status)     filter.status     = status;
-    if (referrerId) filter.referrerId = referrerId;
-    const dir = sortOrder === 'asc' ? 1 : -1;
-    const list = await Candidate.find(filter).sort({ dateOfVisit: dir });
+    const list = await Candidate.find();
     res.json(list);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -241,8 +229,7 @@ Please provide:
     );
     const data = await apiRes.json();
     if (!apiRes.ok) throw new Error(data);
-    const text = data.candidates?.[0]?.output || '';
-    res.json({ text });
+    res.json({ text: data.candidates?.[0]?.output || '' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -269,7 +256,7 @@ app.get('/api/assignments/:studentId', async (req, res) => {
   res.json(all.map(a => ({
     unit: a.unit,
     studyMaterialUrl: a.studyMaterialUrl,
-    closed:     a.closedAt    ? now > a.closedAt    : false,
+    closed:     a.closedAt     ? now > a.closedAt     : false,
     unlocked:   a.unlockedUntil? now < a.unlockedUntil: false,
     submissionCode: a.submissionCode,
     results:    a.results,
@@ -286,7 +273,7 @@ app.post('/api/assignments/:studentId/submit', async (req, res) => {
 app.post('/api/assignments/:studentId/unlock', async (req, res) => {
   await Assignment.findOneAndUpdate(
     { studentId: req.params.studentId, unit: req.body.unit },
-    { unlockedUntil: new Date(Date.now() + 2 * 86400000) }
+    { unlockedUntil: new Date(Date.now() + 2*86400000) }
   );
   res.sendStatus(204);
 });
@@ -309,11 +296,32 @@ app.get('/api/admin/students', async (req, res) => {
     candidateName: p.candidateName,
     email: p.email,
     mobile: p.mobile,
-    attendance:   atts.filter(a => a.studentId === p.studentId),
-    docs:         docs.filter(d => d.courseId === 'COURSE1'),
-    assignments:  asns.filter(a => a.studentId === p.studentId)
+    attendance:  atts.filter(a => a.studentId === p.studentId),
+    docs:        docs.filter(d => d.courseId === 'COURSE1'),
+    assignments: asns.filter(a => a.studentId === p.studentId)
   }));
   res.json(out);
+});
+
+// ── NEW: Admin endpoints for the frontend ──────────────────────────────
+// List all assignments (for ManageAssignments)
+app.get('/api/admin/assignments', async (req, res) => {
+  const all = await Assignment.find();
+  res.json(all);
+});
+
+// List only assignment results (for AssignmentResults)
+app.get('/api/admin/assignments/results', async (req, res) => {
+  const results = await Assignment.find({ 'results.score': { $exists: true } });
+  res.json(results);
+});
+
+// List all feedback records (for ReviewFeedback)
+app.get('/api/admin/feedback', async (req, res) => {
+  const fb = await Assignment.find({ feedback: { $exists: true, $ne: null } })
+    .select('studentId feedback')
+    .lean();
+  res.json(fb);
 });
 
 // Admin: Upload Course Docs
