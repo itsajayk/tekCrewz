@@ -75,10 +75,10 @@ const AdminPanel = () => {
           const res = await fetch('/api/assignments/all'); if (!res.ok) throw new Error(`API error: ${res.status}`);
           setAssignments(await res.json());
         } else if (modalType === 'AssignmentResults') {
-          const res = await fetch('/api/assignments/results'); if (!res.ok) throw new Error(`API error: ${res.status}`);
+          const res = await fetch('/api/admin/assignments/results'); if (!res.ok) throw new Error(`API error: ${res.status}`);
           setResults(await res.json());
         } else if (modalType === 'ReviewFeedback') {
-          const res = await fetch('/api/feedback/all'); if (!res.ok) throw new Error(`API error: ${res.status}`);
+          const res = await fetch('/api/admin/feedback'); if (!res.ok) throw new Error(`API error: ${res.status}`);
           setFeedbackList(await res.json());
         }
       } catch (err) {
@@ -98,7 +98,7 @@ const openModal = type => { setModalType(type); setShowModal(true); setEditMode(
   const createAssignment = () => {
     setLoading(true);
     fetch('/api/assignments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newAssignment) })
-      .then(() => fetch('/api/assignments/all'))
+      .then(() => fetch('/api/admin/assignments'))
       .then(r => r.json())
       .then(data => { setAssignments(data); setLoading(false); });
   };
@@ -106,7 +106,7 @@ const openModal = type => { setModalType(type); setShowModal(true); setEditMode(
   const submitFeedback = () => {
     setLoading(true);
     fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ studentId: selectedStudent.id, feedback: feedbackText }) })
-      .then(() => fetch('/api/feedback/all'))
+      .then(() => fetch('/api/admin/feedback'))
       .then(r => r.json())
       .then(data => { setFeedbackList(data); setLoading(false); });
   };

@@ -1,9 +1,11 @@
+// server.js
 require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const path = require('path');
+const fetch = require('node-fetch');               // for AI Insights call
 const { v2: cloudinary } = require('cloudinary');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
@@ -39,30 +41,20 @@ cloudinary.config({
 });
 
 // ── Multer + Cloudinary ────────────────────────────────────────────────
+// for candidate images/docs (auto detect image or PDF)
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
     folder: 'candidates',
-    resource_type: 'auto',
-    public_id: (req, file) => {
-      const base = file.originalname
-        .replace(/\.[^/.]+$/, '')
-        .replace(/[^\w\-]+/g, '-');
-      return `${Date.now()}-${base}`;
-    }
+    resource_type: 'auto'
   }
 });
-
 const upload = multer({
   storage,
-  fileFilter: (req, file, cb) => {
-    if (/^image\//.test(file.mimetype) || file.mimetype === 'application/pdf') cb(null, true);
-    else cb(new Error('Only image or PDF files allowed.'));
-  },
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB
+  limits: { fileSize: 5 * 1024 * 1024 }
 });
 
-// Storage for course docs (PDFs)
+// for course documents (PDF only)
 const courseDocStorage = new CloudinaryStorage({
   cloudinary,
   params: { folder: 'course_docs', resource_type: 'raw' }
@@ -72,7 +64,8 @@ const uploadCourseDoc = multer({
   fileFilter: (req, file, cb) => {
     if (file.mimetype === 'application/pdf') cb(null, true);
     else cb(new Error('Only PDF files allowed.'));
-  }
+  },
+  limits: { fileSize: 10 * 1024 * 1024 }
 });
 
 // ── Schemas & Models ──────────────────────────────────────────────────
@@ -106,10 +99,10 @@ const candidateSchema = new mongoose.Schema({
 const Candidate = mongoose.model('Candidate', candidateSchema);
 
 const studentProfileSchema = new mongoose.Schema({
-  studentId:    String,
-  candidateName:String,
-  email:        String,
-  mobile:       String
+  studentId:     String,
+  candidateName: String,
+  email:         String,
+  mobile:        String
 }, { timestamps: true });
 const StudentProfile = mongoose.model('StudentProfile', studentProfileSchema);
 
@@ -120,7 +113,11 @@ const attendanceSchema = new mongoose.Schema({
 });
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 
-const courseDocSchema = new mongoose.Schema({ courseId:String, type:String, url:String },{ timestamps:true });
+const courseDocSchema = new mongoose.Schema({
+  courseId: String,
+  type:     String,
+  url:      String
+}, { timestamps: true });
 const CourseDoc = mongoose.model('CourseDoc', courseDocSchema);
 
 const assignmentSchema = new mongoose.Schema({
@@ -172,7 +169,7 @@ app.post(
   }
 );
 
-// Read, Update, Delete Candidates
+// Read Candidates
 app.get('/api/candidates', async (req, res) => {
   try {
     const { date, status, referrerId, sortOrder } = req.query;
@@ -180,7 +177,7 @@ app.get('/api/candidates', async (req, res) => {
     if (date) {
       const [y, m] = date.split('-').map(Number);
       filter.dateOfVisit = {
-        $gte: new Date(y, m-1, 1),
+        $gte: new Date(y, m - 1, 1),
         $lte: new Date(y, m, 0, 23,59,59,999)
       };
     }
@@ -194,6 +191,7 @@ app.get('/api/candidates', async (req, res) => {
   }
 });
 
+// Update Candidate
 app.put('/api/candidates/:id', async (req, res) => {
   try {
     const updated = await Candidate.findByIdAndUpdate(
@@ -207,6 +205,7 @@ app.put('/api/candidates/:id', async (req, res) => {
   }
 });
 
+// Delete Candidate
 app.delete('/api/candidates/:id', async (req, res) => {
   try {
     await Candidate.findByIdAndDelete(req.params.id);
@@ -254,34 +253,29 @@ app.get('/api/students/:studentId/profile', async (req, res) => {
   const prof = await StudentProfile.findOne({ studentId: req.params.studentId });
   res.json(prof);
 });
-
 app.get('/api/students/:studentId/attendance', async (req, res) => {
   const atts = await Attendance.find({ studentId: req.params.studentId }).sort('date');
   res.json(atts);
 });
-
 app.get('/api/courses/:courseId/docs', async (req, res) => {
   const docs = await CourseDoc.find({ courseId: req.params.courseId });
   const out = {};
   docs.forEach(d => (out[d.type] = d.url));
   res.json(out);
 });
-
 app.get('/api/assignments/:studentId', async (req, res) => {
   const all = await Assignment.find({ studentId: req.params.studentId });
   const now = new Date();
-  const formatted = all.map(a => ({
+  res.json(all.map(a => ({
     unit: a.unit,
     studyMaterialUrl: a.studyMaterialUrl,
-    closed: a.closedAt && now > a.closedAt,
-    unlocked: a.unlockedUntil && now < a.unlockedUntil,
+    closed:     a.closedAt    ? now > a.closedAt    : false,
+    unlocked:   a.unlockedUntil? now < a.unlockedUntil: false,
     submissionCode: a.submissionCode,
-    results: a.results,
-    feedback: a.feedback
-  }));
-  res.json(formatted);
+    results:    a.results,
+    feedback:   a.feedback
+  })));
 });
-
 app.post('/api/assignments/:studentId/submit', async (req, res) => {
   await Assignment.findOneAndUpdate(
     { studentId: req.params.studentId, unit: req.body.unit },
@@ -289,7 +283,6 @@ app.post('/api/assignments/:studentId/submit', async (req, res) => {
   );
   res.sendStatus(204);
 });
-
 app.post('/api/assignments/:studentId/unlock', async (req, res) => {
   await Assignment.findOneAndUpdate(
     { studentId: req.params.studentId, unit: req.body.unit },
@@ -297,7 +290,6 @@ app.post('/api/assignments/:studentId/unlock', async (req, res) => {
   );
   res.sendStatus(204);
 });
-
 app.post('/api/assignments/:studentId/feedback', async (req, res) => {
   await Assignment.findOneAndUpdate(
     { studentId: req.params.studentId, unit: req.body.unit },
@@ -317,42 +309,51 @@ app.get('/api/admin/students', async (req, res) => {
     candidateName: p.candidateName,
     email: p.email,
     mobile: p.mobile,
-    attendance: atts.filter(a => a.studentId === p.studentId),
-    docs: docs.filter(d => d.courseId === 'COURSE1'),
-    assignments: asns.filter(a => a.studentId === p.studentId)
+    attendance:   atts.filter(a => a.studentId === p.studentId),
+    docs:         docs.filter(d => d.courseId === 'COURSE1'),
+    assignments:  asns.filter(a => a.studentId === p.studentId)
   }));
   res.json(out);
 });
 
-app.post('/api/admin/course-docs/upload', uploadCourseDoc.fields([
-  { name:'syllabus', maxCount:1 },
-  { name:'schedule', maxCount:1 }
-]), async(req,res)=>{
-  try{
-    const syllabus = req.files.syllabus?.[0]?.path;
-    const schedule = req.files.schedule?.[0]?.path;
-    await CourseDoc.findOneAndUpdate({ courseId:'COURSE1',type:'syllabus' },{ url:syllabus },{ upsert:true });
-    await CourseDoc.findOneAndUpdate({ courseId:'COURSE1',type:'schedule' },{ url:schedule },{ upsert:true });
-    res.json({ syllabus,schedule });
-  }catch(e){ res.status(500).json({ error:e.message }); }
-});
+// Admin: Upload Course Docs
+app.post(
+  '/api/admin/course-docs/upload',
+  uploadCourseDoc.fields([
+    { name:'syllabus', maxCount:1 },
+    { name:'schedule', maxCount:1 }
+  ]),
+  async (req, res) => {
+    try {
+      const syllabus = req.files.syllabus?.[0]?.path;
+      const schedule = req.files.schedule?.[0]?.path;
+      await CourseDoc.findOneAndUpdate(
+        { courseId:'COURSE1', type:'syllabus' },
+        { url: syllabus },
+        { upsert: true }
+      );
+      await CourseDoc.findOneAndUpdate(
+        { courseId:'COURSE1', type:'schedule' },
+        { url: schedule },
+        { upsert: true }
+      );
+      res.json({ syllabus, schedule });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  }
+);
 
-app.get('/api/courses/:id/docs', async(req,res)=>{
-  const docs = await CourseDoc.find({ courseId:req.params.id });
-  const out={}; docs.forEach(d=>out[d.type]=d.url);
-  res.json(out);
-});
-
+// Admin: Manage Assignments / Results / Unlock / Feedback
 app.post('/api/admin/students/:id/manageAssignments', async (req, res) => {
   const { unit, studyMaterialUrl, closeDays } = req.body;
   await Assignment.findOneAndUpdate(
     { studentId: req.params.id, unit },
-    { studyMaterialUrl, closedAt: new Date(Date.now() + closeDays * 86400000) },
+    { studyMaterialUrl, closedAt: new Date(Date.now() + closeDays*86400000) },
     { upsert: true }
   );
   res.sendStatus(204);
 });
-
 app.post('/api/admin/students/:id/enterResults', async (req, res) => {
   await Assignment.findOneAndUpdate(
     { studentId: req.params.id, unit: req.body.unit },
@@ -360,15 +361,13 @@ app.post('/api/admin/students/:id/enterResults', async (req, res) => {
   );
   res.sendStatus(204);
 });
-
 app.post('/api/admin/students/:id/approveUnlock', async (req, res) => {
   await Assignment.findOneAndUpdate(
     { studentId: req.params.id, unit: req.body.unit },
-    { unlockedUntil: new Date(Date.now() + 2 * 86400000) }
+    { unlockedUntil: new Date(Date.now() + 2*86400000) }
   );
   res.sendStatus(204);
 });
-
 app.post('/api/admin/students/:id/reviewFeedback', (_req, res) => {
   res.sendStatus(204);
 });
