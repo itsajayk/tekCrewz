@@ -353,15 +353,36 @@ app.post(
 );
 
 // Admin: Manage Assignments / Results / Unlock / Feedback
-app.post('/api/admin/students/:id/manageAssignments', async (req, res) => {
-  const { unit, studyMaterialUrl, closeDays } = req.body;
-  await Assignment.findOneAndUpdate(
-    { studentId: req.params.id, unit },
-    { studyMaterialUrl, closedAt: new Date(Date.now() + closeDays*86400000) },
-    { upsert: true }
-  );
-  res.sendStatus(204);
-});
+app.post(
+  '/api/admin/students/:id/manageAssignments',
+  async (req, res) => {
+    try {
+      const { unit, studyMaterialUrl, closeDays } = req.body;
+      if (!unit || !studyMaterialUrl)
+        return res.status(400).json({ error: 'unit and studyMaterialUrl required' });
+      const days = parseInt(closeDays, 10);
+      if (isNaN(days)) 
+        return res.status(400).json({ error: 'closeDays must be a number' });
+
+      await Assignment.findOneAndUpdate(
+        { studentId: req.params.id, unit },
+        { studyMaterialUrl, closedAt: new Date(Date.now() + days * 86400000) },
+        { upsert: true }
+      );
+      // ensure CORS headers are on every response
+      res.set('Access-Control-Allow-Origin', req.get('Origin'));
+      res.sendStatus(204);
+    } catch (err) {
+      console.error(err);
+      // still send CORS header on errors
+      res
+        .status(500)
+        .set('Access-Control-Allow-Origin', req.get('Origin'))
+        .json({ error: err.message });
+    }
+  }
+);
+
 app.post('/api/admin/students/:id/enterResults', async (req, res) => {
   await Assignment.findOneAndUpdate(
     { studentId: req.params.id, unit: req.body.unit },
