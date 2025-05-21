@@ -62,6 +62,19 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 });
 
+// Storage for course docs (PDFs)
+const courseDocStorage = new CloudinaryStorage({
+  cloudinary,
+  params: { folder: 'course_docs', resource_type: 'raw' }
+});
+const uploadCourseDoc = multer({
+  storage: courseDocStorage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') cb(null, true);
+    else cb(new Error('Only PDF files allowed.'));
+  }
+});
+
 // ── Schemas & Models ──────────────────────────────────────────────────
 const candidateSchema = new mongoose.Schema({
   referrerId:         { type: String, required: true },
@@ -107,11 +120,7 @@ const attendanceSchema = new mongoose.Schema({
 });
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 
-const courseDocSchema = new mongoose.Schema({
-  courseId: String,
-  type:     String,
-  url:      String
-}, { timestamps: true });
+const courseDocSchema = new mongoose.Schema({ courseId:String, type:String, url:String },{ timestamps:true });
 const CourseDoc = mongoose.model('CourseDoc', courseDocSchema);
 
 const assignmentSchema = new mongoose.Schema({
@@ -315,15 +324,23 @@ app.get('/api/admin/students', async (req, res) => {
   res.json(out);
 });
 
-app.post('/api/admin/students/:id/uploadDocs', async (req, res) => {
-  const { syllabus, schedule } = req.body;
-  await CourseDoc.findOneAndUpdate(
-    { courseId: 'COURSE1', type: 'syllabus' }, { url: syllabus }, { upsert: true }
-  );
-  await CourseDoc.findOneAndUpdate(
-    { courseId: 'COURSE1', type: 'schedule' }, { url: schedule }, { upsert: true }
-  );
-  res.sendStatus(204);
+app.post('/api/admin/course-docs/upload', uploadCourseDoc.fields([
+  { name:'syllabus', maxCount:1 },
+  { name:'schedule', maxCount:1 }
+]), async(req,res)=>{
+  try{
+    const syllabus = req.files.syllabus?.[0]?.path;
+    const schedule = req.files.schedule?.[0]?.path;
+    await CourseDoc.findOneAndUpdate({ courseId:'COURSE1',type:'syllabus' },{ url:syllabus },{ upsert:true });
+    await CourseDoc.findOneAndUpdate({ courseId:'COURSE1',type:'schedule' },{ url:schedule },{ upsert:true });
+    res.json({ syllabus,schedule });
+  }catch(e){ res.status(500).json({ error:e.message }); }
+});
+
+app.get('/api/courses/:id/docs', async(req,res)=>{
+  const docs = await CourseDoc.find({ courseId:req.params.id });
+  const out={}; docs.forEach(d=>out[d.type]=d.url);
+  res.json(out);
 });
 
 app.post('/api/admin/students/:id/manageAssignments', async (req, res) => {
