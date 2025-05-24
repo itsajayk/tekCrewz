@@ -17,7 +17,7 @@ export default function Contact() {
 if (isEmployee) {
     return (
       <MinimalWrapper>
-        <MinimalText>Copyrights {getCurrentYear()} TekCrewz Infotech All rights reserved</MinimalText>
+        <MinimalText>© Copyrights {getCurrentYear()} TekCrewz Infotech All rights reserved</MinimalText>
       </MinimalWrapper>
     );
   }

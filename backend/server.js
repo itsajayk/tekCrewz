@@ -409,6 +409,66 @@ app.get('/api/student/schedule', (req, res) =>
   res.sendFile(path.join(__dirname, 'docs/schedule.pdf'))
 );
 
+
+const QuestionSchema = new mongoose.Schema({
+  question:     String,
+  options:      [String],
+  correctIndex: Number   // 0-3 for a four-option MCQ
+});
+
+const QuizSchema = new mongoose.Schema({
+  title:     String,
+  questions: [QuestionSchema]
+}, { timestamps: true });
+
+app.post('/api/admin/quizzes', async (req, res) => {
+  const { id, title, questions } = req.body;
+  const quiz = await Quiz.findOneAndUpdate(
+    { _id: id },
+    { title, questions },
+    { upsert: true, new: true }
+  );
+  res.json(quiz);
+});
+
+// — Public: list all quizzes
+app.get('/api/quizzes', async (req, res) => {
+  const all = await Quiz.find().select('title');
+  res.json(all);
+});
+
+// — Public: get a single quiz
+app.get('/api/quizzes/:quizId', async (req, res) => {
+  const quiz = await Quiz.findById(req.params.quizId).lean();
+  // strip out correctIndex so the student can’t cheat
+  quiz.questions = quiz.questions.map(q => ({
+    question: q.question,
+    options: q.options
+  }));
+  res.json(quiz);
+});
+
+// — Student: submit answers
+app.post('/api/students/:studentId/quizzes/:quizId/submit', async (req, res) => {
+  const { answers } = req.body; // e.g. [0,2,1,…]
+  const quiz = await Quiz.findById(req.params.quizId).lean();
+  let score = 0;
+  quiz.questions.forEach((q, i) => {
+    if (q.correctIndex === answers[i]) score++;
+  });
+  const percent = Math.round((score / quiz.questions.length) * 100);
+
+  // Save it
+  await StudentQuiz.create({
+    studentId: req.params.studentId,
+    quizId:    req.params.quizId,
+    answers,
+    score:     percent
+  });
+
+  res.json({ score: percent, total: quiz.questions.length });
+});
+
 // ── Start Server ───────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
