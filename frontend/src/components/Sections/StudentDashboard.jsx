@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from "react";
 import styled, { ThemeProvider, keyframes } from "styled-components";  // <-- ThemeProvider here
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { signOut } from "firebase/auth";
 import { auth } from "../Pages/firebase";
 import TopNavbar from "../Nav/TopNavbar";
@@ -14,7 +14,8 @@ import {
   FiCheckSquare,
   FiUnlock,
   FiSun,
-  FiMoon
+  FiMoon,
+  FiMail
 } from "react-icons/fi";
 
 
@@ -49,7 +50,7 @@ const darkTheme = {
 export default function StudentDashboard() {
   const API_BASE_URL = "https://tekcrewz.onrender.com";
   const navigate = useNavigate();
-  const { userId: studentId } = useContext(AuthContext);
+  const { userId: authUid } = useContext(AuthContext);
 
   const [data, setData] = useState(null);
   const [codeInput, setCodeInput] = useState("");
@@ -58,79 +59,56 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [theme, setTheme] = useState('light');
+  const [quizzes, setQuizzes] = useState([]);
 
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
 
   useEffect(() => {
-    if (!studentId) {
+    if (!authUid) {
       navigate("/s-loginPage");
       return;
     }
+
     const fetchAll = async () => {
       setLoading(true);
       try {
-        // 1. fetch candidate profile (optional)
-        let prof = null;
-        try {
-          const candRes = await fetch(`${API_BASE_URL}/api/candidates`);
-          if (candRes.ok) {
-            const candidates = await candRes.json();
-            const fbUser = auth.currentUser;
-            const myEmail = fbUser?.email?.toLowerCase();
-            prof = candidates.find(c => c.email?.toLowerCase() === myEmail);
-          }
-        } catch (e) {
-          console.error('Error fetching candidates:', e);
+        // 1️⃣ Fetch candidate list to lookup your custom studentId (e.g. "BT7FS001")
+        const candRes   = await fetch(`${API_BASE_URL}/api/candidates`);
+        const candidates = candRes.ok ? await candRes.json() : [];
+        const myEmail    = auth.currentUser?.email?.toLowerCase();
+        const prof       = candidates.find(c => c.email?.toLowerCase() === myEmail) || {};
+
+        const dbId         = prof.studentId;
+        const candidateName = prof.candidateName || "New Student";
+        const email         = prof.email || "";
+        const mobile        = prof.mobile || "";
+        const candidatePic  = prof.candidatePic || prof.photoUrl || "";
+
+        if (!dbId) {
+          setError("Unable to find your student record.");
+          setLoading(false);
+          return;
         }
-        // if no candidate record, just fallback to blank
-        const candidateName = prof?.candidateName || "New Student";
-        const email = prof?.email || "";
-        const mobile = prof?.mobile || "";
-        // <<< Add this line to define candidatePic before using it >>>
-        const candidatePic = prof?.candidatePic || prof?.photoUrl || "";
 
-        // 2. attendance (may be empty)
+        // 2️⃣ Fetch attendance
         let attendance = [];
-        try {
-          const attRes = await fetch(
-            `${API_BASE_URL}/api/students/${studentId}/attendance`
-          );
-          if (attRes.ok) attendance = await attRes.json();
-        } catch {}
+        const attRes = await fetch(`${API_BASE_URL}/api/students/${dbId}/attendance`);
+        if (attRes.ok) attendance = await attRes.json();
 
-        // 3. course docs (may be empty)
+        // 3️⃣ Fetch course docs
         let docs = [];
-        try {
-          const docsRes = await fetch(
-            `${API_BASE_URL}/api/courses/COURSE1/docs`
-          );
-          if (docsRes.ok) {
-            const docsObj = await docsRes.json();
-            docs = Object.entries(docsObj).map(([type, url]) => ({
-              type,
-              url,
-            }));
-          }
-        } catch {}
+        const docsRes = await fetch(`${API_BASE_URL}/api/courses/COURSE1/docs`);
+        if (docsRes.ok) {
+          const obj = await docsRes.json();
+          docs = Object.entries(obj).map(([type, url]) => ({ type, url }));
+        }
 
-        // 4. assignments (may be empty)
+        // 4️⃣ Fetch assignments
         let assignments = [];
-        try {
-          const asnRes = await fetch(
-            `${API_BASE_URL}/api/assignments/${studentId}`
-          );
-          if (asnRes.ok) assignments = await asnRes.json();
-        } catch {}
+        const asnRes = await fetch(`${API_BASE_URL}/api/assignments/${dbId}`);
+        if (asnRes.ok) assignments = await asnRes.json();
 
-        setData({
-          candidateName,
-          email,
-          mobile,
-          candidatePic,
-          attendance,
-          docs,
-          assignments,
-        });
+        setData({ dbId, candidateName, email, mobile, candidatePic, attendance, docs, assignments });
       } catch (err) {
         console.error(err);
         setError("Failed to load dashboard data");
@@ -138,13 +116,15 @@ export default function StudentDashboard() {
         setLoading(false);
       }
     };
+
     fetchAll();
-  }, [studentId, navigate]);
+  }, [authUid, navigate]);
+
 
   const submitCode = async (unit) => {
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/assignments/${studentId}/submit`,
+        `${API_BASE_URL}/api/assignments/${data.dbId}/submit`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -168,7 +148,7 @@ export default function StudentDashboard() {
   const requestUnlock = async (unit) => {
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/assignments/${studentId}/unlock`,
+        `${API_BASE_URL}/api/assignments/${data.dbId}/unlock`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -191,7 +171,7 @@ export default function StudentDashboard() {
   const submitFeedback = async (unit) => {
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/assignments/${studentId}/feedback`,
+        `${API_BASE_URL}/api/assignments/${data.dbId}/feedback`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -212,6 +192,12 @@ export default function StudentDashboard() {
     }
   };
 
+   const mailRequest = (field) => {
+    const subject = encodeURIComponent(`${field} Change Request`);
+    const body = encodeURIComponent(`Please update my ${field.toLowerCase()} for Student ID: ${data.studentId}`);
+    window.location.href = `mailto:admin@tekcrewz.com?subject=${subject}&body=${body}`;
+  };
+
   const handleLogout = async () => {
     await signOut(auth);
     navigate("/s-loginPage");
@@ -226,7 +212,8 @@ export default function StudentDashboard() {
       case 'Attendance': return <FiClock />;
       case 'Syllabus': return <FiFileText />;
       case 'Schedule': return <FiCalendar />;
-      default: return <FiCheckSquare />;
+      case 'Quiz': return <FiCheckSquare />;
+      default: return <FiUnlock />;
     }
   };
 
@@ -264,7 +251,7 @@ export default function StudentDashboard() {
             {assignments.map(a => (
               <AssignmentItem key={a.unit}>
                 <strong>{a.unit}</strong>: {a.results
-                  ? `${a.results.passed ? 'Passed' : 'Failed'} (${a.results.score}%)`
+                  ? `Unit ${a.unit} Results: ${a.results.passed ? 'Passed' : 'Failed'} (${a.results.score || 'Not Attempted'})`
                   : (a.submissionCode ? 'Submitted' : 'Pending')
                 }
               </AssignmentItem>
@@ -275,6 +262,104 @@ export default function StudentDashboard() {
     </ProfileContainer>
   );
 };
+      const renderAttendance = () => (
+    <Card>
+      <h3>Attendance</h3>
+      <Table>
+        <thead>
+          <tr><th>Date</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          {attendance.map((r, i) => (
+            <tr key={i}>
+              <td>{new Date(r.date).toLocaleDateString()}</td>
+              <td>{r.status}</td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+      <Button small icon onClick={() => mailRequest('Attendance')}>
+        <FiMail /> Request Change
+      </Button>
+    </Card>
+  );
+
+  const renderDoc = (type) => {
+    const doc = docs.find(d => d.type.toLowerCase() === type.toLowerCase());
+    return (
+    <Card>
+    <h3>Course Syllabus</h3>
+    {doc
+      ? <EmbedWrapper>
+          <iframe
+            src={`https://docs.google.com/gview?url=${encodeURIComponent(doc.url)}&embedded=true`}
+            width="100%"
+            height="100%"
+            frameBorder="0"
+          />
+        </EmbedWrapper>
+      : <p>No document available.</p>}
+  </Card>
+    );
+  };
+
+  const renderQuizList = () => (
+    <Card>
+      <h3>Available Quizzes</h3>
+      <ul>
+        {quizzes.map(q => (
+          <li key={q._id}>
+            <Link to={`/student/quiz/${q._id}`}>{q.title}</Link>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+
+  const renderUnit = (unit) => {
+    const u = assignments.find(a => a.unit === unit);
+    if (!u) return null;
+    return (
+      <Card>
+          <h3>Unit: {unit}</h3>
+
+          <SectionSmall>Study Material</SectionSmall>
+          {u.studyMaterialUrl
+            ? <>
+                {renderDoc(u.studyMaterialUrl)}
+                <Button as="a" href={u.studyMaterialUrl} target="_blank" rel="noopener noreferrer">Download Material</Button>
+              </>
+            : <p>No study material provided.</p>
+          }
+
+          <SectionSmall>Submit Code</SectionSmall>
+          <TextArea rows={6} disabled={u.closed} value={codeInput} onChange={e => setCodeInput(e.target.value)} />
+          <Button disabled={u.closed} onClick={() => submitCode(unit)}>
+            {u.closed ? "Closed" : "Submit"}
+          </Button>
+
+          {u.closed && !u.unlocked && (
+            <UnlockForm onSubmit={e => { e.preventDefault(); requestUnlock(unit); }}>
+              <Button type="submit">Request Reopen</Button>
+            </UnlockForm>
+          )}
+
+          {u.results && (
+            <>
+              <SectionSmall>Result</SectionSmall>
+              <Table>
+                <thead><tr><th>Score</th><th>Passed</th></tr></thead>
+                <tbody><tr><td>{u.results.score}</td><td>{u.results.passed ? 'Yes' : 'No'}</td></tr></tbody>
+              </Table>
+            </>
+          )}
+
+          <SectionSmall>Feedback</SectionSmall>
+          <TextArea rows={4} value={feedbackInput} onChange={e => setFeedbackInput(e.target.value)} />
+          <Button onClick={() => submitFeedback(unit)}>Send Feedback</Button>
+        </Card>
+    );
+  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -320,6 +405,8 @@ export default function StudentDashboard() {
             {/* <Note>To correct, email admin@tekcrewz.com</Note> */}
           </Card>
         );
+      case "Unit": renderUnit();
+      case "Course Docs": renderDoc()
       case "Syllabus":
       case "Schedule": {
         const doc = docs.find(
@@ -327,19 +414,58 @@ export default function StudentDashboard() {
         );
         return (
           <Card>
-            <h3>Course {activeTab}</h3>
-            {doc ? <Pdf src={doc.url} /> : <p>No document available.</p>}
-          </Card>
+          <h3>Course {activeTab}</h3>
+          {doc
+            ? <>
+                {renderDoc(doc.url)}
+                <Button as="a" href={doc.url} target="_blank" rel="noopener noreferrer">Download {activeTab}</Button>
+              </>
+            : <p>No document available.</p>
+          }
+        </Card>
         );
       }
+        case "Quiz":
+          return <Card>
+            <h3>Available Quizzes</h3>
+            <ul>
+              {quizzes.map(q => (
+                <li key={q._id}>
+                  <Link to={`/student/quiz/${q._id}`}>{q.title}</Link>
+                </li>
+              ))}
+              <SwitchLink onClick={() => navigate('/Quiz')}>
+                  Quiz
+              </SwitchLink>
+            </ul>
+          </Card>
       default: {
         const unitData = assignments.find((a) => a.unit === activeTab);
         if (!unitData) return null;
+        const u = assignments.find(a => a.unit === activeTab);
         return (
           <Card>
             <h3>Unit: {unitData.unit}</h3>
             <SectionSmall>Study Material</SectionSmall>
             <Pdf src={unitData.studyMaterialUrl} />
+            <a
+                href={
+                  unitData.studyMaterialUrl.startsWith("http")
+                    ? unitData.studyMaterialUrl
+                    : `https://${unitData.studyMaterialUrl}`
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {unitData.studyMaterialUrl}
+                {u.closed && !u.unlocked && (
+                  <UnlockForm onSubmit={e => { e.preventDefault(); requestUnlock(u.unit); }}>
+                    <Button type="submit">Request Reopen</Button>
+                  </UnlockForm>
+                )}
+              </a>
+
+
 
             <SectionSmall>Submit Code</SectionSmall>
             <TextArea
@@ -423,6 +549,7 @@ export default function StudentDashboard() {
               "Attendance",
               "Syllabus",
               "Schedule",
+              "Quiz",
               ...assignments.map(a => a.unit)
             ].map(tab => (
               <NavItem
@@ -593,7 +720,7 @@ const Table = styled.table`
 `;
 const Pdf = styled.iframe`
   width: 100%;
-  height: 300px;
+  height: 10px;
   border: none;
   margin-bottom: 10px;
 `;
@@ -703,4 +830,19 @@ const ProfileContainer = styled.div`
   display: flex;
   justify-content: left;
   padding-top: 40px;
+`;
+
+const SwitchLink = styled.p`
+  margin-top: 15px;
+  color: #7620ff;
+  cursor: pointer;
+  &:hover {
+    text-decoration: underline;
+  }
+`;
+
+const EmbedWrapper = styled.div`
+  width: 100%;
+  height: 600px;
+  margin-bottom: 16px;
 `;

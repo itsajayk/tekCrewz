@@ -37,6 +37,10 @@
     border-collapse: collapse;
     border-spacing: 0;
   }
+  /* @tailwind base;
+@tailwind components;
+@tailwind utilities; */
+
   a {
     text-decoration: none!important;
     color: #0B093B;

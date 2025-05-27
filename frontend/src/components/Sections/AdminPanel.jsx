@@ -12,7 +12,7 @@ const API_BASE_URL = 'https://tekcrewz.onrender.com';
 axios.defaults.baseURL = API_BASE_URL;
 
 const AdminPanel = () => {
-  const navigate = useNavigate();
+   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('');
   const [students, setStudents] = useState([]);
@@ -30,6 +30,16 @@ const AdminPanel = () => {
   const [attendance, setAttendance] = useState([]);
   const [unlockRequests, setUnlockRequests] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // toasts: { id, message, type: 'success' | 'error' }
+  const [toasts, setToasts] = useState([]);
+
+  // helper to push a toast
+  const pushToast = (message, type='success') => {
+    const id = Date.now();
+    setToasts(t => [...t, { id, message, type }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
+  };
 
   const fetchBatchStudents = async () => {
     const q = query(
@@ -52,10 +62,10 @@ const AdminPanel = () => {
         }
         if (modalType === 'StudentDetails') {
           const { data: cands } = await axios.get('/api/candidates');
-          setStudents(batch.map(u => ({ ...u, ...(cands.find(c => c.studentId === u.id) || {}) })));        
+          setStudents(batch.map(u => ({ ...u, ...(cands.find(c => c.studentId === u.id) || {}) })));
         }
         if (modalType === 'ViewAttendance') {
-          // student list loaded above
+          // nothing else to do
         }
         if (modalType === 'CourseDocs') {
           const { data } = await axios.get('/api/courses/COURSE1/docs');
@@ -79,6 +89,7 @@ const AdminPanel = () => {
         }
       } catch (e) {
         console.error(e);
+        pushToast('Failed to load data', 'error');
       } finally {
         setLoading(false);
       }
@@ -96,86 +107,121 @@ const AdminPanel = () => {
     setResults([]);
     setFeedbackList([]);
     setUnlockRequests([]);
-    setFeedbackUnit('');
     setFeedbackText('');
+    setFeedbackUnit('');
   };
   const closeModal = () => setShowModal(false);
 
   const saveProfile = async () => {
-    if (!selectedStudent) return;
+    if (!selectedStudent) { pushToast('Select a student first', 'error'); return; }
     setLoading(true);
     try {
       const { data } = await axios.put(`/api/candidates/${selectedStudent._id}`, profileData);
       setSelectedStudent(data);
       setStudents(students.map(s => s._id === data._id ? data : s));
       setEditMode(false);
+      pushToast('Profile updated');
     } catch (e) {
       console.error(e);
-    } finally { setLoading(false); }
+      pushToast('Failed to update profile', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const uploadDocs = async e => {
     const form = new FormData();
-    if (e.target.files[0]) form.append('syllabus', e.target.files[0]);
+    if (e.target.files[0]) form.append('syllabus',  e.target.files[0]);
     if (e.target.files[1]) form.append('schedule', e.target.files[1]);
     setLoading(true);
     try {
       const { data } = await axios.post('/api/admin/course-docs/upload', form);
       setCourseDocs(data);
-      alert('Upload success');
+      pushToast('Course documents uploaded');
     } catch {
-      alert('Upload failed');
-    } finally { setLoading(false); }
+      pushToast('Upload failed', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const createAssignment = async () => {
-    if (!selectedStudent) return alert('Select student');
+    if (!selectedStudent) { pushToast('Select a student', 'error'); return; }
     setLoading(true);
     try {
-      await axios.post(
-        `/api/admin/students/${selectedStudent.id}/manageAssignments`,
-        newAssignment
-      );
+      await axios.post(`/api/admin/students/${selectedStudent.id}/manageAssignments`, newAssignment);
       const { data } = await axios.get(`/api/assignments/${selectedStudent.id}`);
       setAssignments(data);
-      alert('Assignment created');
+      pushToast('Assignment created');
     } catch {
-      alert('Failed');
-    } finally { setLoading(false); }
+      pushToast('Failed to create assignment', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const requestUnlock = async unit => {
-    if (!selectedStudent) return;
-    await axios.post(`/api/assignments/${selectedStudent.id}/unlock`, { unit });
-    alert('Unlock requested');
+    if (!selectedStudent) { pushToast('Select a student', 'error'); return; }
+    try {
+      await axios.post(`/api/assignments/${selectedStudent.id}/unlock`, { unit });
+      pushToast('Unlock requested');
+    } catch {
+      pushToast('Failed to request unlock', 'error');
+    }
   };
 
   const approveUnlock = async unit => {
-    if (!selectedStudent) return;
-    await axios.post(`/api/admin/students/${selectedStudent.id}/approveUnlock`, { unit });
-    alert('Unlock approved');
-    setUnlockRequests(unlockRequests.filter(a => a.unit !== unit));
+    if (!selectedStudent) { pushToast('Select a student', 'error'); return; }
+    setLoading(true);
+    try {
+      await axios.post(`/api/admin/students/${selectedStudent.id}/approveUnlock`, { unit });
+      setUnlockRequests(u => u.filter(a => a.unit !== unit));
+      pushToast('Unlock approved');
+    } catch {
+      pushToast('Failed to approve unlock', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const enterResults = async (unit, score, passed) => {
-    await axios.post(`/api/admin/students/${selectedStudent.id}/enterResults`, { unit, results: { score, passed } });
-    alert('Results entered');
-    const { data } = await axios.get('/api/admin/assignments/results'); setResults(data);
+    if (!selectedStudent) { pushToast('Select a student', 'error'); return; }
+    setLoading(true);
+    try {
+      await axios.post(`/api/admin/students/${selectedStudent.id}/enterResults`, { unit, results:{score,passed} });
+      const { data } = await axios.get('/api/admin/assignments/results');
+      setResults(data);
+      pushToast('Results saved');
+    } catch {
+      pushToast('Failed to save results', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const submitFeedback = async () => {
-    if (!selectedStudent || !feedbackUnit) return alert('Select unit');
+    if (!selectedStudent) { pushToast('Select a student', 'error'); return; }
+    if (!feedbackUnit) { pushToast('Select a unit', 'error'); return; }
     setLoading(true);
     try {
-      await axios.post(`/api/admin/students/${selectedStudent.id}/reviewFeedback`, { unit: feedbackUnit, feedback: feedbackText });
-      const { data } = await axios.get('/api/admin/feedback'); setFeedbackList(data);
-      setFeedbackText(''); setFeedbackUnit('');
-    } catch (e) {
-      console.error(e);
-    } finally { setLoading(false); }
+      await axios.post(`/api/admin/students/${selectedStudent.id}/reviewFeedback`, { unit:feedbackUnit, feedback:feedbackText });
+      const { data } = await axios.get('/api/admin/feedback');
+      setFeedbackList(data);
+      setFeedbackText('');
+      setFeedbackUnit('');
+      pushToast('Feedback submitted');
+    } catch {
+      pushToast('Failed to submit feedback', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const modalTypes = ['StudentDetails','ViewAttendance','CourseDocs','ManageAssignments','UnlockRequests','AssignmentResults','ReviewFeedback'];
+  const modalTypes = [
+    'StudentDetails','ViewAttendance','CourseDocs',
+    'ManageAssignments','UnlockRequests',
+    'AssignmentResults','ReviewFeedback'
+  ];
 
   return (
     <PageWrapper>
@@ -265,7 +311,6 @@ const AdminPanel = () => {
                       <tbody>{attendance.map(a => <tr key={a.date}><Td>{new Date(a.date).toLocaleDateString()}</Td><Td>{a.status}</Td></tr>)}</tbody>
                     </Table>
                   )}
-                  {selectedStudent && <Btn onClick={() => window.location.href = `mailto:admin@example.com?subject=Attendance Change Request for ${selectedStudent.id}&body=Please update my attendance.`}>Request Change</Btn>}
                 </Section>
               )}
 
@@ -297,9 +342,7 @@ const AdminPanel = () => {
                       <AssignList>
                         {assignments.map(a => (
                           <AssignItem key={a.unit}>
-                            <strong>{a.unit}</strong> - {a.closed ? 'Closed' : 'Open'} {' '}
-                            <ActionBtn onClick={() => window.open(`/student/quiz/${a.unit}`, '_blank')}>Preview Quiz</ActionBtn>
-                            {a.closed && !a.unlocked && <ActionBtn onClick={() => requestUnlock(a.unit)}>Student Request Unlock</ActionBtn>}
+                            <strong>{a.unit}</strong> - {a.closed ? 'Closed' : 'Open'}
                           </AssignItem>
                         ))}
                       </AssignList>
@@ -324,32 +367,77 @@ const AdminPanel = () => {
               )}
 
               {/* Assignment Results */}
-              {modalType==='AssignmentResults' && !loading && (
-                <ResultsTable>
-                  <thead><tr><Th>Student</Th><Th>Unit</Th><Th>Score</Th><Th>Passed</Th><Th>Action</Th></tr></thead>
-                  <tbody>{results.map(r=><tr key={r._id}>
-                    <Td>{r.studentName}</Td>
-                    <Td>{r.unit}</Td>
-                    <Td><Input type="number" defaultValue={r.results.score} onBlur={e => enterResults(r.unit, e.target.value, r.results.passed)} /></Td>
-                    <Td>
-                      <select defaultValue={r.results.passed ? 'true':'false'} onChange={e => enterResults(r.unit, r.results.score, e.target.value==='true')}>
-                        <option value="true">Yes</option>
-                        <option value="false">No</option>
-                      </select>
-                    </Td>
-                    <Td><ActionBtn onClick={() => enterResults(r.unit, r.results.score, r.results.passed)}>Save</ActionBtn></Td>
-                  </tr>)}
-                  </tbody>
-                </ResultsTable>
+              {modalType === 'AssignmentResults' && !loading && (
+                <Section>
+                  {results.length === 0 ? (
+                    <p>No assignment results have been entered yet.</p>
+                  ) : (
+                    <ResultsTable>
+                      <thead>
+                        <tr>
+                          <Th>Student</Th>
+                          <Th>Unit</Th>
+                          <Th>Score</Th>
+                          <Th>Passed</Th>
+                          <Th>Action</Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {results.map(r => {
+                          // find the candidateName from your students cache (if you fetched it)
+                          const student = students.find(s => s.id === r.studentId);
+                          const name    = student?.candidateName || r.studentId;
+                          return (
+                            <tr key={`${r.studentId}-${r.unit}`}>
+                              <Td>{name}</Td>
+                              <Td>{r.unit}</Td>
+                              <Td>
+                                <Input
+                                  type="number"
+                                  defaultValue={r.results.score}
+                                  onBlur={e =>
+                                    enterResults(r.unit, e.target.value, r.results.passed)
+                                  }
+                                />
+                              </Td>
+                              <Td>
+                                <select
+                                  defaultValue={r.results.passed ? 'true' : 'false'}
+                                  onChange={e =>
+                                    enterResults(
+                                      r.unit,
+                                      r.results.score,
+                                      e.target.value === 'true'
+                                    )
+                                  }
+                                >
+                                  <option value="true">Yes</option>
+                                  <option value="false">No</option>
+                                </select>
+                              </Td>
+                              <Td>
+                                <ActionBtn
+                                  onClick={() =>
+                                    enterResults(r.unit, r.results.score, r.results.passed)
+                                  }
+                                >
+                                  Save
+                                </ActionBtn>
+                              </Td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </ResultsTable>
+                  )}
+                </Section>
               )}
+
 
               {/* Review Feedback */}
               {modalType==='ReviewFeedback' && !loading && (
                 <Section>
-                  <Select value={selectedStudent?.id||''} onChange={e=>{
-                    const s=students.find(x=>x.id===e.target.value);
-                    setSelectedStudent(s);
-                  }}>
+                  <Select value={selectedStudent?.id||''} onChange={e=>setSelectedStudent(students.find(x=>x.id===e.target.value))}>
                     <option value="">Select Student</option>
                     {students.map(s=><option key={s.id} value={s.id}>{s.candidateName||s.id}</option>)}
                   </Select>
@@ -363,16 +451,25 @@ const AdminPanel = () => {
                       <Btn onClick={submitFeedback}>Submit</Btn>
                     </>
                   )}
-                  <FeedbackList>
-                    {feedbackList.map(f=><FeedbackItem key={f._id}>{f.studentId} ({f.unit}): {f.feedback}</FeedbackItem>)}
-                  </FeedbackList>
+                  <FeedbackList>{feedbackList.map(f=><FeedbackItem key={f._id}>{f.studentId} ({f.unit}): {f.feedback}</FeedbackItem>)}</FeedbackList>
                 </Section>
               )}
+
 
             </Body>
           </Dialog>
         </Overlay>
       )}
+
+      {/* Toast Container */}
+      <ToastContainer>
+        {toasts.map(t=>(
+          <Toast key={t.id} type={t.type}>
+            {t.message}
+            <CloseToast onClick={()=>setToasts(ts=>ts.filter(x=>x.id!==t.id))}>✕</CloseToast>
+          </Toast>
+        ))}
+      </ToastContainer>
     </PageWrapper>
   );
 };
@@ -380,6 +477,31 @@ const AdminPanel = () => {
 export default AdminPanel;
 
 /* Styled Components */
+const ToastContainer = styled.div`
+  position: fixed;
+  top: 16px; right: 16px;
+  display: flex; flex-direction: column; gap: 8px;
+  z-index: 1000;
+`;
+const Toast = styled.div`
+  background: ${p=>p.type==='error'? '#f56260':'#60d394'};
+  color: white;
+  padding: 12px 16px;
+  border-radius: 4px;
+  font-weight: 500;
+  display: flex; align-items: center; justify-content: space-between;
+`;
+const CloseToast = styled.span`
+  cursor: pointer;
+  margin-left: 12px;
+  font-size: 14px;
+`;
+const kf = keyframes`
+  0%{background-position:0 50%}
+  50%{background-position:100% 50%}
+  100%{background-position:0 50%}
+`;
+
 const gradientBG = keyframes`
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
@@ -412,8 +534,14 @@ const Span = styled.span``;
 
 const Section = styled.div`display:flex;flex-direction:column;gap:12px;`;
 const Select = styled.select`padding:8px;border-radius:8px;border:1px solid #ccc;width:100%;max-width:300px;`;
-const Table = styled.table`width:100%;border-collapse:collapse;`;
-const ResultsTable = `styled(Table);`;
+
+const Table = styled.table`
+    width: 100%;
+    border-collapse: collapse;
+  `;
+  const ResultsTable = styled(Table)`
+  `;
+
 const Th = styled.th`padding:8px;border:1px solid #ddd;text-align:left;`;
 const Td = styled.td`padding:8px;border:1px solid #ddd;`;
 
@@ -427,4 +555,7 @@ const AssignItem = styled.li`padding:8px;border-bottom:1px solid #eee;display:fl
 const FeedbackList = styled.ul`list-style:none;padding:0;`;
 const FeedbackItem = styled.li`padding:8px;border-bottom:1px solid #ddd;`;
 const Li=styled.li`padding:4px 0;`;
+const FileInputWrapper = styled.div`
+  margin-bottom: 12px;
+`;
 

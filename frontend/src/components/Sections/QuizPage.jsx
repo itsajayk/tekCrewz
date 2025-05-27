@@ -137,13 +137,13 @@ const QuizPage = () => {
 
   useEffect(() => {
     setQuestions(shuffleArray(sampleQuestions));
-    const storedRegID = localStorage.getItem('studentRegID');
+    const storedRegID = localStorage.getItem('role');
     if (storedRegID) {
       setStudentRegID(storedRegID);
       setLoading(true);
       (async () => {
         try {
-          const studentRef = doc(db, "students", storedRegID);
+          const studentRef = doc(db, "users", storedRegID);
           const studentSnap = await getDoc(studentRef);
           if (studentSnap.exists() && studentSnap.data().quizCompleted) {
             setQuizAlreadyTaken(true);

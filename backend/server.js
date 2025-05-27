@@ -326,27 +326,44 @@ app.get('/api/admin/feedback', async (req, res) => {
 
 // Admin: Upload Course Docs
 app.post(
-  '/api/admin/course-docs/upload',
+  '/api/admin/course-docs/upload/:courseId',
   uploadCourseDoc.fields([
     { name:'syllabus', maxCount:1 },
     { name:'schedule', maxCount:1 }
   ]),
   async (req, res) => {
     try {
-      const syllabus = req.files.syllabus?.[0]?.path;
-      const schedule = req.files.schedule?.[0]?.path;
-      await CourseDoc.findOneAndUpdate(
-        { courseId:'COURSE1', type:'syllabus' },
-        { url: syllabus },
-        { upsert: true }
-      );
-      await CourseDoc.findOneAndUpdate(
-        { courseId:'COURSE1', type:'schedule' },
-        { url: schedule },
-        { upsert: true }
-      );
-      res.json({ syllabus, schedule });
+      const courseId = req.params.courseId;
+      const syllabusFile = req.files.syllabus?.[0];
+      const scheduleFile = req.files.schedule?.[0];
+
+      const syllabusPath = syllabusFile?.path;
+      const schedulePath = scheduleFile?.path;
+
+      // upsert syllabus
+      if (syllabusPath) {
+        await CourseDoc.findOneAndUpdate(
+          { courseId, type:'syllabus' },
+          { url: syllabusPath },
+          { upsert: true }
+        );
+      }
+      // upsert schedule
+      if (schedulePath) {
+        await CourseDoc.findOneAndUpdate(
+          { courseId, type:'schedule' },
+          { url: schedulePath },
+          { upsert: true }
+        );
+      }
+
+     // return both path _and_ original filenames
+      res.json({
+        syllabus: syllabusPath,
+        schedule: schedulePath
+      });
     } catch (e) {
+      console.error(e);
       res.status(500).json({ error: e.message });
     }
   }
@@ -447,6 +464,50 @@ app.get('/api/quizzes/:quizId', async (req, res) => {
   }));
   res.json(quiz);
 });
+
+// ── Quiz Management ─────────────────────────────────────────────────────
+
+// Admin: Create or update a quiz
+app.post('/api/admin/quizzes', async (req, res) => {
+  const { id, title, questions } = req.body;
+  const quiz = await Quiz.findOneAndUpdate(
+    { _id: id },
+    { title, questions },
+    { upsert: true, new: true }
+  );
+  res.json(quiz);
+});
+
+// Student: fetch list of quizzes
+app.get('/api/quizzes', async (req, res) => {
+  const all = await Quiz.find().select('title');
+  res.json(all);
+});
+
+// Student: fetch a single quiz (no correctIndex)
+app.get('/api/quizzes/:quizId', async (req, res) => {
+  const quiz = await Quiz.findById(req.params.quizId).lean();
+  quiz.questions = quiz.questions.map(q => ({
+    question: q.question,
+    options:  q.options
+  }));
+  res.json(quiz);
+});
+
+// Student: submit quiz answers
+app.post('/api/students/:studentId/quizzes/:quizId/submit', async (req, res) => {
+  const { answers } = req.body;
+  const quiz = await Quiz.findById(req.params.quizId).lean();
+  let score = 0;
+  quiz.questions.forEach((q,i) => {
+    if (q.correctIndex === answers[i]) score++;
+  });
+  const percent = Math.round((score/quiz.questions.length)*100);
+  // you already have StudentQuiz model?
+  await StudentQuiz.create({ studentId: req.params.studentId, quizId: req.params.quizId, answers, score: percent });
+  res.json({ score: percent, total: quiz.questions.length });
+});
+
 
 // — Student: submit answers
 app.post('/api/students/:studentId/quizzes/:quizId/submit', async (req, res) => {
