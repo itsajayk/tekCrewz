@@ -1,6 +1,6 @@
 // src/components/StudentLogin.jsx
 import React, { useState, useContext } from 'react';
-import styled from 'styled-components';
+import styled,{ keyframes } from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import {
   signInWithEmailAndPassword,
@@ -90,7 +90,7 @@ const StudentLoginPage = () => {
             />
           </InputGroup>
           <SubmitButton type="submit" disabled={isLoading}>
-            {isLoading ? 'Logging in…' : 'Login'}
+            {isLoading ? <SpinnerOverlay><Spinner /></SpinnerOverlay> : 'Login'}
           </SubmitButton>
         </Form>
         <AuxLinks>
@@ -212,3 +212,22 @@ const ErrorText = styled.div`
   font-size: 13px;
   margin-bottom: 15px;
 `;
+
+const spin = keyframes`0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}`;
+const Spinner = styled.div`
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #7620ff;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: ${spin} 1s linear infinite;
+  display: flex;
+  align-item: center;
+  justify-content: center;
+`;
+const SpinnerOverlay = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+`;
+

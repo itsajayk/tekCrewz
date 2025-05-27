@@ -122,13 +122,14 @@ export default function StudentDashboard() {
 
 
   const submitCode = async (unit) => {
+    const { dbId } = data;
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/assignments/${data.dbId}/submit`,
+        `${API_BASE_URL}/api/assignments/${dbId}/submit`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ unit, code: codeInput }),
+          body: JSON.stringify({ unit, code: codeInput })
         }
       );
       if (!res.ok) throw new Error("Submission failed");
@@ -136,7 +137,7 @@ export default function StudentDashboard() {
         ...d,
         assignments: d.assignments.map((a) =>
           a.unit === unit ? { ...a, submissionCode: codeInput } : a
-        ),
+        )
       }));
       setCodeInput("");
     } catch (err) {
@@ -145,14 +146,16 @@ export default function StudentDashboard() {
     }
   };
 
+
   const requestUnlock = async (unit) => {
+    const { dbId } = data;
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/assignments/${data.dbId}/unlock`,
+        `${API_BASE_URL}/api/assignments/${dbId}/unlock`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ unit }),
+          body: JSON.stringify({ unit })
         }
       );
       if (!res.ok) throw new Error("Unlock request failed");
@@ -160,7 +163,7 @@ export default function StudentDashboard() {
         ...d,
         assignments: d.assignments.map((a) =>
           a.unit === unit ? { ...a, unlocked: true } : a
-        ),
+        )
       }));
     } catch (err) {
       console.error(err);
@@ -323,39 +326,68 @@ export default function StudentDashboard() {
       <Card>
           <h3>Unit: {unit}</h3>
 
-          <SectionSmall>Study Material</SectionSmall>
-          {u.studyMaterialUrl
-            ? <>
-                {renderDoc(u.studyMaterialUrl)}
-                <Button as="a" href={u.studyMaterialUrl} target="_blank" rel="noopener noreferrer">Download Material</Button>
-              </>
-            : <p>No study material provided.</p>
-          }
+            <SectionSmall>Study Material</SectionSmall>
+        {u.studyMaterialUrl ? (
+          <>
+            <EmbedWrapper>
+              <iframe
+                src={`https://docs.google.com/gview?url=${encodeURIComponent(
+                  u.studyMaterialUrl
+                )}&embedded=true`}
+                style={{ width: "100%", height: "600px", border: 0 }}
+              />
+            </EmbedWrapper>
+            <Button as="a" href={u.studyMaterialUrl} target="_blank">
+              Download
+            </Button>
+          </>
+        ) : (
+          <p>No study material.</p>
+        )}
 
           <SectionSmall>Submit Code</SectionSmall>
-          <TextArea rows={6} disabled={u.closed} value={codeInput} onChange={e => setCodeInput(e.target.value)} />
-          <Button disabled={u.closed} onClick={() => submitCode(unit)}>
-            {u.closed ? "Closed" : "Submit"}
-          </Button>
+          <TextArea
+          rows={6}
+          disabled={u.closed}
+          value={codeInput}
+          onChange={(e) => setCodeInput(e.target.value)}
+        />
+        <Button disabled={u.closed} onClick={() => submitCode(unit)}>
+          {u.closed ? "Closed" : "Submit"}
+        </Button>
 
-          {u.closed && !u.unlocked && (
-            <UnlockForm onSubmit={e => { e.preventDefault(); requestUnlock(unit); }}>
-              <Button type="submit">Request Reopen</Button>
-            </UnlockForm>
-          )}
+        {u.closed && !u.unlocked && (
+          <UnlockForm onSubmit={(e) => { e.preventDefault(); requestUnlock(unit); }}>
+            <Button type="submit">Request Reopen</Button>
+          </UnlockForm>
+        )}
 
-          {u.results && (
-            <>
-              <SectionSmall>Result</SectionSmall>
-              <Table>
-                <thead><tr><th>Score</th><th>Passed</th></tr></thead>
-                <tbody><tr><td>{u.results.score}</td><td>{u.results.passed ? 'Yes' : 'No'}</td></tr></tbody>
-              </Table>
-            </>
-          )}
+           {u.results && (
+          <>
+            <SectionSmall>Result</SectionSmall>
+            <Table>
+              <thead>
+                <tr>
+                  <th>Score</th>
+                  <th>Passed</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>{u.results.score}</td>
+                  <td>{u.results.passed ? "Yes" : "No"}</td>
+                </tr>
+              </tbody>
+            </Table>
+          </>
+        )}
 
           <SectionSmall>Feedback</SectionSmall>
-          <TextArea rows={4} value={feedbackInput} onChange={e => setFeedbackInput(e.target.value)} />
+          <TextArea
+          rows={4}
+          value={feedbackInput}
+          onChange={(e) => setFeedbackInput(e.target.value)}
+        />
           <Button onClick={() => submitFeedback(unit)}>Send Feedback</Button>
         </Card>
     );

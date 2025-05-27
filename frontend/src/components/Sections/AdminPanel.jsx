@@ -30,6 +30,9 @@ const AdminPanel = () => {
   const [attendance, setAttendance] = useState([]);
   const [unlockRequests, setUnlockRequests] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState('');
+const [syllabusFile,   setSyllabusFile]   = useState(null);
+const [scheduleFile,   setScheduleFile]   = useState(null);
 
   // toasts: { id, message, type: 'success' | 'error' }
   const [toasts, setToasts] = useState([]);
@@ -68,7 +71,7 @@ const AdminPanel = () => {
           // nothing else to do
         }
         if (modalType === 'CourseDocs') {
-          const { data } = await axios.get('/api/courses/COURSE1/docs');
+          const { data } = await axios.get(`/api/admin/course-docs/upload/${encodeURIComponent(selectedCourse)}`);
           setCourseDocs(data);
         }
         if (modalType === 'ManageAssignments' && selectedStudent) {
@@ -129,21 +132,45 @@ const AdminPanel = () => {
     }
   };
 
-  const uploadDocs = async e => {
-    const form = new FormData();
-    if (e.target.files[0]) form.append('syllabus',  e.target.files[0]);
-    if (e.target.files[1]) form.append('schedule', e.target.files[1]);
-    setLoading(true);
-    try {
-      const { data } = await axios.post('/api/admin/course-docs/upload', form);
-      setCourseDocs(data);
-      pushToast('Course documents uploaded');
-    } catch {
-      pushToast('Upload failed', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const uploadCourseDocs = async () => {
+  if (!selectedCourse) {
+    return pushToast('Please select a course', 'error');
+  }
+  if (!syllabusFile && !scheduleFile) {
+    return pushToast('Please choose at least one PDF', 'error');
+  }
+  const form = new FormData();
+  form.append('courseId', selectedCourse);
+  if (syllabusFile) form.append('syllabus', syllabusFile, syllabusFile.name);
+  if (scheduleFile) form.append('schedule', scheduleFile, scheduleFile.name);
+
+  setLoading(true);
+  try {
+    const { data } = await axios.post(
+      `/api/admin/course-docs/upload/${encodeURIComponent(selectedCourse)}`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    setCourseDocs(cd => ({
+      ...cd,
+      [selectedCourse]: {
+        syllabus: data.syllabus,
+        schedule: data.schedule,
+        syllabusOriginalName: syllabusFile?.name,
+        scheduleOriginalName: scheduleFile?.name
+      }
+    }));
+    pushToast('Course documents uploaded');
+    // clear inputs
+    setSyllabusFile(null);
+    setScheduleFile(null);
+  } catch (err) {
+    console.error(err);
+    pushToast('Upload failed', 'error');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const createAssignment = async () => {
     if (!selectedStudent) { pushToast('Select a student', 'error'); return; }
@@ -316,15 +343,63 @@ const AdminPanel = () => {
 
               {/* Course Docs */}
               {modalType === 'CourseDocs' && !loading && (
-                <Section>
-                  <Select value={docType} onChange={e => setDocType(e.target.value)}><option value="syllabus">Syllabus</option><option value="schedule">Schedule</option></Select>
-                  <List>
-                    <Li>Syllabus: {courseDocs.syllabus ? <a href={courseDocs.syllabus} target="_blank">{courseDocs.syllabus.split('/').pop()}</a> : 'None'}</Li>
-                    <Li>Schedule: {courseDocs.schedule ? <a href={courseDocs.schedule} target="_blank">{courseDocs.schedule.split('/').pop()}</a> : 'None'}</Li>
-                  </List>
-                  <File type="file" accept="application/pdf" multiple onChange={uploadDocs}/>
-                </Section>
-              )}
+  <Section>
+    <Label>Select Course:</Label>
+    <Select
+      value={selectedCourse}
+      onChange={e => setSelectedCourse(e.target.value)}
+    >
+      <option value="">-- Select Course --</option>
+          <option value="Full Stack">Full Stack</option>
+          <option value="python">Python</option>
+          <option value="SEO & Digital Marketing">SEO & Digital Marketing</option>
+          <option value="Graphic Designing">Graphic Designing</option>
+          <option value="Software Testing">Software Testing</option>
+          <option value="Business Analyst">Business Analyst</option>
+          <option value="PHP with Laravel">PHP with Laravel</option>
+          <option value="Dot Net">Dot Net</option>
+    </Select>
+
+                    {selectedCourse && (
+                      <>
+                        <FileInputWrapper>
+                          <Label>Syllabus PDF:</Label>
+                            <File
+                              type="file"
+                              accept="application/pdf"
+                              onChange={e => setSyllabusFile(e.target.files[0])}
+                            />
+                        </FileInputWrapper>
+
+                        <FileInputWrapper>
+                          <Label>Schedule PDF:</Label>
+                            <File
+                              type="file"
+                              accept="application/pdf"
+                              onChange={e => setScheduleFile(e.target.files[0])}
+                            />
+                        </FileInputWrapper>
+
+                            <Btn onClick={uploadCourseDocs}>Upload Documents</Btn>
+
+                        <List>
+                          <Li>
+                            Syllabus:&nbsp;
+                            {courseDocs[selectedCourse]?.syllabus
+                              ? courseDocs[selectedCourse].syllabusOriginalName
+                              : 'None'}
+                          </Li>
+                          <Li>
+                            Schedule:&nbsp;
+                            {courseDocs[selectedCourse]?.schedule
+                              ? courseDocs[selectedCourse].scheduleOriginalName
+                              : 'None'}
+                          </Li>
+                        </List>
+                      </>
+                    )}
+                  </Section>
+                )}
 
               {/* Manage Assignments */}
               {modalType === 'ManageAssignments' && !loading && (
