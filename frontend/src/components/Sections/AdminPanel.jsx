@@ -24,7 +24,13 @@ const AdminPanel = () => {
   const [assignments, setAssignments] = useState([]);
   const [results, setResults] = useState([]);
   const [feedbackList, setFeedbackList] = useState([]);
-  const [newAssignment, setNewAssignment] = useState({ unit: '', studyMaterialUrl: '', closeDays: 3 });
+// replace your existing newAssignment hook with:
+const [newAssignment, setNewAssignment] = useState({
+  unit: '',
+  studyMaterialUrl: '',
+  studyMaterialFile: null,
+  closeDays: 3
+});
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackUnit, setFeedbackUnit] = useState('');
   const [attendance, setAttendance] = useState([]);
@@ -86,10 +92,6 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
           const { data } = await axios.get('/api/admin/feedback');
           setFeedbackList(data);
         }
-        if (modalType === 'UnlockRequests' && selectedStudent) {
-          const { data } = await axios.get(`/api/assignments/${selectedStudent.id}`);
-          setUnlockRequests(data.filter(a => a.closed && !a.unlocked));
-        }
       } catch (e) {
         console.error(e);
         pushToast('Failed to load data', 'error');
@@ -97,6 +99,24 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
         setLoading(false);
       }
     })();
+  }, [showModal, modalType, selectedStudent]);
+  
+      // Whenever I'm in the UnlockRequests modal and a student is selected,
+      // fetch only their closed-but-not-unlocked assignments:
+      useEffect(() => {
+      if (!showModal || modalType !== 'UnlockRequests' || !selectedStudent) return;
+      setLoading(true);
+      axios.get(`/api/assignments/${selectedStudent.id}`)
+      .then(({ data }) => {
+        // Show assignments that have been unlocked (i.e. requested for unlock)
+        const pending = data.filter(a => a.closed && a.unlocked);
+        setUnlockRequests(pending);
+      })
+      .catch(e => {
+        console.error(e);
+        pushToast('Failed to load unlock requests', 'error');
+      })
+      .finally(() => setLoading(false));
   }, [showModal, modalType, selectedStudent]);
 
   const openModal = type => {
@@ -173,19 +193,38 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
 };
 
   const createAssignment = async () => {
-    if (!selectedStudent) { pushToast('Select a student', 'error'); return; }
-    setLoading(true);
-    try {
-      await axios.post(`/api/admin/students/${selectedStudent.id}/manageAssignments`, newAssignment);
-      const { data } = await axios.get(`/api/assignments/${selectedStudent.id}`);
-      setAssignments(data);
-      pushToast('Assignment created');
-    } catch {
-      pushToast('Failed to create assignment', 'error');
-    } finally {
-      setLoading(false);
+  if (!selectedStudent) { pushToast('Select a student', 'error'); return; }
+  setLoading(true);
+  try {
+    // build multipart form
+    const form = new FormData();
+    form.append('unit', newAssignment.unit);
+    form.append('closeDays', newAssignment.closeDays);
+    if (newAssignment.studyMaterialFile) {
+      form.append('studyMaterial', newAssignment.studyMaterialFile);
+    } else {
+      form.append('studyMaterialUrl', newAssignment.studyMaterialUrl);
     }
-  };
+
+    await axios.post(
+      `/api/admin/students/${selectedStudent.id}/manageAssignments`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+
+    // refresh list
+    const { data } = await axios.get(`/api/assignments/${selectedStudent.id}`);
+    setAssignments(data);
+    pushToast('Assignment created');
+    // reset form
+    setNewAssignment({ unit:'', studyMaterialUrl:'', studyMaterialFile:null, closeDays:3 });
+  } catch {
+    pushToast('Failed to create assignment', 'error');
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const requestUnlock = async unit => {
     if (!selectedStudent) { pushToast('Select a student', 'error'); return; }
@@ -343,22 +382,22 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
 
               {/* Course Docs */}
               {modalType === 'CourseDocs' && !loading && (
-  <Section>
-    <Label>Select Course:</Label>
-    <Select
-      value={selectedCourse}
-      onChange={e => setSelectedCourse(e.target.value)}
-    >
-      <option value="">-- Select Course --</option>
-          <option value="Full Stack">Full Stack</option>
-          <option value="python">Python</option>
-          <option value="SEO & Digital Marketing">SEO & Digital Marketing</option>
-          <option value="Graphic Designing">Graphic Designing</option>
-          <option value="Software Testing">Software Testing</option>
-          <option value="Business Analyst">Business Analyst</option>
-          <option value="PHP with Laravel">PHP with Laravel</option>
-          <option value="Dot Net">Dot Net</option>
-    </Select>
+                <Section>
+                  <Label>Select Course:</Label>
+                  <Select
+                    value={selectedCourse}
+                    onChange={e => setSelectedCourse(e.target.value)}
+                  >
+                    <option value="">-- Select Course --</option>
+                        <option value="Full Stack">Full Stack</option>
+                        <option value="python">Python</option>
+                        <option value="SEO & Digital Marketing">SEO & Digital Marketing</option>
+                        <option value="Graphic Designing">Graphic Designing</option>
+                        <option value="Software Testing">Software Testing</option>
+                        <option value="Business Analyst">Business Analyst</option>
+                        <option value="PHP with Laravel">PHP with Laravel</option>
+                        <option value="Dot Net">Dot Net</option>
+                  </Select>
 
                     {selectedCourse && (
                       <>
@@ -403,43 +442,111 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
 
               {/* Manage Assignments */}
               {modalType === 'ManageAssignments' && !loading && (
+                      <Section>
+                        <Select
+                          value={selectedStudent?.id || ''}
+                          onChange={e => setSelectedStudent(students.find(x => x.id===e.target.value) || null)}
+                        >
+                          <option value="">Select Student</option>
+                          {students.map(s => (
+                            <option key={s.id} value={s.id}>
+                              {s.candidateName || s.id}
+                            </option>
+                          ))}
+                        </Select>
+
+                        {selectedStudent && (
+                          <>
+                            <Input
+                              placeholder="Unit"
+                              value={newAssignment.unit}
+                              onChange={e => setNewAssignment(p => ({ ...p, unit: e.target.value }))}
+                            />
+
+                            {/* PDF upload */}
+                            <FileInputWrapper>
+                              <Label>Study Material (PDF only)</Label>
+                              <File
+                                type="file"
+                                accept="application/pdf"
+                                onChange={e => {
+                                  const file = e.target.files[0];
+                                  setNewAssignment(p => ({
+                                    ...p,
+                                    studyMaterialFile: file,
+                                    studyMaterialUrl: file ? file.name : ''
+                                  }));
+                                }}
+                              />
+                            </FileInputWrapper>
+                            {newAssignment.studyMaterialFile && (
+                              <PDFPreview>
+                                📄 {newAssignment.studyMaterialFile.name}
+                                <RemoveIcon
+                                  onClick={() => setNewAssignment(p => ({
+                                    ...p,
+                                    studyMaterialFile: null,
+                                    studyMaterialUrl: ''
+                                  }))}
+                                >
+                                  ×
+                                </RemoveIcon>
+                              </PDFPreview>
+                            )}
+
+                            <Input
+                              placeholder="Close after days"
+                              type="number"
+                              value={newAssignment.closeDays}
+                              onChange={e => setNewAssignment(p => ({ ...p, closeDays: e.target.value }))}
+                            />
+
+                            <Btn onClick={createAssignment}>Create</Btn>
+
+                            <AssignList>
+                              {assignments.map(a => (
+                                <AssignItem key={a.unit}>
+                                  <strong>{a.unit}</strong> – {a.closed ? 'Closed' : 'Open'}
+                                </AssignItem>
+                              ))}
+                            </AssignList>
+                          </>
+                        )}
+                      </Section>
+                    )}
+
+                    {/* Unlock Requests */}
+                {modalType === 'UnlockRequests' && !loading && (
                 <Section>
-                  <Select value={selectedStudent?.id || ''} onChange={e => setSelectedStudent(students.find(x => x.id===e.target.value) || null)}>
+                  <Select
+                    value={selectedStudent?.id || ''}
+                    onChange={e => setSelectedStudent(
+                      students.find(x => x.id === e.target.value) || null
+                    )}
+                  >
                     <option value="">Select Student</option>
-                    {students.map(s => <option key={s.id} value={s.id}>{s.candidateName||s.id}</option>)}
+                    {students.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.candidateName || s.id}
+                      </option>
+                    ))}
                   </Select>
-                  {selectedStudent && (
-                    <>
-                      <Input placeholder="Unit" value={newAssignment.unit} onChange={e => setNewAssignment(p => ({ ...p, unit: e.target.value }))} />
-                      <Input placeholder="Study Material URL" value={newAssignment.studyMaterialUrl} onChange={e => setNewAssignment(p => ({ ...p, studyMaterialUrl: e.target.value }))} />
-                      <Input placeholder="Close after days" type="number" value={newAssignment.closeDays} onChange={e => setNewAssignment(p => ({ ...p, closeDays: e.target.value }))} />
-                      <Btn onClick={createAssignment}>Create</Btn>
-                      <AssignList>
-                        {assignments.map(a => (
-                          <AssignItem key={a.unit}>
-                            <strong>{a.unit}</strong> - {a.closed ? 'Closed' : 'Open'}
-                          </AssignItem>
-                        ))}
-                      </AssignList>
-                    </>
+
+                  {unlockRequests.length === 0 ? (
+                    <p>No pending unlocks.</p>
+                  ) : (
+                    unlockRequests.map(a => (
+                      <AssignItem key={a.unit}>
+                        {a.unit}
+                        <ActionBtn onClick={() => approveUnlock(a.unit)}>
+                          Approve Unlock
+                        </ActionBtn>
+                      </AssignItem>
+                    ))
                   )}
                 </Section>
               )}
 
-              {/* Unlock Requests */}
-              {modalType === 'UnlockRequests' && !loading && (
-                <Section>
-                  <Select value={selectedStudent?.id||''} onChange={e => setSelectedStudent(students.find(x=>x.id===e.target.value)||null)}>
-                    <option value="">Select Student</option>
-                    {students.map(s=><option key={s.id} value={s.id}>{s.candidateName||s.id}</option>)}
-                  </Select>
-                  {unlockRequests.map(a=>(
-                    <AssignItem key={a.unit}>
-                      {a.unit} <ActionBtn onClick={() => approveUnlock(a.unit)}>Approve Unlock</ActionBtn>
-                    </AssignItem>
-                  ))}
-                </Section>
-              )}
 
               {/* Assignment Results */}
               {modalType === 'AssignmentResults' && !loading && (
@@ -632,5 +739,20 @@ const FeedbackItem = styled.li`padding:8px;border-bottom:1px solid #ddd;`;
 const Li=styled.li`padding:4px 0;`;
 const FileInputWrapper = styled.div`
   margin-bottom: 12px;
+`;
+
+const PDFPreview = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #f0f0f0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+`;
+const RemoveIcon = styled.span`
+  cursor: pointer;
+  margin-left: 8px;
+  font-weight: bold;
 `;
 

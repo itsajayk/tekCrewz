@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState, useContext, useCallback  } from "react";
 import styled, { ThemeProvider, keyframes } from "styled-components";  // <-- ThemeProvider here
 import { Link, useNavigate } from "react-router-dom";
 import { signOut } from "firebase/auth";
@@ -60,65 +60,84 @@ export default function StudentDashboard() {
   const [error, setError] = useState(null);
   const [theme, setTheme] = useState('light');
   const [quizzes, setQuizzes] = useState([]);
+  const [modalMsg, setModalMsg] = useState('');
+  const [showModal, setShowModal] = useState(false);
 
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
+  const closeModal = () => setShowModal(false);
 
-  useEffect(() => {
+    const fetchAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      // 1️⃣ candidates → prof → dbId
+      const candRes = await fetch(`${API_BASE_URL}/api/candidates`);
+      const candidates = candRes.ok ? await candRes.json() : [];
+      const myEmail = auth.currentUser?.email?.toLowerCase();
+      const prof = candidates.find(c => c.email?.toLowerCase() === myEmail) || {};
+      const dbId = prof.studentId;
+      if (!dbId) {
+        setError("Unable to find your student record.");
+        return;
+      }
+
+      // 2️⃣ attendance
+      const attRes = await fetch(`${API_BASE_URL}/api/students/${dbId}/attendance`);
+      const attendance = attRes.ok ? await attRes.json() : [];
+
+      // 3️⃣ course docs
+      const docsRes = await fetch(`${API_BASE_URL}/api/courses/COURSE1/docs`);
+      let docs = [];
+      if (docsRes.ok) {
+        const obj = await docsRes.json();
+        docs = Object.entries(obj).map(([type, url]) => ({ type, url }));
+      }
+
+      // 4️⃣ assignments
+      const asnRes = await fetch(`${API_BASE_URL}/api/assignments/${dbId}`);
+      let assignments = asnRes.ok ? await asnRes.json() : [];
+
+      // closed/unlocked flags
+      const now = new Date();
+        assignments = assignments.map(a => {
+          // closedAt comes from server as `closed: Boolean(a.closedAt && now > a.closedAt)`
+          const closedByTime = a.closedAt ? now > new Date(a.closedAt) : false;
+          const unlockedUntil = a.unlockedUntil ? new Date(a.unlockedUntil) : null;
+          const isUnlocked = unlockedUntil && unlockedUntil > now;
+          return {
+            ...a,
+            // only closed if past closedAt AND NOT currently unlocked
+            closed: closedByTime && !isUnlocked,
+            unlocked: Boolean(isUnlocked)
+          };
+        });
+
+
+      setData({
+        dbId,
+        candidateName: prof.candidateName || "New Student",
+        email: prof.email || "",
+        mobile: prof.mobile || "",
+        candidatePic: prof.candidatePic || prof.photoUrl || "",
+        attendance,
+        docs,
+        assignments
+      });
+    } catch (err) {
+      console.error(err);
+      setError("Failed to load dashboard data");
+    } finally {
+      setLoading(false);
+    }
+  }, [API_BASE_URL, authUid]);
+
+    // ② run once on mount
+      useEffect(() => {
     if (!authUid) {
       navigate("/s-loginPage");
       return;
-    }
-
-    const fetchAll = async () => {
-      setLoading(true);
-      try {
-        // 1️⃣ Fetch candidate list to lookup your custom studentId (e.g. "BT7FS001")
-        const candRes   = await fetch(`${API_BASE_URL}/api/candidates`);
-        const candidates = candRes.ok ? await candRes.json() : [];
-        const myEmail    = auth.currentUser?.email?.toLowerCase();
-        const prof       = candidates.find(c => c.email?.toLowerCase() === myEmail) || {};
-
-        const dbId         = prof.studentId;
-        const candidateName = prof.candidateName || "New Student";
-        const email         = prof.email || "";
-        const mobile        = prof.mobile || "";
-        const candidatePic  = prof.candidatePic || prof.photoUrl || "";
-
-        if (!dbId) {
-          setError("Unable to find your student record.");
-          setLoading(false);
-          return;
         }
-
-        // 2️⃣ Fetch attendance
-        let attendance = [];
-        const attRes = await fetch(`${API_BASE_URL}/api/students/${dbId}/attendance`);
-        if (attRes.ok) attendance = await attRes.json();
-
-        // 3️⃣ Fetch course docs
-        let docs = [];
-        const docsRes = await fetch(`${API_BASE_URL}/api/courses/COURSE1/docs`);
-        if (docsRes.ok) {
-          const obj = await docsRes.json();
-          docs = Object.entries(obj).map(([type, url]) => ({ type, url }));
-        }
-
-        // 4️⃣ Fetch assignments
-        let assignments = [];
-        const asnRes = await fetch(`${API_BASE_URL}/api/assignments/${dbId}`);
-        if (asnRes.ok) assignments = await asnRes.json();
-
-        setData({ dbId, candidateName, email, mobile, candidatePic, attendance, docs, assignments });
-      } catch (err) {
-        console.error(err);
-        setError("Failed to load dashboard data");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAll();
-  }, [authUid, navigate]);
+        fetchAll();
+      }, [authUid, navigate, fetchAll]);
 
 
   const submitCode = async (unit) => {
@@ -147,29 +166,51 @@ export default function StudentDashboard() {
   };
 
 
-  const requestUnlock = async (unit) => {
-    const { dbId } = data;
-    try {
-      const res = await fetch(
-        `${API_BASE_URL}/api/assignments/${dbId}/unlock`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ unit })
-        }
-      );
-      if (!res.ok) throw new Error("Unlock request failed");
-      setData((d) => ({
-        ...d,
-        assignments: d.assignments.map((a) =>
-          a.unit === unit ? { ...a, unlocked: true } : a
-        )
-      }));
-    } catch (err) {
-      console.error(err);
-      alert(err.message);
-    }
-  };
+  const requestUnlock = async unit => {
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}/api/assignments/${data.dbId}/unlock`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ unit }),
+      }
+    );
+    if (!res.ok) throw new Error(`Server responded ${res.status}`);
+
+    // Re-fetch that student’s assignments:
+    const fresh = await fetch(`${API_BASE_URL}/api/assignments/${data.dbId}`);
+    if (!fresh.ok) throw new Error(`Assignments reload failed: ${fresh.status}`);
+    const updated = await fresh.json();
+
+    // Recompute closed & unlocked flags just like on load:
+    const now = new Date();
+    const withFlags = updated.map(a => {
+      const closedByTime = a.closedAt ? now > new Date(a.closedAt) : false;
+      const unlockedUntil = a.unlockedUntil ? new Date(a.unlockedUntil) : null;
+      const isUnlocked = unlockedUntil && unlockedUntil > now;
+
+      return {
+        ...a,
+        closed: closedByTime && !isUnlocked,
+        unlocked: Boolean(isUnlocked)
+      };
+    });
+
+    // Update your dashboard state so the UI refreshes:
+    setData(d => ({ ...d, assignments: withFlags }));
+
+    setModalMsg('Unlock request sent! Await admin approval.');
+    setShowModal(true);
+  } catch (err) {
+    console.error(err);
+    setModalMsg(`Failed to send unlock request: ${err.message}`);
+    setShowModal(true);
+  }
+};
+
+
+
 
   const submitFeedback = async (unit) => {
     try {
@@ -195,10 +236,10 @@ export default function StudentDashboard() {
     }
   };
 
-   const mailRequest = (field) => {
+  const mailRequest = (field) => {
     const subject = encodeURIComponent(`${field} Change Request`);
     const body = encodeURIComponent(`Please update my ${field.toLowerCase()} for Student ID: ${data.studentId}`);
-    window.location.href = `mailto:admin@tekcrewz.com?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:business.tekcrewz@gmail.com?subject=${subject}&body=${body}`;
   };
 
   const handleLogout = async () => {
@@ -320,49 +361,35 @@ export default function StudentDashboard() {
   );
 
   const renderUnit = (unit) => {
-    const u = assignments.find(a => a.unit === unit);
+    const u = assignments.find((a) => a.unit === unit);
     if (!u) return null;
     return (
       <Card>
-          <h3>Unit: {unit}</h3>
+        <h3>Unit: {unit}</h3>
 
-            <SectionSmall>Study Material</SectionSmall>
+        <SectionSmall>Study Material</SectionSmall>
         {u.studyMaterialUrl ? (
           <>
             <EmbedWrapper>
-              <iframe
-                src={`https://docs.google.com/gview?url=${encodeURIComponent(
-                  u.studyMaterialUrl
-                )}&embedded=true`}
-                style={{ width: "100%", height: "600px", border: 0 }}
-              />
+              <iframe src={`https://docs.google.com/gview?url=${encodeURIComponent(u.studyMaterialUrl)}&embedded=true`} width="100%" height="600px" frameBorder="0"/>
             </EmbedWrapper>
-            <Button as="a" href={u.studyMaterialUrl} target="_blank">
-              Download
-            </Button>
+            <Button as="a" href={u.studyMaterialUrl} target="_blank">Download PDF</Button>
           </>
         ) : (
           <p>No study material.</p>
         )}
 
-          <SectionSmall>Submit Code</SectionSmall>
-          <TextArea
-          rows={6}
-          disabled={u.closed}
-          value={codeInput}
-          onChange={(e) => setCodeInput(e.target.value)}
-        />
-        <Button disabled={u.closed} onClick={() => submitCode(unit)}>
-          {u.closed ? "Closed" : "Submit"}
-        </Button>
+        <SectionSmall>Submit Code</SectionSmall>
+        <TextArea rows={6} disabled={u.closed} value={codeInput} onChange={e=>setCodeInput(e.target.value)}/>
+        <Button disabled={u.closed} onClick={()=>submitCode(unit)}>{u.closed?"Closed":"Submit"}</Button>
 
-        {u.closed && !u.unlocked && (
-          <UnlockForm onSubmit={(e) => { e.preventDefault(); requestUnlock(unit); }}>
-            <Button type="submit">Request Reopen</Button>
+          {u.closed && !u.unlocked && (
+          <UnlockForm onSubmit={e=>{e.preventDefault();requestUnlock(unit);}}>
+            <Button type="submit">Request Extension</Button>
           </UnlockForm>
         )}
 
-           {u.results && (
+          {u.results && (
           <>
             <SectionSmall>Result</SectionSmall>
             <Table>
@@ -479,7 +506,7 @@ export default function StudentDashboard() {
           <Card>
             <h3>Unit: {unitData.unit}</h3>
             <SectionSmall>Study Material</SectionSmall>
-            <Pdf src={unitData.studyMaterialUrl} />
+            <Pdf/>
             <a
                 href={
                   unitData.studyMaterialUrl.startsWith("http")
@@ -491,10 +518,10 @@ export default function StudentDashboard() {
               >
                 {unitData.studyMaterialUrl}
                 {u.closed && !u.unlocked && (
-                  <UnlockForm onSubmit={e => { e.preventDefault(); requestUnlock(u.unit); }}>
-                    <Button type="submit">Request Reopen</Button>
-                  </UnlockForm>
-                )}
+          <UnlockForm onSubmit={e => { e.preventDefault(); requestUnlock(unitData.unit); }}>
+            <Button type="submit">Request Extension</Button>
+          </UnlockForm>
+        )}
               </a>
 
 
@@ -563,7 +590,7 @@ export default function StudentDashboard() {
         <ThemeProvider theme={theme === 'light' ? lightTheme : darkTheme}>
       <Page>
         <TopNavbar onLogout={async() => { await signOut(auth); navigate('/s-loginPage'); }} />
-        
+        {showModal && <ModalOverlay onClick={closeModal}><Modal onClick={e=>e.stopPropagation()}><p>{modalMsg}</p><Button onClick={closeModal}>Close</Button></Modal></ModalOverlay>}
         <Layout>
           <Sidebar>
             <ToggleWrapper>
@@ -878,3 +905,5 @@ const EmbedWrapper = styled.div`
   height: 600px;
   margin-bottom: 16px;
 `;
+const ModalOverlay = styled.div`position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;justify-content:center;align-items:center;z-index:1000;`;
+const Modal = styled.div`background:${p=>p.theme.cardBg};padding:20px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.2);color:${p=>p.theme.text};`;
