@@ -57,7 +57,13 @@ const upload = multer({
 // for course documents (PDF only)
 const courseDocStorage = new CloudinaryStorage({
   cloudinary,
-  params: { folder: 'course_docs', resource_type: 'raw' }
+  params: { 
+    folder: 'course_docs', 
+    resource_type: 'raw', 
+    format: 'pdf',
+    public_id: (req, file) => {
+      return file.originalname.replace(/\.pdf$/i, '');
+    }}
 });
 const uploadCourseDoc = multer({
   storage: courseDocStorage,
@@ -135,10 +141,21 @@ const assignmentSchema = new mongoose.Schema({
 }, { timestamps: true });
 const Assignment = mongoose.model('Assignment', assignmentSchema);
 
+// at top, instead of your existing assignmentStorage:
 const assignmentStorage = new CloudinaryStorage({
   cloudinary,
-  params: { folder: 'assignment_materials', resource_type: 'raw' }
+  params: {
+    folder: 'assignment_materials',
+    resource_type: 'raw',
+    format: 'pdf',                    // <— force .pdf in URL
+    public_id: (req, file) => {
+      // strip “.pdf” from original before using as public_id
+      return file.originalname.replace(/\.pdf$/i, '');
+    }
+  }
 });
+
+
 const uploadAssignment = multer({
   storage: assignmentStorage,
   fileFilter: (req, file, cb) => {

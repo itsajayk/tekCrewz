@@ -47,6 +47,28 @@ const darkTheme = {
   buttonColor: '#2f3e4e',
 };
 
+// Utility functions
+function getDownloadUrl(fileUrl) {
+  try {
+    const separator = fileUrl.includes('?') ? '&' : '?';
+    return `${fileUrl}${separator}fl_attachment=true`;
+  } catch (err) {
+    return fileUrl;
+  }
+}
+
+function extractOriginalFileName(fileUrl) {
+  try {
+    const url = new URL(fileUrl);
+    const segments = url.pathname.split('/');
+    const fileWithPrefix = segments[segments.length - 1];
+    const dashIndex = fileWithPrefix.indexOf('-');
+    return dashIndex === -1 ? fileWithPrefix : fileWithPrefix.substring(dashIndex + 1);
+  } catch (err) {
+    return fileUrl;
+  }
+}
+
 export default function StudentDashboard() {
   const API_BASE_URL = "https://tekcrewz.onrender.com";
   const navigate = useNavigate();
@@ -370,10 +392,15 @@ export default function StudentDashboard() {
         <SectionSmall>Study Material</SectionSmall>
         {u.studyMaterialUrl ? (
           <>
-            <EmbedWrapper>
-              <iframe src={`https://docs.google.com/gview?url=${encodeURIComponent(u.studyMaterialUrl)}&embedded=true`} width="100%" height="600px" frameBorder="0"/>
-            </EmbedWrapper>
-            <Button as="a" href={u.studyMaterialUrl} target="_blank">Download PDF</Button>
+            <PDFCard>
+                  <PDFIcon className="fa-solid fa-file-pdf" />
+                  <FileInfo>
+                    <FileName>{extractOriginalFileName(u.studyMaterialUrl)}</FileName>
+                  </FileInfo>
+                  <DownloadLink href={getDownloadUrl(u.studyMaterialUrl)} download>
+                    <i className="fa-solid fa-download"></i>
+                  </DownloadLink>
+                </PDFCard>
           </>
         ) : (
           <p>No study material.</p>
@@ -507,6 +534,15 @@ export default function StudentDashboard() {
             <h3>Unit: {unitData.unit}</h3>
             <SectionSmall>Study Material</SectionSmall>
             <Pdf/>
+            {unitData.studyMaterialUrl ? (<PDFCard>
+                  <PDFIcon className="fa-solid fa-file-pdf" />
+                  <FileInfo>
+                    <FileName>{extractOriginalFileName(unitData.studyMaterialUrl)}</FileName>
+                  </FileInfo>
+                  <DownloadLink href={getDownloadUrl(unitData.studyMaterialUrl)} download>
+                    <i className="fa-solid fa-download"></i>
+                  </DownloadLink>
+                </PDFCard>): "No Material for this unit"}
             <a
                 href={
                   unitData.studyMaterialUrl.startsWith("http")
@@ -516,7 +552,6 @@ export default function StudentDashboard() {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                {unitData.studyMaterialUrl}
                 {u.closed && !u.unlocked && (
           <UnlockForm onSubmit={e => { e.preventDefault(); requestUnlock(unitData.unit); }}>
             <Button type="submit">Request Extension</Button>
@@ -907,3 +942,42 @@ const EmbedWrapper = styled.div`
 `;
 const ModalOverlay = styled.div`position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;justify-content:center;align-items:center;z-index:1000;`;
 const Modal = styled.div`background:${p=>p.theme.cardBg};padding:20px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.2);color:${p=>p.theme.text};`;
+
+const PDFCard = styled.div`
+  display: flex;
+  align-items: center;
+  background-color: #f9f9f9;
+  border: 1px solid #eee;
+  padding: 8px;
+  border-radius: 6px;
+  width: 220px;
+  gap: 8px;
+`;
+
+const PDFIcon = styled.i`
+  color: #d9534f;
+  font-size: 24px;
+`;
+
+const FileInfo = styled.div`
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+`;
+
+const FileName = styled.span`
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+  word-break: break-all;
+`;
+
+const DownloadLink = styled.a`
+  color: #28a745;
+  font-size: 18px;
+  text-decoration: none;
+  &:hover {
+    color: #218838;
+  }
+`;
