@@ -182,6 +182,12 @@ const studentFileStorage = new CloudinaryStorage({
   }
 });
 
+const uploadStudentFile = multer({
+  storage: studentFileStorage,
+  limits: { fileSize: 20 * 1024 * 1024 } // allow up to 20 MB for student files
+});
+
+
 // ── Routes ─────────────────────────────────────────────────────────────
 
 // Create Candidate (with file uploads)
