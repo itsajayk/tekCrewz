@@ -291,10 +291,10 @@ export default function StudentDashboard() {
   };
 
     // ▶ NEW: call the server endpoint to upload file
-  const uploadFile = async (unit) => {
-  if (!selectedFile) return;
+  const uploadFile = async (unit, file) => {
+  if (!file) return;
   const formData = new FormData();
-  formData.append('file', selectedFile);
+  formData.append('file', file);
   formData.append('unit', unit);
 
   try {
@@ -306,17 +306,27 @@ export default function StudentDashboard() {
       }
     );
     const json = await res.json();
-    // json.fileUrl is the Cloudinary URL, update local state so UI shows it
+    // json.fileUrl is the Cloudinary‐returned URL
+    // Update the assignment’s submissionFileUrl in state
     setData(d => ({
       ...d,
       assignments: d.assignments.map(a =>
         a.unit === unit ? { ...a, submissionFileUrl: json.fileUrl } : a
       )
     }));
+    // ALSO: store it in uploadedFiles so we can display fileName/link
+    setUploadedFiles(ufs => ({
+      ...ufs,
+      [unit]: {
+        url: json.fileUrl,
+        fileName: file.name
+      }
+    }));
   } catch (e) {
     console.error('Upload failed', e);
   }
 };
+
 
   if (loading) return <SpinnerOverlay><Spinner /></SpinnerOverlay>;
   if (error) return <ErrorMsg>{error}</ErrorMsg>;
@@ -440,26 +450,26 @@ const renderDoc = (type) => {
     </Card>
   );
 
-   const renderUnit = (unit) => {
-    const u = assignments.find((a) => a.unit === unit);
+    // ── renderUnit ─────────────────────────────────────────────────────────
+  const renderUnit = (unit) => {
+    const u = assignments.find(a => a.unit === unit);
     if (!u) return null;
+
     return (
       <Card>
         <h3>Unit: {unit}</h3>
 
         <SectionSmall>Study Material</SectionSmall>
         {u.studyMaterialUrl ? (
-          <>
-            <PDFCard>
-              <PDFIcon className="fa-solid fa-file-pdf" />
-              <FileInfo>
-                <FileName>{extractOriginalFileName(u.studyMaterialUrl)}</FileName>
-              </FileInfo>
-              <DownloadLink href={getDownloadUrl(u.studyMaterialUrl)} download>
-                <i className="fa-solid fa-download"></i>
-              </DownloadLink>
-            </PDFCard>
-          </>
+          <PDFCard>
+            <PDFIcon className="fa-solid fa-file-pdf" />
+            <FileInfo>
+              <FileName>{extractOriginalFileName(u.studyMaterialUrl)}</FileName>
+            </FileInfo>
+            <DownloadLink href={getDownloadUrl(u.studyMaterialUrl)} download>
+              <i className="fa-solid fa-download"></i>
+            </DownloadLink>
+          </PDFCard>
         ) : (
           <p>No study material.</p>
         )}
@@ -493,7 +503,12 @@ const renderDoc = (type) => {
         />
         {uploadedFiles[unit] && (
           <UploadedInfo>
-            Uploaded: <a href={uploadedFiles[unit].url} target="_blank" rel="noopener noreferrer">
+            Uploaded:{" "}
+            <a
+              href={uploadedFiles[unit].url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               {uploadedFiles[unit].fileName}
             </a>
           </UploadedInfo>
@@ -537,6 +552,8 @@ const renderDoc = (type) => {
       case "Attendance": return renderAttendance();
       case "Unit": return renderUnit();
       case "Course Docs": return renderDoc()
+      case "Unit":
+      return renderUnit();
       case "Syllabus":
       case "Schedule": {
         const doc = docs.find(
@@ -570,106 +587,10 @@ const renderDoc = (type) => {
               </SwitchLink>
             </ul>
           </Card>
-      default: {
-        const unitData = assignments.find((a) => a.unit === activeTab);
+      default:   // default means activeTab matches a real unit name
+        const unitData = assignments.find(a => a.unit === activeTab);
         if (!unitData) return null;
-        const u = assignments.find(a => a.unit === activeTab);
-        return (
-          <Card>
-            <h3>Unit: {unitData.unit}</h3>
-            <SectionSmall>Study Material</SectionSmall>
-            <Pdf/>
-            {unitData.studyMaterialUrl ? (
-                  <PDFCard>
-                      <PDFIcon className="fa-solid fa-file-pdf" />
-                      <FileInfo>
-                        <FileName>
-                          {extractOriginalFileName(unitData.studyMaterialUrl)}
-                        </FileName>
-                      </FileInfo>
-                      <DownloadLink
-                        href={getDownloadUrl(unitData.studyMaterialUrl)}
-                        // `download` attribute is now optional; browser sees .pdf
-                      >
-                        <i className="fa-solid fa-download"></i>
-                      </DownloadLink>
-                    </PDFCard>
-              ): "No Material for this unit"}
-            <a
-                href={
-                  unitData.studyMaterialUrl.startsWith("http")
-                    ? unitData.studyMaterialUrl
-                    : `https://${unitData.studyMaterialUrl}`
-                }
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {u.closed && !u.unlocked && (
-          <UnlockForm onSubmit={e => { e.preventDefault(); requestUnlock(unitData.unit); }}>
-            <Button type="submit">Request Extension</Button>
-          </UnlockForm>
-        )}
-              </a>
-
-
-
-            <SectionSmall>Submit Code</SectionSmall>
-            <TextArea
-              rows={6}
-              disabled={unitData.closed}
-              value={codeInput}
-              onChange={(e) => setCodeInput(e.target.value)}
-            />
-            <Button
-              disabled={unitData.closed}
-              onClick={() => submitCode(unitData.unit)}
-            >
-              {unitData.closed ? "Closed" : "Submit"}
-            </Button>
-
-            {unitData.closed && !unitData.unlocked && (
-              <UnlockForm
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  requestUnlock(unitData.unit);
-                }}
-              >
-                <Button type="submit">Request Reopen</Button>
-              </UnlockForm>
-            )}
-
-            {unitData.results && (
-              <>
-                <SectionSmall>Result</SectionSmall>
-                <Table>
-                  <thead>
-                    <tr>
-                      <th>Score</th>
-                      <th>Passed</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>{unitData.results.score}</td>
-                      <td>{unitData.results.passed ? "Yes" : "No"}</td>
-                    </tr>
-                  </tbody>
-                </Table>
-              </>
-            )}
-
-            <SectionSmall>Feedback</SectionSmall>
-            <TextArea
-              rows={4}
-              value={feedbackInput}
-              onChange={(e) => setFeedbackInput(e.target.value)}
-            />
-            <Button onClick={() => submitFeedback(unitData.unit)}>
-              Send Feedback
-            </Button>
-          </Card>
-        );
-      }
+        return renderUnit(activeTab);
     }
   };
 

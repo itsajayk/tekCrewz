@@ -1,4 +1,3 @@
-// server.js
 require('dotenv').config();
 
 const express = require('express');
@@ -155,7 +154,6 @@ const assignmentStorage = new CloudinaryStorage({
   }
 });
 
-
 const uploadAssignment = multer({
   storage: assignmentStorage,
   fileFilter: (req, file, cb) => {
@@ -186,7 +184,6 @@ const uploadStudentFile = multer({
   storage: studentFileStorage,
   limits: { fileSize: 20 * 1024 * 1024 } // allow up to 20 MB for student files
 });
-
 
 // ── Routes ─────────────────────────────────────────────────────────────
 
@@ -255,7 +252,6 @@ app.delete('/api/candidates/:id', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 
 // Student Dashboard
 app.get('/api/students/:studentId/profile', async (req, res) => {
@@ -332,7 +328,6 @@ app.post(
   }
 );
 
-
 // Admin Aggregations
 app.get('/api/admin/students', async (req, res) => {
   const profiles = await StudentProfile.find();
@@ -350,7 +345,6 @@ app.get('/api/admin/students', async (req, res) => {
   }));
   res.json(out);
 });
-
 
 // ── NEW: Admin endpoints for the frontend ──────────────────────────────
 // List all assignments (for ManageAssignments)
@@ -486,46 +480,34 @@ app.get('/api/student/schedule', (req, res) =>
   res.sendFile(path.join(__dirname, 'docs/schedule.pdf'))
 );
 
+// ── Quiz Schemas & Models (moved before using them) ─────────────────────────────────────────
 
+// 1) Define the Question sub‐schema
 const QuestionSchema = new mongoose.Schema({
   question:     String,
   options:      [String],
-  correctIndex: Number   // 0-3 for a four-option MCQ
+  correctIndex: Number   // 0–3 for a four‐option MCQ
 });
 
+// 2) Define the main QuizSchema
 const QuizSchema = new mongoose.Schema({
   title:     String,
   questions: [QuestionSchema]
 }, { timestamps: true });
 
-app.post('/api/admin/quizzes', async (req, res) => {
-  const { id, title, questions } = req.body;
-  const quiz = await Quiz.findOneAndUpdate(
-    { _id: id },
-    { title, questions },
-    { upsert: true, new: true }
-  );
-  res.json(quiz);
-});
+// 3) Register the Quiz model
+const Quiz = mongoose.model('Quiz', QuizSchema);
 
-// — Public: list all quizzes
-app.get('/api/quizzes', async (req, res) => {
-  const all = await Quiz.find().select('title');
-  res.json(all);
-});
+// 4) Define and register the StudentQuiz model
+const StudentQuizSchema = new mongoose.Schema({
+  studentId: String,
+  quizId:    mongoose.Schema.Types.ObjectId,
+  answers:   [Number],
+  score:     Number
+}, { timestamps: true });
+const StudentQuiz = mongoose.model('StudentQuiz', StudentQuizSchema);
 
-// — Public: get a single quiz
-app.get('/api/quizzes/:quizId', async (req, res) => {
-  const quiz = await Quiz.findById(req.params.quizId).lean();
-  // strip out correctIndex so the student can’t cheat
-  quiz.questions = quiz.questions.map(q => ({
-    question: q.question,
-    options: q.options
-  }));
-  res.json(quiz);
-});
-
-// ── Quiz Management ─────────────────────────────────────────────────────
+// ── Quiz Routes ───────────────────────────────────────────────────────────
 
 // Admin: Create or update a quiz
 app.post('/api/admin/quizzes', async (req, res) => {
@@ -538,13 +520,13 @@ app.post('/api/admin/quizzes', async (req, res) => {
   res.json(quiz);
 });
 
-// Student: fetch list of quizzes
+// Public: list all quizzes
 app.get('/api/quizzes', async (req, res) => {
   const all = await Quiz.find().select('title');
   res.json(all);
 });
 
-// Student: fetch a single quiz (no correctIndex)
+// Public: get a single quiz (strip out correctIndex for students)
 app.get('/api/quizzes/:quizId', async (req, res) => {
   const quiz = await Quiz.findById(req.params.quizId).lean();
   quiz.questions = quiz.questions.map(q => ({
@@ -559,27 +541,12 @@ app.post('/api/students/:studentId/quizzes/:quizId/submit', async (req, res) => 
   const { answers } = req.body;
   const quiz = await Quiz.findById(req.params.quizId).lean();
   let score = 0;
-  quiz.questions.forEach((q,i) => {
-    if (q.correctIndex === answers[i]) score++;
-  });
-  const percent = Math.round((score/quiz.questions.length)*100);
-  // you already have StudentQuiz model?
-  await StudentQuiz.create({ studentId: req.params.studentId, quizId: req.params.quizId, answers, score: percent });
-  res.json({ score: percent, total: quiz.questions.length });
-});
-
-
-// — Student: submit answers
-app.post('/api/students/:studentId/quizzes/:quizId/submit', async (req, res) => {
-  const { answers } = req.body; // e.g. [0,2,1,…]
-  const quiz = await Quiz.findById(req.params.quizId).lean();
-  let score = 0;
   quiz.questions.forEach((q, i) => {
     if (q.correctIndex === answers[i]) score++;
   });
   const percent = Math.round((score / quiz.questions.length) * 100);
 
-  // Save it
+  // Save the student's result
   await StudentQuiz.create({
     studentId: req.params.studentId,
     quizId:    req.params.quizId,
