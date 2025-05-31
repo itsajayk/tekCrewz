@@ -351,6 +351,7 @@ app.get('/api/admin/students', async (req, res) => {
   res.json(out);
 });
 
+
 // ── NEW: Admin endpoints for the frontend ──────────────────────────────
 // List all assignments (for ManageAssignments)
 app.get('/api/admin/assignments', async (req, res) => {

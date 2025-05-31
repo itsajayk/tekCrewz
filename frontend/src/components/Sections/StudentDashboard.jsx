@@ -291,31 +291,32 @@ export default function StudentDashboard() {
   };
 
     // ▶ NEW: call the server endpoint to upload file
-  const handleFileUpload = async (unit, file) => {
-    if (!file) return;
-    const form = new FormData();
-    form.append("unit", unit);
-    form.append("file", file);
+  const uploadFile = async (unit) => {
+  if (!selectedFile) return;
+  const formData = new FormData();
+  formData.append('file', selectedFile);
+  formData.append('unit', unit);
 
-    try {
-      const res = await axios.post(
-        `/api/assignments/${data.dbId}/upload`,
-        form,
-        { headers: { "Content-Type": "multipart/form-data" } }
-      );
-      if (res.status === 200 && res.data.fileUrl) {
-        setUploadedFiles(prev => ({
-          ...prev,
-          [unit]: { fileName: file.name, url: res.data.fileUrl }
-        }));
-      } else {
-        throw new Error("Upload failed");
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}/api/assignments/${data.dbId}/upload`,
+      {
+        method: 'POST',
+        body: formData
       }
-    } catch (err) {
-      console.error("File upload error:", err);
-      alert("File upload failed");
-    }
-  };
+    );
+    const json = await res.json();
+    // json.fileUrl is the Cloudinary URL, update local state so UI shows it
+    setData(d => ({
+      ...d,
+      assignments: d.assignments.map(a =>
+        a.unit === unit ? { ...a, submissionFileUrl: json.fileUrl } : a
+      )
+    }));
+  } catch (e) {
+    console.error('Upload failed', e);
+  }
+};
 
   if (loading) return <SpinnerOverlay><Spinner /></SpinnerOverlay>;
   if (error) return <ErrorMsg>{error}</ErrorMsg>;
@@ -487,7 +488,7 @@ const renderDoc = (type) => {
           disabled={u.closed}
           onChange={(e) => {
             const file = e.target.files[0];
-            if (file) handleFileUpload(unit, file);
+            if (file) uploadFile(unit, file);
           }}
         />
         {uploadedFiles[unit] && (
