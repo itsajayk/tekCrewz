@@ -1,4 +1,3 @@
-// server.js
 require('dotenv').config();
 
 const express = require('express');
@@ -63,7 +62,8 @@ const courseDocStorage = new CloudinaryStorage({
     format: 'pdf',
     public_id: (req, file) => {
       return file.originalname.replace(/\.pdf$/i, '');
-    }}
+    }
+  }
 });
 const uploadCourseDoc = multer({
   storage: courseDocStorage,
@@ -72,6 +72,48 @@ const uploadCourseDoc = multer({
     else cb(new Error('Only PDF files allowed.'));
   },
   limits: { fileSize: 10 * 1024 * 1024 }
+});
+
+// for assignment study materials (admin uploads)
+const assignmentStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'assignment_materials',
+    resource_type: 'raw',
+    format: 'pdf',                    // <— force .pdf in URL
+    public_id: (req, file) => {
+      return file.originalname.replace(/\.pdf$/i, '');
+    }
+  }
+});
+const uploadAssignment = multer({
+  storage: assignmentStorage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') cb(null, true);
+    else cb(new Error('Only PDF files allowed.'));
+  },
+  limits: { fileSize: 10 * 1024 * 1024 }
+});
+
+// ── NEW: Student file uploads (Cloudinary) ─────────────────────────────
+const studentFileStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'student_uploads',
+    resource_type: 'raw',       // allow any file type (e.g., .zip, .pdf, .jpg)
+    public_id: (req, file) => {
+      // store under: studentId/unit/fileName (no extension stripping)
+      const studentId = req.params.studentId;
+      const unit = req.body.unit || 'unknown_unit';
+      // sanitize original filename:
+      const safeName = file.originalname.replace(/\.[^/.]+$/, "");
+      return `${studentId}/${unit}/${safeName}`;
+    }
+  }
+});
+const uploadStudentFile = multer({
+  storage: studentFileStorage,
+  limits: { fileSize: 20 * 1024 * 1024 } // up to 20MB per student file
 });
 
 // ── Schemas & Models ──────────────────────────────────────────────────
@@ -133,6 +175,7 @@ const assignmentSchema = new mongoose.Schema({
   closedAt:         Date,
   unlockedUntil:    Date,
   submissionCode:   String,
+  submissionFileUrl:String,     // ← NEW: store student-uploaded file URL
   results: {
     score: Number,
     passed: Boolean
@@ -140,48 +183,6 @@ const assignmentSchema = new mongoose.Schema({
   feedback:         String
 }, { timestamps: true });
 const Assignment = mongoose.model('Assignment', assignmentSchema);
-
-// at top, instead of your existing assignmentStorage:
-const assignmentStorage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'assignment_materials',
-    resource_type: 'raw',
-    format: 'pdf',                    // <— force .pdf in URL
-    public_id: (req, file) => {
-      // strip “.pdf” from original before using as public_id
-      return file.originalname.replace(/\.pdf$/i, '');
-    }
-  }
-});
-
-
-const uploadAssignment = multer({
-  storage: assignmentStorage,
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/pdf') cb(null, true);
-    else cb(new Error('Only PDF files allowed.'));
-  },
-  limits: { fileSize: 10 * 1024 * 1024 }
-});
-
-const studentFileStorage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'student_uploads',
-    resource_type: 'auto',
-    public_id: (req, file) => {
-      const studentId = req.params.studentId;
-      const unit = req.body.unit || 'unknown_unit';
-      return `${studentId}_${unit}_${Date.now()}`;
-    }
-  }
-});
-const uploadStudentFile = multer({
-  storage: studentFileStorage,
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB max
-});
-
 
 // ── Routes ─────────────────────────────────────────────────────────────
 
@@ -283,73 +284,6 @@ Please provide:
   }
 });
 
-app.post(
-  '/api/assignments/:studentId/upload',
-  uploadStudentFile.single('file'),
-  async (req, res) => {
-    try {
-      const { unit } = req.body;
-      if (!unit) {
-        return res.status(400).json({ error: 'unit is required' });
-      }
-      const fileUrl = req.file?.path || null;
-      const fileName = req.file?.originalname || null;
-      await Assignment.findOneAndUpdate(
-        { studentId: req.params.studentId, unit },
-        { uploadedFileUrl: fileUrl, uploadedFileName: fileName }
-      );
-      res.status(200).json({ uploadedFileUrl: fileUrl, uploadedFileName: fileName });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: err.message });
-    }
-  }
-);
-
-// ── NEW: Endpoint to delete an uploaded file for a unit (if needed) ─────
-app.delete('/api/assignments/:studentId/:unit/upload', async (req, res) => {
-  try {
-    const { studentId, unit } = req.params;
-    // Clear the uploaded file fields in the DB
-    const updated = await Assignment.findOneAndUpdate(
-      { studentId, unit },
-      { $unset: { uploadedFileUrl: "", uploadedFileName: "" } },
-      { new: true }
-    );
-    if (!updated) return res.status(404).json({ error: 'Assignment not found' });
-    res.json({ message: 'Uploaded file cleared' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ── NEW: Automatically create assignment record if not exists when student uploads file ─
-app.post(
-  '/api/assignments/:studentId/create-if-missing',
-  async (req, res) => {
-    try {
-      const { studentId } = req.params;
-      const { unit, studyMaterialUrl, closeDays } = req.body;
-      if (!unit) return res.status(400).json({ error: 'unit is required' });
-      const days = parseInt(closeDays, 10);
-      if (isNaN(days)) return res.status(400).json({ error: 'closeDays must be a number' });
-      await Assignment.findOneAndUpdate(
-        { studentId, unit },
-        {
-          studyMaterialUrl: studyMaterialUrl || "",
-          closedAt: new Date(Date.now() + days * 86400000)
-        },
-        { upsert: true }
-      );
-      res.status(200).json({ message: 'Assignment created or updated' });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: err.message });
-    }
-  }
-);
-
 // Student Dashboard
 app.get('/api/students/:studentId/profile', async (req, res) => {
   const prof = await StudentProfile.findOne({ studentId: req.params.studentId });
@@ -374,6 +308,7 @@ app.get('/api/assignments/:studentId', async (req, res) => {
     closed:     a.closedAt     ? now > a.closedAt     : false,
     unlocked:   a.unlockedUntil? now < a.unlockedUntil: false,
     submissionCode: a.submissionCode,
+    submissionFileUrl: a.submissionFileUrl || "",
     results:    a.results,
     feedback:   a.feedback
   })));
@@ -399,6 +334,31 @@ app.post('/api/assignments/:studentId/feedback', async (req, res) => {
   );
   res.sendStatus(204);
 });
+
+// ── NEW: Upload student‐submitted file ─────────────────────────────────
+app.post(
+  '/api/assignments/:studentId/upload',
+  uploadStudentFile.single('file'),
+  async (req, res) => {
+    try {
+      const studentId = req.params.studentId;
+      const unit = req.body.unit;
+      const fileUrl = req.file.path; // Cloudinary‐returned URL
+
+      // Update the Assignment document to store this file URL
+      await Assignment.findOneAndUpdate(
+        { studentId, unit },
+        { submissionFileUrl: fileUrl },
+        { upsert: false }
+      );
+
+      res.json({ fileUrl });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
 
 // Admin Aggregations
 app.get('/api/admin/students', async (req, res) => {
@@ -434,7 +394,7 @@ app.get('/api/admin/assignments/results', async (req, res) => {
 // List all feedback records (for ReviewFeedback)
 app.get('/api/admin/feedback', async (req, res) => {
   const fb = await Assignment.find({ feedback: { $exists: true, $ne: null } })
-    .select('studentId feedback')
+    .select('studentId unit feedback')
     .lean();
   res.json(fb);
 });
@@ -633,7 +593,6 @@ app.post('/api/students/:studentId/quizzes/:quizId/submit', async (req, res) => 
   await StudentQuiz.create({ studentId: req.params.studentId, quizId: req.params.quizId, answers, score: percent });
   res.json({ score: percent, total: quiz.questions.length });
 });
-
 
 // — Student: submit answers
 app.post('/api/students/:studentId/quizzes/:quizId/submit', async (req, res) => {

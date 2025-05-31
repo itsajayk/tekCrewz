@@ -18,7 +18,7 @@ import {
   FiMoon,
   FiMail
 } from "react-icons/fi";
-
+import axios from "axios";
 
 // Define light and dark themes
 const lightTheme = {
@@ -86,6 +86,8 @@ export default function StudentDashboard() {
   const [quizzes, setQuizzes] = useState([]);
   const [modalMsg, setModalMsg] = useState('');
   const [showModal, setShowModal] = useState(false);
+    // Track uploaded files per unit
+  const [uploadedFiles, setUploadedFiles] = useState({});
 
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
   const closeModal = () => setShowModal(false);
@@ -288,6 +290,33 @@ export default function StudentDashboard() {
     navigate("/s-loginPage");
   };
 
+    // ▶ NEW: call the server endpoint to upload file
+  const handleFileUpload = async (unit, file) => {
+    if (!file) return;
+    const form = new FormData();
+    form.append("unit", unit);
+    form.append("file", file);
+
+    try {
+      const res = await axios.post(
+        `/api/assignments/${data.dbId}/upload`,
+        form,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+      if (res.status === 200 && res.data.fileUrl) {
+        setUploadedFiles(prev => ({
+          ...prev,
+          [unit]: { fileName: file.name, url: res.data.fileUrl }
+        }));
+      } else {
+        throw new Error("Upload failed");
+      }
+    } catch (err) {
+      console.error("File upload error:", err);
+      alert("File upload failed");
+    }
+  };
+
   if (loading) return <SpinnerOverlay><Spinner /></SpinnerOverlay>;
   if (error) return <ErrorMsg>{error}</ErrorMsg>;
 
@@ -410,7 +439,7 @@ const renderDoc = (type) => {
     </Card>
   );
 
-  const renderUnit = (unit) => {
+   const renderUnit = (unit) => {
     const u = assignments.find((a) => a.unit === unit);
     if (!u) return null;
     return (
@@ -421,30 +450,55 @@ const renderDoc = (type) => {
         {u.studyMaterialUrl ? (
           <>
             <PDFCard>
-                  <PDFIcon className="fa-solid fa-file-pdf" />
-                  <FileInfo>
-                    <FileName>{extractOriginalFileName(u.studyMaterialUrl)}</FileName>
-                  </FileInfo>
-                  <DownloadLink href={getDownloadUrl(u.studyMaterialUrl)} download>
-                    <i className="fa-solid fa-download"></i>
-                  </DownloadLink>
-                </PDFCard>
+              <PDFIcon className="fa-solid fa-file-pdf" />
+              <FileInfo>
+                <FileName>{extractOriginalFileName(u.studyMaterialUrl)}</FileName>
+              </FileInfo>
+              <DownloadLink href={getDownloadUrl(u.studyMaterialUrl)} download>
+                <i className="fa-solid fa-download"></i>
+              </DownloadLink>
+            </PDFCard>
           </>
         ) : (
           <p>No study material.</p>
         )}
 
         <SectionSmall>Submit Code</SectionSmall>
-        <TextArea rows={6} disabled={u.closed} value={codeInput} onChange={e=>setCodeInput(e.target.value)}/>
-        <Button disabled={u.closed} onClick={()=>submitCode(unit)}>{u.closed?"Closed":"Submit"}</Button>
+        <TextArea
+          rows={6}
+          disabled={u.closed}
+          value={codeInput}
+          onChange={(e) => setCodeInput(e.target.value)}
+        />
+        <Button disabled={u.closed} onClick={() => submitCode(unit)}>
+          {u.closed ? "Closed" : "Submit"}
+        </Button>
 
-          {u.closed && !u.unlocked && (
-          <UnlockForm onSubmit={e=>{e.preventDefault();requestUnlock(unit);}}>
+        {u.closed && !u.unlocked && (
+          <UnlockForm onSubmit={e => { e.preventDefault(); requestUnlock(unit); }}>
             <Button type="submit">Request Extension</Button>
           </UnlockForm>
         )}
 
-          {u.results && (
+        <SectionSmall>Upload File (Optional)</SectionSmall>
+        <input
+          type="file"
+          accept="*/*"
+          disabled={u.closed}
+          onChange={(e) => {
+            const file = e.target.files[0];
+            if (file) handleFileUpload(unit, file);
+          }}
+        />
+        {uploadedFiles[unit] && (
+          <UploadedInfo>
+            Uploaded: <a href={uploadedFiles[unit].url} target="_blank" rel="noopener noreferrer">
+              {uploadedFiles[unit].fileName}
+            </a>
+          </UploadedInfo>
+        )}
+
+        {u.results && (
           <>
             <SectionSmall>Result</SectionSmall>
             <Table>
@@ -464,14 +518,14 @@ const renderDoc = (type) => {
           </>
         )}
 
-          <SectionSmall>Feedback</SectionSmall>
-          <TextArea
+        <SectionSmall>Feedback</SectionSmall>
+        <TextArea
           rows={4}
           value={feedbackInput}
           onChange={(e) => setFeedbackInput(e.target.value)}
         />
-          <Button onClick={() => submitFeedback(unit)}>Send Feedback</Button>
-        </Card>
+        <Button onClick={() => submitFeedback(unit)}>Send Feedback</Button>
+      </Card>
     );
   };
 
@@ -977,4 +1031,10 @@ const DownloadLink = styled.a`
   &:hover {
     color: #218838;
   }
+`;
+
+const UploadedInfo = styled.div`
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: #333;
 `;
