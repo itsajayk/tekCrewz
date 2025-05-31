@@ -2,7 +2,8 @@ import React, { useEffect, useState, useContext, useCallback  } from "react";
 import styled, { ThemeProvider, keyframes } from "styled-components";  // <-- ThemeProvider here
 import { Link, useNavigate } from "react-router-dom";
 import { signOut } from "firebase/auth";
-import { auth } from "../Pages/firebase";
+import { auth, db } from "../Pages/firebase";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import TopNavbar from "../Nav/TopNavbar";
 import Footer from "./Footer";
 import { AuthContext } from "../../contexts/AuthContext";
@@ -75,6 +76,7 @@ export default function StudentDashboard() {
   const { userId: authUid } = useContext(AuthContext);
 
   const [data, setData] = useState(null);
+  const [attendanceRecords, setAttendanceRecords] = useState([]);       // ← New
   const [codeInput, setCodeInput] = useState("");
   const [feedbackInput, setFeedbackInput] = useState("");
   const [activeTab, setActiveTab] = useState("Profile");
@@ -114,7 +116,7 @@ export default function StudentDashboard() {
         docs = Object.entries(obj).map(([type, url]) => ({ type, url }));
       }
 
-      // 4️⃣ assignments
+      // 3️⃣ assignments
       const asnRes = await fetch(`${API_BASE_URL}/api/assignments/${dbId}`);
       let assignments = asnRes.ok ? await asnRes.json() : [];
 
@@ -144,6 +146,20 @@ export default function StudentDashboard() {
         docs,
         assignments
       });
+      // 4️⃣ subscribe to Firestore attendance
+      const q = query(
+        collection(db, 'attendance'),
+        where('studentId', '==', dbId)
+      );
+      return onSnapshot(q, snap => {
+        const recs = snap.docs.map(d => ({
+          date: d.data().date.toDate ? d.data().date.toDate() : new Date(d.data().date),
+          status: d.data().status
+        }));
+        setAttendanceRecords(
+          recs.sort((a, b) => b.date - a.date)
+        );
+      });
     } catch (err) {
       console.error(err);
       setError("Failed to load dashboard data");
@@ -158,8 +174,11 @@ export default function StudentDashboard() {
       navigate("/s-loginPage");
       return;
         }
-        fetchAll();
-      }, [authUid, navigate, fetchAll]);
+    const unsubAttendance = fetchAll();
+      return () => {
+      if (typeof unsubAttendance === 'function') unsubAttendance();
+    };
+  }, [authUid, navigate, fetchAll]);
 
 
   const submitCode = async (unit) => {
@@ -328,7 +347,8 @@ export default function StudentDashboard() {
     </ProfileContainer>
   );
 };
-      const renderAttendance = () => (
+
+        const renderAttendance = () => (
     <Card>
       <h3>Attendance</h3>
       <Table>
@@ -336,9 +356,9 @@ export default function StudentDashboard() {
           <tr><th>Date</th><th>Status</th></tr>
         </thead>
         <tbody>
-          {attendance.map((r, i) => (
+          {attendanceRecords.map((r, i) => (
             <tr key={i}>
-              <td>{new Date(r.date).toLocaleDateString()}</td>
+              <td>{r.date.toLocaleDateString()}</td>
               <td>{r.status}</td>
             </tr>
           ))}
@@ -350,24 +370,32 @@ export default function StudentDashboard() {
     </Card>
   );
 
-  const renderDoc = (type) => {
-    const doc = docs.find(d => d.type.toLowerCase() === type.toLowerCase());
-    return (
+ // at top of component, after `const { docs } = data;`
+const renderDoc = (type) => {
+  if (!Array.isArray(docs) || !type) return null;
+  const match = docs.find(d =>
+    typeof d.type === 'string'
+    && typeof type === 'string'
+    && d.type.toLowerCase() === type.toLowerCase()
+  );
+  return (
     <Card>
-    <h3>Course Syllabus</h3>
-    {doc
-      ? <EmbedWrapper>
+      <h3>{match ? match.type : `Document: ${type}`}</h3>
+      {match && (
+        <EmbedWrapper>
           <iframe
-            src={`https://docs.google.com/gview?url=${encodeURIComponent(doc.url)}&embedded=true`}
+            src={`https://docs.google.com/gview?url=${encodeURIComponent(match.url)}&embedded=true`}
             width="100%"
-            height="100%"
+            height="600px"
             frameBorder="0"
           />
         </EmbedWrapper>
-      : <p>No document available.</p>}
-  </Card>
-    );
-  };
+      )}
+      {!match && <p>No document available.</p>}
+    </Card>
+  );
+};
+
 
   const renderQuizList = () => (
     <Card>
@@ -451,48 +479,9 @@ export default function StudentDashboard() {
     switch (activeTab) {
       case "Profile":
         return renderProfileCard();
-      case "Attendance":
-        return (
-          <Card>
-            <h3>Attendance</h3>
-            <Table>
-              <thead><tr><th>Date</th><th>Status</th></tr></thead>
-              <tbody>
-                {attendance.map((r, i) => (
-                  <tr key={i}>
-                    <td>{new Date(r.date).toLocaleDateString()}</td>
-                    <td>{r.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </Card>
-        );
-      case "Attendance":
-        return (
-          <Card>
-            <h3>Attendance</h3>
-            <Table>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {attendance.map((r, i) => (
-                  <tr key={i}>
-                    <td>{new Date(r.date).toLocaleDateString()}</td>
-                    <td>{r.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-            {/* <Note>To correct, email admin@tekcrewz.com</Note> */}
-          </Card>
-        );
-      case "Unit": renderUnit();
-      case "Course Docs": renderDoc()
+      case "Attendance": return renderAttendance();
+      case "Unit": return renderUnit();
+      case "Course Docs": return renderDoc()
       case "Syllabus":
       case "Schedule": {
         const doc = docs.find(
@@ -503,7 +492,8 @@ export default function StudentDashboard() {
           <h3>Course {activeTab}</h3>
           {doc
             ? <>
-                {renderDoc(doc.url)}
+                {renderDoc("syllabus")}
+                {renderDoc("schedule")}
                 <Button as="a" href={doc.url} target="_blank" rel="noopener noreferrer">Download {activeTab}</Button>
               </>
             : <p>No document available.</p>
@@ -534,15 +524,22 @@ export default function StudentDashboard() {
             <h3>Unit: {unitData.unit}</h3>
             <SectionSmall>Study Material</SectionSmall>
             <Pdf/>
-            {unitData.studyMaterialUrl ? (<PDFCard>
-                  <PDFIcon className="fa-solid fa-file-pdf" />
-                  <FileInfo>
-                    <FileName>{extractOriginalFileName(unitData.studyMaterialUrl)}</FileName>
-                  </FileInfo>
-                  <DownloadLink href={getDownloadUrl(unitData.studyMaterialUrl)} download>
-                    <i className="fa-solid fa-download"></i>
-                  </DownloadLink>
-                </PDFCard>): "No Material for this unit"}
+            {unitData.studyMaterialUrl ? (
+                  <PDFCard>
+                      <PDFIcon className="fa-solid fa-file-pdf" />
+                      <FileInfo>
+                        <FileName>
+                          {extractOriginalFileName(unitData.studyMaterialUrl)}
+                        </FileName>
+                      </FileInfo>
+                      <DownloadLink
+                        href={getDownloadUrl(unitData.studyMaterialUrl)}
+                        // `download` attribute is now optional; browser sees .pdf
+                      >
+                        <i className="fa-solid fa-download"></i>
+                      </DownloadLink>
+                    </PDFCard>
+              ): "No Material for this unit"}
             <a
                 href={
                   unitData.studyMaterialUrl.startsWith("http")

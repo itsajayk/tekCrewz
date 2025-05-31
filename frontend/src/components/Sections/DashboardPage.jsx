@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useContext } from 'react';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../Pages/firebase';
-import { doc, getDoc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
+import { doc, getDocs ,getDoc, updateDoc, serverTimestamp, onSnapshot, collection, query, where, addDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import * as XLSX from 'xlsx';
 import TopNavbar from '../Nav/TopNavbar';
@@ -35,6 +35,23 @@ const DashboardPage = () => {
   const [editProjData, setEditProjData] = useState({ status: '', timeConsumed: '', percentage: '' });
 
   const userId = auth.currentUser?.displayName;
+
+
+  // Attendance feature for tutors
+  const [showAttendanceModal, setShowAttendanceModal] = useState(false);
+  const [studentsList, setStudentsList] = useState([]);
+  const [selectedStudent, setSelectedStudent] = useState('');
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().substr(0,10));
+  const [attendanceStatus, setAttendanceStatus] = useState('Present');
+
+    // New state for spinner & modals
+  const [savingAttendance, setSavingAttendance] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showWarningModal, setShowWarningModal] = useState(false);
+
+  // only tutors: IDs starting EMPDT or EMPTR
+  const isTutor = userId?.startsWith('EMPDT') || userId?.startsWith('EMPTR');
 
   // Ensure arrays
   const projects = Array.isArray(profile?.projects) ? profile.projects : [];
@@ -70,6 +87,57 @@ const DashboardPage = () => {
       })
     );
   }, [selectedMonth, profile]);
+
+  // Fetch students for attendance
+  useEffect(() => {
+    if (!isTutor) return;
+    const q = query(collection(db, 'users'), where('role', '==', 'student'));
+    getDocs(q).then(snap => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setStudentsList(list);
+    });
+  }, [isTutor]);
+
+   // Save attendance record with checks
+  const saveAttendance = async () => {
+    if (!selectedStudent) return;
+    // Check for existing record same day
+    const sameDay = attendanceRecords.find(r => {
+      const recDate = r.date?.toDate ? r.date.toDate() : new Date(r.date);
+      return recDate.toISOString().substr(0,10) === attendanceDate;
+    });
+    if (sameDay) {
+      setShowWarningModal(true);
+      return;
+    }
+
+    setSavingAttendance(true);
+    try {
+      await addDoc(collection(db,'attendance'), {
+        studentId: selectedStudent,
+        date: new Date(attendanceDate),
+        status: attendanceStatus,
+        timestamp: serverTimestamp()
+      });
+      setShowSuccessModal(true);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save attendance');
+    } finally {
+      setSavingAttendance(false);
+    }
+  };
+
+  // Subscribe attendance records when a student selected
+  useEffect(() => {
+    if (!selectedStudent) return;
+    const q = query(collection(db, 'attendance'), where('studentId', '==', selectedStudent));
+    const unsub = onSnapshot(q, snap => {
+      const recs = snap.docs.map(d => d.data());
+      setAttendanceRecords(recs.sort((a,b) => new Date(b.date) - new Date(a.date)));
+    });
+    return unsub;
+  }, [selectedStudent]);
 
   // Open project edit modal
   const openEditModal = (idx) => {
@@ -178,6 +246,12 @@ const DashboardPage = () => {
             <CardIcon>🎯</CardIcon>
             <CardTitle>Performance</CardTitle>
           </Card>
+          {isTutor && (
+            <Card onClick={() => setShowAttendanceModal(true)}>
+              <CardIcon>📝</CardIcon>
+              <CardTitle>Attendance</CardTitle>
+            </Card>
+          )}
           <Card onClick={handleLogout}>
             <CardIcon>🚪</CardIcon>
             <CardTitle>Logout</CardTitle>
@@ -391,6 +465,96 @@ const DashboardPage = () => {
             </ModalContent>
           </ModalOverlay>
         )}
+
+         {/* Attendance Modal */}
+        {showAttendanceModal && (
+          <ModalOverlay onClick={() => setShowAttendanceModal(false)}>
+            <ModalContent onClick={e=>e.stopPropagation()}>
+              <ModalHeader>Mark Attendance</ModalHeader>
+              <FormRow>
+                <Select value={selectedStudent} onChange={e=>setSelectedStudent(e.target.value)}>
+                  <option value="">Select Student</option>
+                  {studentsList.map(s=>
+                    <option key={s.id} value={s.id}>
+                      {s.candidateName || s.id}
+                    </option>
+                  )}
+                </Select>
+              </FormRow>
+              <FormRow>
+                <label>Date</label>
+                <MonthInput
+                  type="date"
+                  value={attendanceDate}
+                  onChange={e=>setAttendanceDate(e.target.value)}
+                />
+              </FormRow>
+              <FormRow>
+                <label>Status</label>
+                <Select
+                  value={attendanceStatus}
+                  onChange={e=>setAttendanceStatus(e.target.value)}
+                >
+                  <option>Present</option>
+                  <option>Absent</option>
+                </Select>
+              </FormRow>
+              <Button onClick={saveAttendance} disabled={savingAttendance}>
+                {savingAttendance ? 'Saving…' : 'Save'}
+              </Button>
+
+              {savingAttendance && (
+                <SpinnerOverlay>
+                  <Spinner />
+                </SpinnerOverlay>
+              )}
+
+              <AttendanceList>
+                <thead>
+                  <tr><th>Date</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                  {attendanceRecords.map((r,i)=>(
+                    <tr key={i}>
+                      <td>
+                        {new Date(
+                          r.date.seconds
+                            ? r.date.seconds*1000
+                            : r.date
+                        ).toLocaleDateString()}
+                      </td>
+                      <td>{r.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </AttendanceList>
+              <Button variant="secondary" onClick={()=>setShowAttendanceModal(false)}>
+                Close
+              </Button>
+            </ModalContent>
+          </ModalOverlay>
+        )}
+
+         {/* Success Modal */}
+        {showSuccessModal && (
+          <ModalOverlay onClick={()=>setShowSuccessModal(false)}>
+            <ModalContent onClick={e=>e.stopPropagation()}>
+              <p>Attendance marked successfully!</p>
+              <Button onClick={()=>setShowSuccessModal(false)}>OK</Button>
+            </ModalContent>
+          </ModalOverlay>
+        )}
+
+        {/* Warning Modal */}
+        {showWarningModal && (
+          <ModalOverlay onClick={()=>setShowWarningModal(false)}>
+            <ModalContent onClick={e=>e.stopPropagation()}>
+              <p>Attendance for this student on this date has already been recorded.</p>
+              <Button onClick={()=>setShowWarningModal(false)}>OK</Button>
+            </ModalContent>
+          </ModalOverlay>
+        )}
+
       </Content>
       <Footer />
     </Container>
@@ -589,4 +753,16 @@ const Loading = styled.div`
   text-align: center;
   font-size: 1.2rem;
   color: #666;
+`;
+const AttendanceList = styled.table` width:100%; border-collapse: collapse; th, td {border:1px solid #ddd; padding:8px;} thead{background:#f0f0f0;} `;
+
+// Spinner
+const SpinnerOverlay = styled.div`
+  position:absolute;inset:0;background:rgba(255,255,255,0.8);
+  display:flex;justify-content:center;align-items:center;
+`;
+const spin = keyframes`0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}`;
+const Spinner = styled.div`
+  border:4px solid #f3f3f3;border-top:4px solid #7620ff;
+  border-radius:50%;width:40px;height:40px;animation:${spin} 1s linear infinite;
 `;

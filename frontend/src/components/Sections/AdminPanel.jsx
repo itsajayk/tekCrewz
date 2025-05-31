@@ -363,18 +363,56 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
               {/* View Attendance */}
               {modalType === 'ViewAttendance' && !loading && (
                 <Section>
-                  <Select value={selectedStudent?.id || ''} onChange={e => {
-                    const s = students.find(x => x.id === e.target.value);
-                    setSelectedStudent(s);
-                    if (s) axios.get(`/api/students/${s.id}/attendance`).then(r => setAttendance(r.data));
-                  }}>
+                  <Select
+                    value={selectedStudent?.id || ''}
+                    onChange={async e => {
+                      const id = e.target.value;
+                      const s = students.find(x => x.id === id) || null;
+                      setSelectedStudent(s);
+                      if (!s) {
+                        return setAttendance([]);
+                      }
+
+                      // Firestore query to fetch attendance for that student
+                      const q = query(
+                        collection(db, 'attendance'),
+                        where('studentId', '==', s.id)
+                      );
+                      const snap = await getDocs(q);
+                      const recs = snap.docs.map(d => ({
+                        date: d.data().date.toDate
+                          ? d.data().date.toDate()
+                          : new Date(d.data().date),
+                        status: d.data().status
+                      }));
+                      recs.sort((a, b) => b.date - a.date);
+                      setAttendance(recs);
+                    }}
+                  >
                     <option value="">Select Student</option>
-                    {students.map(s => <option key={s.id} value={s.id}>{s.candidateName || s.id}</option>)}
+                    {students.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.candidateName || s.id}
+                      </option>
+                    ))}
                   </Select>
+
                   {attendance.length > 0 && (
                     <Table>
-                      <thead><tr><Th>Date</Th><Th>Status</Th></tr></thead>
-                      <tbody>{attendance.map(a => <tr key={a.date}><Td>{new Date(a.date).toLocaleDateString()}</Td><Td>{a.status}</Td></tr>)}</tbody>
+                      <thead>
+                        <tr>
+                          <Th>Date</Th>
+                          <Th>Status</Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {attendance.map(a => (
+                          <tr key={a.date.toISOString()}>
+                            <Td>{a.date.toLocaleDateString()}</Td>
+                            <Td>{a.status}</Td>
+                          </tr>
+                        ))}
+                      </tbody>
                     </Table>
                   )}
                 </Section>

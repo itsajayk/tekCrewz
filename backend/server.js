@@ -165,6 +165,24 @@ const uploadAssignment = multer({
   limits: { fileSize: 10 * 1024 * 1024 }
 });
 
+const studentFileStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'student_uploads',
+    resource_type: 'auto',
+    public_id: (req, file) => {
+      const studentId = req.params.studentId;
+      const unit = req.body.unit || 'unknown_unit';
+      return `${studentId}_${unit}_${Date.now()}`;
+    }
+  }
+});
+const uploadStudentFile = multer({
+  storage: studentFileStorage,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB max
+});
+
+
 // ── Routes ─────────────────────────────────────────────────────────────
 
 // Create Candidate (with file uploads)
@@ -264,6 +282,73 @@ Please provide:
     res.status(500).json({ error: err.message });
   }
 });
+
+app.post(
+  '/api/assignments/:studentId/upload',
+  uploadStudentFile.single('file'),
+  async (req, res) => {
+    try {
+      const { unit } = req.body;
+      if (!unit) {
+        return res.status(400).json({ error: 'unit is required' });
+      }
+      const fileUrl = req.file?.path || null;
+      const fileName = req.file?.originalname || null;
+      await Assignment.findOneAndUpdate(
+        { studentId: req.params.studentId, unit },
+        { uploadedFileUrl: fileUrl, uploadedFileName: fileName }
+      );
+      res.status(200).json({ uploadedFileUrl: fileUrl, uploadedFileName: fileName });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
+// ── NEW: Endpoint to delete an uploaded file for a unit (if needed) ─────
+app.delete('/api/assignments/:studentId/:unit/upload', async (req, res) => {
+  try {
+    const { studentId, unit } = req.params;
+    // Clear the uploaded file fields in the DB
+    const updated = await Assignment.findOneAndUpdate(
+      { studentId, unit },
+      { $unset: { uploadedFileUrl: "", uploadedFileName: "" } },
+      { new: true }
+    );
+    if (!updated) return res.status(404).json({ error: 'Assignment not found' });
+    res.json({ message: 'Uploaded file cleared' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── NEW: Automatically create assignment record if not exists when student uploads file ─
+app.post(
+  '/api/assignments/:studentId/create-if-missing',
+  async (req, res) => {
+    try {
+      const { studentId } = req.params;
+      const { unit, studyMaterialUrl, closeDays } = req.body;
+      if (!unit) return res.status(400).json({ error: 'unit is required' });
+      const days = parseInt(closeDays, 10);
+      if (isNaN(days)) return res.status(400).json({ error: 'closeDays must be a number' });
+      await Assignment.findOneAndUpdate(
+        { studentId, unit },
+        {
+          studyMaterialUrl: studyMaterialUrl || "",
+          closedAt: new Date(Date.now() + days * 86400000)
+        },
+        { upsert: true }
+      );
+      res.status(200).json({ message: 'Assignment created or updated' });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
 
 // Student Dashboard
 app.get('/api/students/:studentId/profile', async (req, res) => {
