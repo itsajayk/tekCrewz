@@ -165,6 +165,23 @@ const uploadAssignment = multer({
   limits: { fileSize: 10 * 1024 * 1024 }
 });
 
+// ── NEW: Student file uploads (Cloudinary) ─────────────────────────────
+const studentFileStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'student_uploads',
+    resource_type: 'raw',       // allow any file type (e.g., .zip, .pdf, .jpg)
+    public_id: (req, file) => {
+      // store under: studentId/unit/fileName (no extension stripping)
+      const studentId = req.params.studentId;
+      const unit = req.body.unit || 'unknown_unit';
+      // sanitize original filename:
+      const safeName = file.originalname.replace(/\.[^/.]+$/, "");
+      return `${studentId}/${unit}/${safeName}`;
+    }
+  }
+});
+
 // ── Routes ─────────────────────────────────────────────────────────────
 
 // Create Candidate (with file uploads)
@@ -283,6 +300,32 @@ app.post('/api/assignments/:studentId/feedback', async (req, res) => {
   );
   res.sendStatus(204);
 });
+
+// ── NEW: Upload student‐submitted file ─────────────────────────────────
+app.post(
+  '/api/assignments/:studentId/upload',
+  uploadStudentFile.single('file'),
+  async (req, res) => {
+    try {
+      const studentId = req.params.studentId;
+      const unit = req.body.unit;
+      const fileUrl = req.file.path; // Cloudinary‐returned URL
+
+      // Update the Assignment document to store this file URL
+      await Assignment.findOneAndUpdate(
+        { studentId, unit },
+        { submissionFileUrl: fileUrl },
+        { upsert: false }
+      );
+
+      res.json({ fileUrl });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
 
 // Admin Aggregations
 app.get('/api/admin/students', async (req, res) => {
