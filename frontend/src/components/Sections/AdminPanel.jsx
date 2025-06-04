@@ -12,7 +12,7 @@ const API_BASE_URL = 'https://tekcrewz.onrender.com';
 axios.defaults.baseURL = API_BASE_URL;
 
 const AdminPanel = () => {
-   const navigate = useNavigate();
+  const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('');
   const [students, setStudents] = useState([]);

@@ -96,7 +96,7 @@ const candidateSchema = new mongoose.Schema({
   markStatement:      String,
   signature:          String,
   paidAmount:         Number,
-  courseRegistered:   String,
+  courseRegistered:   { type: [String], default: [] }, // CHANGED: was String → now array of course names
   paidDate:           Date,
   status:             String,
   role:               String
@@ -205,8 +205,19 @@ app.post(
       ['score','communicationScore','paidAmount'].forEach(k => {
         if (req.body[k] != null) req.body[k] = Number(req.body[k]);
       });
+
+      // ── ENSURE courseRegistered IS AN ARRAY ────────────────────────────────────
+      let courses = [];
+      if (Array.isArray(req.body.courseRegistered)) {
+        courses = req.body.courseRegistered;
+      } else if (typeof req.body.courseRegistered === 'string' && req.body.courseRegistered.trim()) {
+        courses = [req.body.courseRegistered];
+      }
+      // ── ───────────────────────────────────────────────────────────────────────
+
       const newCandidate = new Candidate({
         ...req.body,
+        courseRegistered: courses,        // CHANGED: store array
         candidatePic:  req.files.candidatePic?.[0]?.path,
         markStatement: req.files.markStatement?.[0]?.path,
         signature:     req.files.signature?.[0]?.path
@@ -232,9 +243,20 @@ app.get('/api/candidates', async (req, res) => {
 // Update Candidate
 app.put('/api/candidates/:id', async (req, res) => {
   try {
+    // ── ENSURE courseRegistered IS AN ARRAY ────────────────────────────────────
+    let bodyUpdate = { ...req.body };
+    if (req.body.courseRegistered) {
+      if (Array.isArray(req.body.courseRegistered)) {
+        bodyUpdate.courseRegistered = req.body.courseRegistered;
+      } else if (typeof req.body.courseRegistered === 'string' && req.body.courseRegistered.trim()) {
+        bodyUpdate.courseRegistered = [req.body.courseRegistered];
+      }
+    }
+    // ── ───────────────────────────────────────────────────────────────────────
+
     const updated = await Candidate.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      bodyUpdate,                     // CHANGED: pass array
       { new: true, runValidators: true }
     );
     res.json(updated);

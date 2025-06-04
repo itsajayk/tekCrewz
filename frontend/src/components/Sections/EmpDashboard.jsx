@@ -262,7 +262,7 @@ export default function EmpDashboard() {
                 <Input type="number" value={newPayroll.allowances} onChange={e => setNewPayroll(p => ({ ...p, allowances: e.target.value }))} />
                 <Label>Deductions</Label>
                 <Input type="number" value={newPayroll.deductions} onChange={e => setNewPayroll(p => ({ ...p, deductions: e.target.value }))} />
-                <Label>Loss of pay (no of leave days)</Label>
+                <Label>Loss of pay (no of days)</Label>
                 <Input type="number" value={newPayroll.paidLeaves} onChange={e => setNewPayroll(p => ({ ...p, paidLeaves: e.target.value }))} />
               </Column>
               <Column>

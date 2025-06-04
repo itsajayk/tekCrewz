@@ -2,9 +2,21 @@ import React, { useEffect, useState, useContext } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../Pages/firebase';
-import { doc, getDocs ,getDoc, updateDoc, serverTimestamp, onSnapshot, collection, query, where, addDoc } from 'firebase/firestore';
+import {
+  doc,
+  getDocs,
+  onSnapshot,
+  collection,
+  query,
+  where,
+  updateDoc,
+  serverTimestamp,
+  addDoc
+} from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
+import axios from 'axios';
 import * as XLSX from 'xlsx';
+
 import TopNavbar from '../Nav/TopNavbar';
 import Footer from './Footer';
 import { AuthContext } from '../../contexts/AuthContext';
@@ -20,6 +32,8 @@ const DashboardPage = () => {
   const navigate = useNavigate();
   const { role } = useContext(AuthContext);
   const [profile, setProfile] = useState(null);
+
+  // Payroll / Performance / AI state
   const [showPayrollModal, setShowPayrollModal] = useState(false);
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
   const [showAiModal, setShowAiModal] = useState(false);
@@ -36,7 +50,6 @@ const DashboardPage = () => {
 
   const userId = auth.currentUser?.displayName;
 
-
   // Attendance feature for tutors
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
   const [studentsList, setStudentsList] = useState([]);
@@ -44,16 +57,21 @@ const DashboardPage = () => {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().substr(0,10));
   const [attendanceStatus, setAttendanceStatus] = useState('Present');
-
-    // New state for spinner & modals
   const [savingAttendance, setSavingAttendance] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState(false);
 
-  // only tutors: IDs starting EMPDT or EMPTR
+  // ONLY tutors: IDs starting EMPDT or EMPTR
   const isTutor = userId?.startsWith('EMPDT') || userId?.startsWith('EMPTR');
 
-  // Ensure arrays
+  // Assignments state for tutors
+  const [showAssignmentsModal, setShowAssignmentsModal] = useState(false);
+  const [assignmentsList, setAssignmentsList] = useState([]);
+  const [selectedStudentForAssign, setSelectedStudentForAssign] = useState('');
+  const [resultsInputs, setResultsInputs] = useState({}); 
+  const [assignLoading, setAssignLoading] = useState(false);
+
+  // Ensure arrays exist
   const projects = Array.isArray(profile?.projects) ? profile.projects : [];
   const tasks = Array.isArray(profile?.tasks) ? profile.tasks : [];
 
@@ -88,7 +106,7 @@ const DashboardPage = () => {
     );
   }, [selectedMonth, profile]);
 
-  // Fetch students for attendance
+  // Fetch students for attendance & assignments
   useEffect(() => {
     if (!isTutor) return;
     const q = query(collection(db, 'users'), where('role', '==', 'student'));
@@ -98,7 +116,7 @@ const DashboardPage = () => {
     });
   }, [isTutor]);
 
-   // Save attendance record with checks
+  // Save attendance record with checks
   const saveAttendance = async () => {
     if (!selectedStudent) return;
     // Check for existing record same day
@@ -218,6 +236,60 @@ const DashboardPage = () => {
     XLSX.writeFile(wb, `Payroll_${userId}_${selectedMonth}.xlsx`);
   };
 
+  // Assignments (Tutor) – Fetch whenever a student is selected
+  useEffect(() => {
+    if (!selectedStudentForAssign) return;
+    setAssignLoading(true);
+    axios.get(`https://tekcrewz.onrender.com/api/assignments/${selectedStudentForAssign}`)
+      .then(res => {
+        // res.data is array of assignments for that student
+        setAssignmentsList(res.data);
+        // Initialize resultsInputs: { unit1: {score:'', passed:false}, ...}
+        const initial = {};
+        res.data.forEach(a => {
+          initial[a.unit] = {
+            score: a.results?.score || '',
+            passed: a.results?.passed || false
+          };
+        });
+        setResultsInputs(initial);
+      })
+      .catch(err => {
+        console.error("Failed to fetch assignments:", err);
+        setAssignmentsList([]);
+        setResultsInputs({});
+      })
+      .finally(() => setAssignLoading(false));
+  }, [selectedStudentForAssign]);
+
+  // Save a single assignment result
+  const saveAssignmentResult = async (unit) => {
+    if (!selectedStudentForAssign) return;
+    const { score, passed } = resultsInputs[unit];
+    try {
+      await axios.post(
+        `https://tekcrewz.onrender.com/api/admin/students/${selectedStudentForAssign}/enterResults`,
+        { unit, results: { score: Number(score), passed } }
+      );
+      // Optionally, show a small “saved” indicator or reload assignmentsList
+      // For now, just reload that student’s assignments:
+      const res = await axios.get(`https://tekcrewz.onrender.com/api/assignments/${selectedStudentForAssign}`);
+      setAssignmentsList(res.data);
+      // Ensure resultsInputs updated from new data
+      const updatedInputs = { ...resultsInputs };
+      res.data.forEach(a => {
+        updatedInputs[a.unit] = {
+          score: a.results?.score || '',
+          passed: a.results?.passed || false
+        };
+      });
+      setResultsInputs(updatedInputs);
+    } catch (err) {
+      console.error("Failed to save assignment result:", err);
+      alert("Unable to save result.");
+    }
+  };
+
   const handleLogout = async () => {
     await signOut(auth);
     navigate('/login');
@@ -247,10 +319,16 @@ const DashboardPage = () => {
             <CardTitle>Performance</CardTitle>
           </Card>
           {isTutor && (
-            <Card onClick={() => setShowAttendanceModal(true)}>
-              <CardIcon>📝</CardIcon>
-              <CardTitle>Attendance</CardTitle>
-            </Card>
+            <>
+              <Card onClick={() => setShowAttendanceModal(true)}>
+                <CardIcon>📝</CardIcon>
+                <CardTitle>Attendance</CardTitle>
+              </Card>
+              <Card onClick={() => setShowAssignmentsModal(true)}>
+                <CardIcon>📚</CardIcon>
+                <CardTitle>Mark Assignments</CardTitle>
+              </Card>
+            </>
           )}
           <Card onClick={handleLogout}>
             <CardIcon>🚪</CardIcon>
@@ -466,19 +544,19 @@ const DashboardPage = () => {
           </ModalOverlay>
         )}
 
-         {/* Attendance Modal */}
+        {/* Attendance Modal */}
         {showAttendanceModal && (
           <ModalOverlay onClick={() => setShowAttendanceModal(false)}>
-            <ModalContent onClick={e=>e.stopPropagation()}>
+            <ModalContent onClick={e => e.stopPropagation()}>
               <ModalHeader>Mark Attendance</ModalHeader>
               <FormRow>
-                <Select value={selectedStudent} onChange={e=>setSelectedStudent(e.target.value)}>
+                <Select value={selectedStudent} onChange={e => setSelectedStudent(e.target.value)}>
                   <option value="">Select Student</option>
-                  {studentsList.map(s=>
+                  {studentsList.map(s => (
                     <option key={s.id} value={s.id}>
                       {s.candidateName || s.id}
                     </option>
-                  )}
+                  ))}
                 </Select>
               </FormRow>
               <FormRow>
@@ -486,14 +564,14 @@ const DashboardPage = () => {
                 <MonthInput
                   type="date"
                   value={attendanceDate}
-                  onChange={e=>setAttendanceDate(e.target.value)}
+                  onChange={e => setAttendanceDate(e.target.value)}
                 />
               </FormRow>
               <FormRow>
                 <label>Status</label>
                 <Select
                   value={attendanceStatus}
-                  onChange={e=>setAttendanceStatus(e.target.value)}
+                  onChange={e => setAttendanceStatus(e.target.value)}
                 >
                   <option>Present</option>
                   <option>Absent</option>
@@ -514,12 +592,12 @@ const DashboardPage = () => {
                   <tr><th>Date</th><th>Status</th></tr>
                 </thead>
                 <tbody>
-                  {attendanceRecords.map((r,i)=>(
+                  {attendanceRecords.map((r, i) => (
                     <tr key={i}>
                       <td>
                         {new Date(
                           r.date.seconds
-                            ? r.date.seconds*1000
+                            ? r.date.seconds * 1000
                             : r.date
                         ).toLocaleDateString()}
                       </td>
@@ -528,29 +606,142 @@ const DashboardPage = () => {
                   ))}
                 </tbody>
               </AttendanceList>
-              <Button variant="secondary" onClick={()=>setShowAttendanceModal(false)}>
+              <Button variant="secondary" onClick={() => setShowAttendanceModal(false)}>
                 Close
               </Button>
             </ModalContent>
           </ModalOverlay>
         )}
 
-         {/* Success Modal */}
+        {/* Attendance Success Modal */}
         {showSuccessModal && (
-          <ModalOverlay onClick={()=>setShowSuccessModal(false)}>
-            <ModalContent onClick={e=>e.stopPropagation()}>
+          <ModalOverlay onClick={() => setShowSuccessModal(false)}>
+            <ModalContent onClick={e => e.stopPropagation()}>
               <p>Attendance marked successfully!</p>
-              <Button onClick={()=>setShowSuccessModal(false)}>OK</Button>
+              <Button onClick={() => setShowSuccessModal(false)}>OK</Button>
             </ModalContent>
           </ModalOverlay>
         )}
 
-        {/* Warning Modal */}
+        {/* Attendance Warning Modal */}
         {showWarningModal && (
-          <ModalOverlay onClick={()=>setShowWarningModal(false)}>
-            <ModalContent onClick={e=>e.stopPropagation()}>
+          <ModalOverlay onClick={() => setShowWarningModal(false)}>
+            <ModalContent onClick={e => e.stopPropagation()}>
               <p>Attendance for this student on this date has already been recorded.</p>
-              <Button onClick={()=>setShowWarningModal(false)}>OK</Button>
+              <Button onClick={() => setShowWarningModal(false)}>OK</Button>
+            </ModalContent>
+          </ModalOverlay>
+        )}
+
+        {/* Assignments Modal (Tutor only) */}
+        {showAssignmentsModal && (
+          <ModalOverlay onClick={() => setShowAssignmentsModal(false)}>
+            <ModalContent onClick={e => e.stopPropagation()}>
+              <ModalHeader>Mark Assignments</ModalHeader>
+              <FormRow>
+                <Select
+                  value={selectedStudentForAssign}
+                  onChange={e => setSelectedStudentForAssign(e.target.value)}
+                >
+                  <option value="">Select Student</option>
+                  {studentsList.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.candidateName || s.id}
+                    </option>
+                  ))}
+                </Select>
+              </FormRow>
+
+              {assignLoading ? (
+                <p>Loading assignments…</p>
+              ) : (
+                <>
+                  {assignmentsList.length > 0 ? (
+                    <ProjectDetailsTable>
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>Unit</th>
+                          <th>Uploaded File</th>
+                          <th>Score</th>
+                          <th>Passed</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {assignmentsList.map((a, idx) => (
+                          <tr key={a.unit}>
+                            <td>{idx + 1}</td>
+                            <td>{a.unit}</td>
+                            <td>
+                              {a.submissionFileUrl ? (
+                                <a
+                                  href={a.submissionFileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  View File
+                                </a>
+                              ) : a.submissionCode ? (
+                                <pre style={{ whiteSpace: 'pre-wrap', maxWidth: '200px' }}>
+                                  {a.submissionCode}
+                                </pre>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                            <td>
+                              <Input
+                                type="number"
+                                value={resultsInputs[a.unit]?.score || ''}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  setResultsInputs(ri => ({
+                                    ...ri,
+                                    [a.unit]: {
+                                      ...ri[a.unit],
+                                      score: val
+                                    }
+                                  }));
+                                }}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="checkbox"
+                                checked={resultsInputs[a.unit]?.passed || false}
+                                onChange={e => {
+                                  const checked = e.target.checked;
+                                  setResultsInputs(ri => ({
+                                    ...ri,
+                                    [a.unit]: {
+                                      ...ri[a.unit],
+                                      passed: checked
+                                    }
+                                  }));
+                                }}
+                              />
+                            </td>
+                            <td>
+                              <ActionBtn onClick={() => saveAssignmentResult(a.unit)}>
+                                Save
+                              </ActionBtn>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </ProjectDetailsTable>
+                  ) : (
+                    <NoData>No assignments submitted by this student yet.</NoData>
+                  )}
+                </>
+              )}
+
+              <ModalActions>
+                <Button variant="secondary" onClick={() => setShowAssignmentsModal(false)}>
+                  Close
+                </Button>
+              </ModalActions>
             </ModalContent>
           </ModalOverlay>
         )}
@@ -563,7 +754,7 @@ const DashboardPage = () => {
 
 export default DashboardPage;
 
-// Styled Components (unchanged)
+// Styled Components
 const Container = styled.div`
   display: flex;
   flex-direction: column;
@@ -754,15 +945,37 @@ const Loading = styled.div`
   font-size: 1.2rem;
   color: #666;
 `;
-const AttendanceList = styled.table` width:100%; border-collapse: collapse; th, td {border:1px solid #ddd; padding:8px;} thead{background:#f0f0f0;} `;
-
-// Spinner
-const SpinnerOverlay = styled.div`
-  position:absolute;inset:0;background:rgba(255,255,255,0.8);
-  display:flex;justify-content:center;align-items:center;
+const AttendanceList = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  margin: 15px 0;
+  th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+  }
+  thead {
+    background: #f0f0f0;
+  }
 `;
-const spin = keyframes`0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}`;
+
+// Spinner styling
+const SpinnerOverlay = styled.div`
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+`;
+const spin = keyframes`
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+`;
 const Spinner = styled.div`
-  border:4px solid #f3f3f3;border-top:4px solid #7620ff;
-  border-radius:50%;width:40px;height:40px;animation:${spin} 1s linear infinite;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #7620ff;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: ${spin} 1s linear infinite;
 `;
