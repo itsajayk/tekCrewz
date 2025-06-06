@@ -19,7 +19,14 @@ const AdminPanel = () => {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [profileData, setProfileData] = useState({});
   const [editMode, setEditMode] = useState(false);
-  const [courseDocs, setCourseDocs] = useState({ syllabus: '', schedule: '' });
+
+  const [courseDocs, setCourseDocs] = useState({
+    syllabus: '',
+    syllabusOriginalName: '',
+    schedule: '',
+    scheduleOriginalName: ''
+  });
+
   const [docType, setDocType] = useState('syllabus');
   const [assignments, setAssignments] = useState([]);
   const [results, setResults] = useState([]);
@@ -77,8 +84,22 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
           // nothing else to do
         }
         if (modalType === 'CourseDocs') {
-          const { data } = await axios.get(`/api/admin/course-docs/upload/${encodeURIComponent(selectedCourse)}`);
-          setCourseDocs(data);
+          if (!selectedCourse) {
+            pushToast('Please select a course first', 'error');
+          } else {
+            // 🔧 CHANGED: fetch from the new GET route we added in server.js
+            const { data } = await axios.get(
+              `/api/admin/course-docs/upload/${encodeURIComponent(selectedCourse)}`
+            );
+            // The data will already be in the shape: 
+            //   { syllabus: <url>, syllabusOriginalName: <name>, schedule: <url>, scheduleOriginalName: <name> }
+            setCourseDocs({
+              syllabus: data.syllabus || '',
+              syllabusOriginalName: data.syllabusOriginalName || '',
+              schedule: data.schedule || '',
+              scheduleOriginalName: data.scheduleOriginalName || ''
+            });
+          }
         }
         if (modalType === 'ManageAssignments' && selectedStudent) {
           const { data } = await axios.get(`/api/assignments/${selectedStudent.id}`);
@@ -99,7 +120,7 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
         setLoading(false);
       }
     })();
-  }, [showModal, modalType, selectedStudent]);
+  }, [showModal, modalType, selectedStudent, selectedCourse]);
   
       // Whenever I'm in the UnlockRequests modal and a student is selected,
       // fetch only their closed-but-not-unlocked assignments:
@@ -153,44 +174,49 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
   };
 
   const uploadCourseDocs = async () => {
-  if (!selectedCourse) {
-    return pushToast('Please select a course', 'error');
-  }
-  if (!syllabusFile && !scheduleFile) {
-    return pushToast('Please choose at least one PDF', 'error');
-  }
-  const form = new FormData();
-  form.append('courseId', selectedCourse);
-  if (syllabusFile) form.append('syllabus', syllabusFile, syllabusFile.name);
-  if (scheduleFile) form.append('schedule', scheduleFile, scheduleFile.name);
+    if (!selectedCourse) {
+      return pushToast('Please select a course', 'error');
+    }
+    if (!syllabusFile && !scheduleFile) {
+      return pushToast('Please choose at least one PDF', 'error');
+    }
 
-  setLoading(true);
-  try {
-    const { data } = await axios.post(
-      `/api/admin/course-docs/upload/${encodeURIComponent(selectedCourse)}`,
-      form,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
-    );
-    setCourseDocs(cd => ({
-      ...cd,
-      [selectedCourse]: {
-        syllabus: data.syllabus,
-        schedule: data.schedule,
-        syllabusOriginalName: syllabusFile?.name,
-        scheduleOriginalName: scheduleFile?.name
-      }
-    }));
-    pushToast('Course documents uploaded');
-    // clear inputs
-    setSyllabusFile(null);
-    setScheduleFile(null);
-  } catch (err) {
-    console.error(err);
-    pushToast('Upload failed', 'error');
-  } finally {
-    setLoading(false);
-  }
-};
+    const form = new FormData();
+    form.append('courseId', selectedCourse);
+    if (syllabusFile) form.append('syllabus', syllabusFile, syllabusFile.name);
+    if (scheduleFile) form.append('schedule', scheduleFile, scheduleFile.name);
+
+    setLoading(true);
+    try {
+      // 🔧 CHANGED: POST to the existing upload route
+      await axios.post(
+        `/api/admin/course-docs/upload/${encodeURIComponent(selectedCourse)}`,
+        form,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        }
+      );
+
+      pushToast('Course documents uploaded');
+
+      // 🔧 CHANGED: Immediately re‐fetch so the UI updates with the new PDF URLs
+      const { data: newData } = await axios.get(
+        `/api/admin/course-docs/upload/${encodeURIComponent(selectedCourse)}`
+      );
+      setCourseDocs({
+        syllabus: newData.syllabus || '',
+        syllabusOriginalName: newData.syllabusOriginalName || '',
+        schedule: newData.schedule || '',
+        scheduleOriginalName: newData.scheduleOriginalName || ''
+      });
+      
+    } catch (e) {
+      console.error(e);
+      pushToast('Upload failed', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const createAssignment = async () => {
   if (!selectedStudent) { pushToast('Select a student', 'error'); return; }

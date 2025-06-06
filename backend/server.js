@@ -389,12 +389,39 @@ app.get('/api/admin/feedback', async (req, res) => {
   res.json(fb);
 });
 
+app.get(
+  '/api/admin/course-docs/upload/:courseId',          // 🔧 CHANGED: new GET route
+  async (req, res) => {
+    try {
+      const courseId = req.params.courseId;            // retrieve the courseId from the URL
+      // Fetch all CourseDoc entries matching that courseId
+      const docs = await CourseDoc.find({ courseId });
+
+      // Build response object matching AdminPanel's state-shape expectations
+      const result = {};
+      docs.forEach(doc => {
+        // doc.type is either 'syllabus' or 'schedule'
+        result[doc.type] = doc.url;                    // e.g. { syllabus: 'https://…' }
+        // derive an “original filename” from the URL path’s last segment:
+        const segments = doc.url.split('/');
+        const filename = segments[segments.length - 1] || '';
+        result[`${doc.type}OriginalName`] = filename;  // e.g. { syllabusOriginalName: 'syllabus.pdf' }
+      });
+
+      return res.json(result);
+    } catch (e) {
+      console.error(e);
+      return res.status(500).json({ error: e.message });
+    }
+  }
+);
+
 // Admin: Upload Course Docs
 app.post(
   '/api/admin/course-docs/upload/:courseId',
   uploadCourseDoc.fields([
-    { name:'syllabus', maxCount:1 },
-    { name:'schedule', maxCount:1 }
+    { name: 'syllabus', maxCount: 1 },
+    { name: 'schedule', maxCount: 1 }
   ]),
   async (req, res) => {
     try {
@@ -408,28 +435,29 @@ app.post(
       // upsert syllabus
       if (syllabusPath) {
         await CourseDoc.findOneAndUpdate(
-          { courseId, type:'syllabus' },
+          { courseId, type: 'syllabus' },
           { url: syllabusPath },
           { upsert: true }
         );
       }
+
       // upsert schedule
       if (schedulePath) {
         await CourseDoc.findOneAndUpdate(
-          { courseId, type:'schedule' },
+          { courseId, type: 'schedule' },
           { url: schedulePath },
           { upsert: true }
         );
       }
 
-     // return both path _and_ original filenames
-      res.json({
-        syllabus: syllabusPath,
+      // return both path and original filenames (matching the GET shape above)
+      return res.json({
+        syllabus: syllabusPath,                         // 🔧 CHANGED: returned keys match AdminPanel’s expectations
         schedule: schedulePath
       });
     } catch (e) {
       console.error(e);
-      res.status(500).json({ error: e.message });
+      return res.status(500).json({ error: e.message });
     }
   }
 );
