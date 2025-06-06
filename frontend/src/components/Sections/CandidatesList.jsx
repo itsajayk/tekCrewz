@@ -186,33 +186,150 @@ const CandidatesList = () => {
       console.error('Error removing candidate:', err);
     }
   };
-  const handleReport = async candidate => {
+
+  // Generate PDF report (unchanged logic, just kept here)
+  const handleReport = async (candidate) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     let y = 10;
     const rightMargin = 10;
 
-    // Header: add photo if exists
+    // --- Header Section: Candidate Photo & Report Title ---
     if (candidate.candidatePic) {
       try {
         const photoData = await loadImageAsDataURL(candidate.candidatePic);
-        const photoWidth = 28, photoHeight = 28;
+        const photoWidth = 28,
+          photoHeight = 28;
         doc.addImage(photoData, 'PNG', pageWidth - photoWidth - rightMargin, y, photoWidth, photoHeight);
       } catch (e) {
-        console.error("Error loading candidate photo", e);
+        console.error('Error loading candidate photo', e);
       }
     }
     doc.setFontSize(14);
-    doc.text("TEKCREWZ CANDIDATE – APPLICATION REPORT", pageWidth / 2, y + 20, { align: 'center' });
+    doc.text('TEKCREWZ CANDIDATE – APPLICATION REPORT', pageWidth / 2, y + 20, { align: 'center' });
     y += 40;
     doc.setFontSize(12);
 
-    // Candidate details (omitted here for brevity; same as before)
-    // … (the code you already have for generating the PDF) …
+    // --- Candidate Details ---
+    doc.text(`Candidate student Id: ${candidate.studentId || '…………………………………………………'}`, 10, y);
+    y += 8;
+    doc.text(`Candidate Name: ${candidate.candidateName || '……………………………………………'}`, 10, y);
+    y += 8;
 
-    const filename = `Candidate Report - ${candidate.candidateName || "Candidate"}.pdf`;
+    const degreeText = `Degree: ${candidate.candidateDegree || '…………………'}`;
+    const progText = `Programme: ${candidate.programme || '…………………'}`;
+    const courseText = `Course Name: ${candidate.candidateCourseName || '…………………'}`;
+    doc.text(degreeText, 10, y);
+    doc.text(progText, pageWidth / 2 - 20, y);
+    doc.text(courseText, pageWidth - rightMargin, y, { align: 'right' });
+    y += 8;
+
+    doc.text(`College Name: ${candidate.college || '……………………………………………'}`, 10, y);
+    y += 8;
+    doc.text(`Score Type: (${candidate.marksType || 'CGPA / Percentage'})`, 10, y);
+    doc.text(
+      `Scholarship attained: ${candidate.scholarshipSecured || '……………………………………'}`,
+      pageWidth - rightMargin,
+      y,
+      { align: 'right' }
+    );
+    y += 8;
+    doc.text(`Self-Mobile No: ${candidate.mobile || '………………………………………………………'}`, 10, y);
+    doc.text(
+      `Parent Mobile No: ${candidate.parentMobile || '………………………………………………………………'}`,
+      pageWidth - rightMargin,
+      y,
+      { align: 'right' }
+    );
+    y += 8;
+    doc.text(
+      `Email-Id: ${candidate.email || '……………………………………………………………………'}`,
+      10,
+      y
+    );
+    doc.text(
+      `Date-of-Visit: ${
+        candidate.dateOfVisit
+          ? new Date(candidate.dateOfVisit).toLocaleDateString()
+          : '…………………………………'
+      }`,
+      pageWidth - rightMargin,
+      y,
+      { align: 'right' }
+    );
+    y += 8;
+    doc.text(
+      `Courses Enrolled: (1) ${candidate.coursesEnquired || '(1) ………………………………  (2) ………………………………'}`,
+      10,
+      y
+    );
+    y += 15;
+
+    // --- Counselor Section ---
+    doc.text('TO BE FILLED BY STUDENT COUNSELLOR', pageWidth / 2, y, { align: 'center' });
+    y += 12;
+
+    doc.text('Payment Term:', 10, y);
+    const checkboxSize = 5;
+    let startX = 10 + doc.getTextWidth('Payment Term: ') + 5;
+    doc.rect(startX, y - 5, checkboxSize, checkboxSize);
+    if (candidate.paymentTerm === 'Full term') doc.text('X', startX + 1, y);
+    doc.text('FULL-TERM PAID', startX + checkboxSize + 2, y);
+
+    startX += checkboxSize + 2 + doc.getTextWidth('FULL-TERM PAID') + 10;
+    doc.rect(startX, y - 5, checkboxSize, checkboxSize);
+    if (candidate.paymentTerm === 'Term 1') doc.text('X', startX + 1, y);
+    doc.text('TERM-1 FEE PAID', startX + checkboxSize + 2, y);
+
+    startX += checkboxSize + 2 + doc.getTextWidth('Term 2 PAID') + 20;
+    doc.rect(startX, y - 5, checkboxSize, checkboxSize);
+    if (candidate.paymentTerm === 'Term 2') doc.text('X', startX + 1, y);
+    doc.text('TERM-2 FEE PAID', startX + checkboxSize + 2, y);
+    y += 8;
+
+    doc.text(
+      `Term 2 Payment Date: ………………………………       Communication Score:   ${
+        candidate.communicationScore || 'Communication Score: ………………'
+      }`,
+      10,
+      y
+    );
+    y += 8;
+
+    doc.text('Remarks:', 10, y);
+    y += 8;
+    const remarksBoxHeight = 20;
+    doc.rect(10, y, pageWidth - 20, remarksBoxHeight);
+    if (candidate.remarks) {
+      doc.text(candidate.remarks, 12, y + 10, { maxWidth: pageWidth - 24 });
+    }
+    y += remarksBoxHeight + 12;
+
+    doc.text('COURSE UNDERTAKING - CRITERIA', pageWidth / 2, y, { align: 'center' });
+    y += 10;
+    const undertakingText =
+      'I ……………………………………… hereby enroll myself in the selected course ……………………………………………………… Whole-heartedly after knowing the Terms and Condition of the TEKCREWZ INFOTECH. I agree to follow all rules of the Company, attend classes regularly, and complete assignments as per the schedule. I understand that fees paid are non-refundable under any circumstances.';
+    doc.text(undertakingText, 10, y, { maxWidth: pageWidth - 20 });
+    y += 30;
+    doc.text('Date: ………………………………………    Place: ………………………………………', 10, y);
+    y += 8;
+    doc.text('Candidate Signature', pageWidth - rightMargin, y + 10, { align: 'right' });
+    y += 35;
+    if (candidate.signature) {
+      try {
+        const signatureData = await loadImageAsDataURL(candidate.signature);
+        const sigWidth = 40,
+          sigHeight = 20;
+        doc.addImage(signatureData, 'PNG', pageWidth - sigWidth - rightMargin, y - 20, sigWidth, sigHeight);
+      } catch (e) {
+        console.error('Error loading candidate signature', e);
+      }
+    }
+
+    const filename = `Candidate Report - ${candidate.candidateName || 'Candidate'}.pdf`;
     doc.save(filename);
   };
+
 
   useEffect(() => {                                                                    // NEW
     const handleClickOutside = event => {                                             // NEW

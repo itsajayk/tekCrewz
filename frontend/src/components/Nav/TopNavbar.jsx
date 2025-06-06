@@ -111,6 +111,28 @@ export default function TopNavbar() {
               )}
             </li>
           </UlWrapperRight>
+
+          <UlWrapperRight className="flexNullCenter">
+            <li className="font15 pointer flexCenter">
+              {currentUser ? (
+                <a
+                  className="radius9 orangeBg lightColor"
+                  style={{ padding: "10px 15px", cursor: "pointer" }}
+                  onClick={handleLogout}
+                >
+                  LOG OUT
+                </a>
+              ) : (
+                <a
+                  className="radius9 orangeBg lightColor"
+                  style={{ padding: "10px 15px", cursor: "pointer" }}
+                  onClick={() => navigate('/QuizLogin')}
+                >
+                  QuizLogin
+                </a>
+              )}
+            </li>
+          </UlWrapperRight>
         </NavInner>
       </Wrapper>
     </>
@@ -148,5 +170,18 @@ const UlWrapper = styled.ul`
 const UlWrapperRight = styled.ul`
   @media (max-width: 760px) {
     display: none;
+  }
+`;
+const LoginButton = styled.button`
+  padding: 12px;
+  background: #7620ff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 10px;
+  &:hover {
+    background: #580cd2;
+    transition: .5s;
   }
 `;

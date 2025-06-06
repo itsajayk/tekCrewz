@@ -12,7 +12,7 @@ export default function Contact() {
   const { currentUser } = useContext(AuthContext);
   // Fallback to localStorage if needed
   const userId = currentUser?.displayName || localStorage.getItem('userId') || '';
-  const isEmployee = /^(EMPDT|EMPTR|EMPDV|EMPAD|REFSD)/.test(userId);
+  const isEmployee = /^(EMPDT|EMPTR|EMPDV|EMPAD|REFSD|BT1FS)/.test(userId);
 
 if (isEmployee) {
     return (
@@ -75,7 +75,7 @@ if (isEmployee) {
 
           <BottomWrapper style={{ padding: "20px 0" }}>
             <StyleP className="whiteColor font13">
-              © {getCurrentYear()} - <span className="purpleColor font13">TekCrewz</span> All Rights Reserved
+              © {getCurrentYear()} - <span className="purpleColor font13">TekCrewz</span>All Rights Reserved
             </StyleP>
             <ScrollLink to="home" smooth={true} offset={-80} duration={500} className="whiteColor animate pointer font13">
               Back to top
@@ -83,6 +83,13 @@ if (isEmployee) {
           </BottomWrapper>
         </div>
       </div>
+
+      <FixedWhatsapp
+        href="https://api.whatsapp.com/send?phone=919655466339&text=Hello%2C%20I%27m%20interested%20in%20your%20services%20need%20some%20assistance"
+        target="_blank"
+      >
+        <FaWhatsapp size={38} />
+      </FixedWhatsapp>
     </Wrapper>
   );
 }

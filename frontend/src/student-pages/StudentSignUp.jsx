@@ -81,7 +81,7 @@ const StudentSignUp = () => {
       setSuccessModal(true);
       setTimeout(() => {
         setSuccessModal(false);
-        navigate("/s-loginPage");
+        navigate("/QuizLogin");
       }, 2000);
     } catch (error) {
       console.error("Error during sign up:", error);
@@ -179,7 +179,7 @@ const StudentSignUp = () => {
           <SubmitButton type="submit" disabled={isLoading}>
             {isLoading ? "Registering..." : "Sign Up"}
           </SubmitButton>
-          <SignupLink onClick={() => navigate("/s-loginPage")}>
+          <SignupLink onClick={() => navigate("/QuizLogin")}>
             Have an account?
           </SignupLink>
         </Form>

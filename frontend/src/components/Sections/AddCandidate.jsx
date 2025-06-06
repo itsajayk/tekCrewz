@@ -26,7 +26,7 @@ import { generateUniqueIdFromFirestore } from '../Pages/idGenerator';
 const API_BASE_URL = 'https://tekcrewz.onrender.com';
 const COURSE_CODES = {
   'full-stack': 'FS',
-  python: 'PY',
+  'python': 'PY',
   'php with laravel': 'PL',
   'dot net': 'DT',
   'business analyst': 'BA',
@@ -190,7 +190,7 @@ export default function AddCandidate() {
     const temp = {};
     [
       'referrerId','batchNumber','candidateName','college','candidateDegree','programme',
-      'marksType','score','mobile','parentMobile','email','coursesEnquired',
+      'candidateCourseName','marksType','score','mobile','parentMobile','email','coursesEnquired',
       'dateOfVisit','paymentTerm','communicationScore'
     ].forEach(f => {
       if (!formData[f]) temp[f] = 'Required.';
@@ -283,17 +283,17 @@ export default function AddCandidate() {
                 onChange={handleChange}
                 disabled={loadingUsers || !!fetchError}
               >
-        <option value="">Select User</option>
-        {loadingUsers  && <option>Loading…</option>}
-        {fetchError && <option disabled>{fetchError}</option>}
-        {!loadingUsers  && !fetchError && users.map(user => (
-          <option key={user.id} value={user.id}>
-            {user.displayName || user.id}
-          </option>
-        ))}
-      </Select>
-      {errors.userId && <ErrorText>{errors.userId}</ErrorText>}
-    </InputGroup>
+                <option value="">Select User</option>
+                {loadingUsers  && <option>Loading…</option>}
+                {fetchError && <option disabled>{fetchError}</option>}
+                {!loadingUsers  && !fetchError && users.map(user => (
+                  <option key={user.id} value={user.id}>
+                    {user.displayName || user.id}
+                  </option>
+                ))}
+              </Select>
+              {errors.userId && <ErrorText>{errors.userId}</ErrorText>}
+            </InputGroup>
 
              {/* Batch Number */}
             <InputGroup>
@@ -362,13 +362,14 @@ export default function AddCandidate() {
 
             {/* Course Name (opt) */}
             <InputGroup>
-              <Label>Course Name (optional)</Label>
+              <Label>Course Name</Label>
               <Input
                 name="candidateCourseName"
                 value={formData.candidateCourseName}
                 onChange={handleChange}
                 placeholder="Enter course name"
               />
+              {errors.candidateCourseName && <ErrorText>{errors.candidateCourseName}</ErrorText>}
             </InputGroup>
 
             {/* Marks Type */}

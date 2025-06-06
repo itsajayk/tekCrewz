@@ -21,6 +21,7 @@ import StudentRoute from './components/Routes/StudentRoute.jsx';
 import DashboardPage from './components/Sections/DashboardPage.jsx';
 import EmpDashboard from './components/Sections/EmpDashboard.jsx';
 import StudentDashboard from './components/Sections/StudentDashboard.jsx'
+import QuizLogin from './student-pages/QuizLogin.jsx';
 
 export default function App() {
   return (
@@ -68,10 +69,11 @@ export default function App() {
             
             {/* Student Protected Route */}
             <Route path="/Quiz" element={
-              <StudentRoute>
+              
                 <QuizPage />
-              </StudentRoute>
+              
             }/>
+            
             {/* Student Protected Route */}
             <Route path="/StudentDashboard" element={
               <StudentRoute>
@@ -83,6 +85,7 @@ export default function App() {
             <Route path="/reset-password" element={<ResetPasswordPage />}/>
             <Route path="/s-signUpPage" element={<StudentSignUp />}/>
             <Route path="/s-loginPage" element={<StudentLogin />}/>
+            <Route path="/QuizLogin" element={<QuizLogin />}/>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/EmpDashboard" element={<EmpDashboard />} />
             {/* <Route path="/StudentDashboard" element={<StudentDashboard/>}/> */}

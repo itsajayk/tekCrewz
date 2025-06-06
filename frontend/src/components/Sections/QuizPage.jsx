@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import TopNavbar from '../Nav/TopNavbar';
 import Footer from '../Sections/Footer';
-import { doc, getDoc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, addDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../Pages/firebase';
-import { signOut } from 'firebase/auth';
+import { signOut, onAuthStateChanged  } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 
 const sampleQuestions = [
@@ -119,7 +119,7 @@ const QuizPage = () => {
   const scoreRef = useRef(0);
   const [studentRegID, setStudentRegID] = useState(null);
   const [quizAlreadyTaken, setQuizAlreadyTaken] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Feedback modal state. Rating is a number between 0 and 5.
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -136,25 +136,31 @@ const QuizPage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    setQuestions(shuffleArray(sampleQuestions));
-    const storedRegID = localStorage.getItem('role');
-    if (storedRegID) {
-      setStudentRegID(storedRegID);
-      setLoading(true);
-      (async () => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
         try {
-          const studentRef = doc(db, "users", storedRegID);
-          const studentSnap = await getDoc(studentRef);
-          if (studentSnap.exists() && studentSnap.data().quizCompleted) {
-            setQuizAlreadyTaken(true);
+          const studentsRef = collection(db, "students");
+          const q = query(studentsRef, where("uid", "==", user.uid));
+          const querySnap = await getDocs(q);
+          if (!querySnap.empty) {
+            const studentDoc = querySnap.docs[0];
+            const regID = studentDoc.id;
+            setStudentRegID(regID); // NEW
+            if (studentDoc.data().quizCompleted) {
+              setQuizAlreadyTaken(true); // NEW
+            }
           }
         } catch (error) {
-          console.error("Error fetching student data:", error);
+          console.error("Error fetching student data:", error); // NEW
         } finally {
-          setLoading(false);
+          setQuestions(shuffleArray(sampleQuestions)); // NEW
         }
-      })();
-    }
+      } else {
+        setQuestions(shuffleArray(sampleQuestions)); // NEW
+      }
+      setLoading(false); // CHANGED: set loading to false after auth check completes
+    });
+    return () => unsubscribe();
   }, []);
 
   const handleOptionSelect = (option) => setSelectedOption(option);
@@ -198,7 +204,7 @@ const QuizPage = () => {
     if (studentRegID) {
       try {
         const studentRef = doc(db, "students", studentRegID);
-        await updateDoc(studentRef, { quizCompleted: false });
+        await updateDoc(studentRef, { quizCompleted: false, score: 0 });
       } catch (error) {
         console.error("Error resetting quiz status in Firestore:", error);
       }
@@ -314,7 +320,7 @@ const QuizPage = () => {
               )
             )
           ) : (
-            <NoStudentIDMessage>Quiz Already Taken !</NoStudentIDMessage>
+            <NoStudentIDMessage>Please log in to take the quiz.</NoStudentIDMessage>
           )
         )}
       </Content>

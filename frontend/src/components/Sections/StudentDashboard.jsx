@@ -125,6 +125,8 @@ export default function StudentDashboard() {
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
   const closeModal = () => setShowModal(false);
 
+  const [courseDocs, setCourseDocs] = useState([]);
+
     const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
@@ -144,12 +146,22 @@ export default function StudentDashboard() {
       const attendance = attRes.ok ? await attRes.json() : [];
 
       // 3️⃣ course docs
-      const docsRes = await fetch(`${API_BASE_URL}/api/courses/COURSE1/docs`);
-      let docs = [];
-      if (docsRes.ok) {
-        const obj = await docsRes.json();
-        docs = Object.entries(obj).map(([type, url]) => ({ type, url }));
+      const registeredCourses = Array.isArray(prof.courseRegistered) 
+        ? prof.courseRegistered 
+        : (typeof prof.courseRegistered === 'string' && prof.courseRegistered.trim() 
+            ? [prof.courseRegistered] 
+            : []);                                          // CHANGED
+
+      const docsArray = [];                                             // CHANGED
+      for (const courseId of registeredCourses) {                       // CHANGED
+        const res = await fetch(`${API_BASE_URL}/api/courses/${encodeURIComponent(courseId)}/docs`); // CHANGED
+        if (res.ok) {
+          const obj = await res.json();
+          const docEntries = Object.entries(obj).map(([type, url]) => ({ type, url }));
+          docsArray.push({ courseId, docs: docEntries });               // CHANGED
+        }
       }
+      // ────────────────────────────────────────────────────────────────────────────────
 
       // 3️⃣ assignments
       const asnRes = await fetch(`${API_BASE_URL}/api/assignments/${dbId}`);
@@ -182,8 +194,8 @@ export default function StudentDashboard() {
         paidAmount: prof.paidAmount || "Not Paid",
         candidatePic: prof.candidatePic || prof.photoUrl || "",
         attendance,
-        docs,
-        assignments
+        assignments,
+        courseDocs: docsArray
       });
       // 4️⃣ subscribe to Firestore attendance
       const q = query(
@@ -729,53 +741,118 @@ const renderUnit = (unit) => {
       case "Course Docs": return renderDoc()
       case "Unit":
       return renderUnit();
-       case "Syllabus":
-    case "Schedule": {
-      // Find the matching document (if any)
-      const docType = activeTab.toLowerCase();
-      const docItem = docs.find(
-        (d) => typeof d.type === 'string' && d.type.toLowerCase() === docType
-      );
+    case "Syllabus": {
+        return (
+          <DocSectionWrapper>
+            {/* 1) SECTION HEADER: slides in from left */}
+            <DocHeaderAnimated>Syllabus</DocHeaderAnimated>
+            <DividerAnimated />
 
-      return (
-        <DocSectionWrapper>
-          {/* 1) SECTION HEADER: slides in from left */}
-          <DocHeaderAnimated>Course {activeTab}</DocHeaderAnimated>
+            {/* ── CHANGED: Loop over courseDocs and show each course’s syllabus ──────── */} {/* CHANGED */}
+            {courseDocs.length > 0 ? (                                               /* CHANGED */
+              courseDocs.map(cd => {                                                /* CHANGED */
+                const item = cd.docs.find(d => d.type.toLowerCase() === 'syllabus');/* CHANGED */
+                return (
+                  <React.Fragment key={cd.courseId}>
+                    <CourseTitle>{cd.courseId} – Syllabus</CourseTitle>            {/* CHANGED */}
+                    {item ? (                                                        /* CHANGED */
+                      <DocContentGrid>
+                        <DocViewerWrapperAnimated delay={0.4}>
+                          <iframe
+                            src={`https://docs.google.com/gview?url=${encodeURIComponent(item.url)}&embedded=true`}
+                            frameBorder="0"
+                            title={`${cd.courseId} Syllabus`}
+                          />
+                        </DocViewerWrapperAnimated>
 
-          <DividerAnimated /> {/* ← subtle line under header, fades in */}
+                        <DocInfoPaneAnimated delay={0.6}>
+                          <InfoBadge>Type: {item.type}</InfoBadge>
+                          <InfoTextAnimate delay={0.8}>
+                            View or download the {cd.courseId} syllabus here.
+                          </InfoTextAnimate>
+                          <DownloadButtonAnimated
+                            as="a"
+                            href={getDownloadUrl(item.url)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            delay={1.0}
+                          >
+                            Download Syllabus
+                          </DownloadButtonAnimated>
+                        </DocInfoPaneAnimated>
+                      </DocContentGrid>
+                    ) : (
+                      <NoDocAnimated delay={0.4}>
+                        No syllabus available for {cd.courseId}.
+                      </NoDocAnimated>
+                    )}
+                  </React.Fragment>
+                );
+              })
+            ) : (
+              <NoDocAnimated delay={0.4}>No registered courses found.</NoDocAnimated> /* CHANGED */
+            )}
+            {/* ─────────────────────────────────────────────────────────────────────────── */} {/* CHANGED */}
+          </DocSectionWrapper>
+        );
+      }
+      case "Schedule": {
+        return (
+          <DocSectionWrapper>
+            {/* 1) SECTION HEADER: slides in from left */}
+            <DocHeaderAnimated>Schedule</DocHeaderAnimated>
+            <DividerAnimated />
 
-          {docItem ? (
-            <DocContentGrid>
-              {/* 2) LEFT SIDE: Embedded PDF Viewer (fades in) */}
-              <DocViewerWrapperAnimated delay={0.4}>
-                <iframe
-                  src={`https://docs.google.com/gview?url=${encodeURIComponent(docItem.url)}&embedded=true`}
-                  frameBorder="0"
-                  title={`Course ${activeTab}`}
-                />
-              </DocViewerWrapperAnimated>
+            {/* ── CHANGED: Loop over courseDocs and show each course’s schedule ─────── */} {/* CHANGED */}
+            {courseDocs.length > 0 ? (                                              /* CHANGED */
+              courseDocs.map(cd => {                                                /* CHANGED */
+                const item = cd.docs.find(d => d.type.toLowerCase() === 'schedule');/* CHANGED */
+                return (
+                  <React.Fragment key={cd.courseId}>
+                    <CourseTitle>{cd.courseId} – Schedule</CourseTitle>            {/* CHANGED */}
+                    {item ? (                                                        /* CHANGED */
+                      <DocContentGrid>
+                        <DocViewerWrapperAnimated delay={0.4}>
+                          <iframe
+                            src={`https://docs.google.com/gview?url=${encodeURIComponent(item.url)}&embedded=true`}
+                            frameBorder="0"
+                            title={`${cd.courseId} Schedule`}
+                          />
+                        </DocViewerWrapperAnimated>
 
-              {/* 3) RIGHT SIDE: Quick Info & Download (slides in from right) */}
-              <DocInfoPaneAnimated delay={0.6}>
-                <InfoBadge>Type: {docItem.type}</InfoBadge>
-                <InfoTextAnimate delay={0.8}>View or download the full {activeTab.toLowerCase()} here.</InfoTextAnimate>
-                <DownloadButtonAnimated
-                  as="a"
-                  href={getDownloadUrl(docItem.url)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  delay={1.0}
-                >
-                  Download {activeTab}
-                </DownloadButtonAnimated>
-              </DocInfoPaneAnimated>
-            </DocContentGrid>
-          ) : (
-            <NoDocAnimated delay={0.6}>No {activeTab.toLowerCase()} available.</NoDocAnimated>
-          )}
-        </DocSectionWrapper>
-      );
-    }
+                        <DocInfoPaneAnimated delay={0.6}>
+                          <InfoBadge>Type: {item.type}</InfoBadge>
+                          <InfoTextAnimate delay={0.8}>
+                            View or download the {cd.courseId} schedule here.
+                          </InfoTextAnimate>
+                          <DownloadButtonAnimated
+                            as="a"
+                            href={getDownloadUrl(item.url)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            delay={1.0}
+                          >
+                            Download Schedule
+                          </DownloadButtonAnimated>
+                        </DocInfoPaneAnimated>
+                      </DocContentGrid>
+                    ) : (
+                      <NoDocAnimated delay={0.4}>
+                        No schedule available for {cd.courseId}.
+                      </NoDocAnimated>
+                    )}
+                  </React.Fragment>
+                );
+              })
+            ) : (
+              <NoDocAnimated delay={0.4}>No registered courses found.</NoDocAnimated> /* CHANGED */
+            )}
+            {/* ─────────────────────────────────────────────────────────────────────────── */} 
+          </DocSectionWrapper>
+        );
+      }
+
+
         case "Quiz":
           return <Card>
             <h3>Available Quizzes</h3>
@@ -1571,6 +1648,11 @@ const DocContentGrid = styled.div`
   grid-template-columns: 2fr 1fr;
   gap: 24px;
   @media (max-width: 768px) { grid-template-columns: 1fr; gap: 16px; }
+`;
+
+const CourseTitle = styled.h3`             
+  margin-top: 24px;                         
+  color: ${p => p.theme.text};              
 `;
 
 const DocViewerWrapperAnimated = styled.div`
