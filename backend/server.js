@@ -14,6 +14,7 @@ const app = express();
 // ── CORS ─────────────────────────────────────────────────────────────
 const allowedOrigins = [
   'http://localhost:3000',
+  'https://tekcrewz.onrender.com',
   'https://tekcrewz.com',
   'https://www.tekcrewz.com'
 ];

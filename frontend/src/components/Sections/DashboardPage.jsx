@@ -16,6 +16,7 @@ import {
 import { signOut } from 'firebase/auth';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
+import { writeBatch, doc as fbDoc, collection as fbCol, getDocs as fbGetDocs } from 'firebase/firestore'; // new
 
 import TopNavbar from '../Nav/TopNavbar';
 import Footer from './Footer';
@@ -74,6 +75,48 @@ const DashboardPage = () => {
   // Ensure arrays exist
   const projects = Array.isArray(profile?.projects) ? profile.projects : [];
   const tasks = Array.isArray(profile?.tasks) ? profile.tasks : [];
+
+const [batches, setBatches] = useState([]); // new
+const [courses, setCourses] = useState([]); // new
+const [selectedBatch, setSelectedBatch] = useState(''); // new
+const [selectedCourse, setSelectedCourse] = useState(''); // new
+const [selectedTrainingMode, setSelectedTrainingMode] = useState(''); // new
+const [filteredCandidates, setFilteredCandidates] = useState([]); // new
+const [absentCandidates, setAbsentCandidates] = useState([]); // new
+
+
+  // Fetch batches from Firebase
+useEffect(() => {
+  fbGetDocs(fbCol(db, 'batch')).then(snap => {
+    setBatches(snap.docs.map(d => d.id));
+  });
+}, []);
+
+// Fetch all courses from Mongo
+useEffect(() => {
+  axios.get('/api/candidates').then(res => {
+    const uniques = [...new Set(res.data.map(c => c.candidateCourseName))];
+    setCourses(uniques);
+  });
+}, []);
+
+// Load candidates based on selected filters
+useEffect(() => {
+  if (!selectedBatch || !selectedCourse || !selectedTrainingMode) {
+    setFilteredCandidates([]);
+    return;
+  }
+  axios.get('/api/candidates').then(res => {
+    const list = res.data.filter(c =>
+      c.batchNumber === selectedBatch &&
+      c.candidateCourseName === selectedCourse &&
+      c.trainingMode === selectedTrainingMode
+    );
+    setFilteredCandidates(list);
+    setAbsentCandidates([]);
+  });
+}, [selectedBatch, selectedCourse, selectedTrainingMode]);
+
 
   // Fetch profile & split projects
   useEffect(() => {
@@ -145,6 +188,30 @@ const DashboardPage = () => {
       setSavingAttendance(false);
     }
   };
+
+  const submitBatchAttendance = async () => {
+  setSavingAttendance(true);
+  try {
+    const batch = writeBatch(db);
+    filteredCandidates.forEach(c => {
+      const ref = fbDoc(fbCol(db, 'attendance'));
+      batch.set(ref, {
+        studentId: c.studentId,
+        date: new Date(attendanceDate),
+        status: absentCandidates.includes(c._id) ? 'Absent' : 'Present',
+        timestamp: serverTimestamp()
+      });
+    });
+    await batch.commit();
+    setShowSuccessModal(true);
+  } catch (err) {
+    console.error(err);
+    setShowWarningModal(true);
+  } finally {
+    setSavingAttendance(false);
+  }
+};
+
 
   // Subscribe attendance records when a student selected
   useEffect(() => {
@@ -549,69 +616,85 @@ const DashboardPage = () => {
           <ModalOverlay onClick={() => setShowAttendanceModal(false)}>
             <ModalContent onClick={e => e.stopPropagation()}>
               <ModalHeader>Mark Attendance</ModalHeader>
-              <FormRow>
-                <Select value={selectedStudent} onChange={e => setSelectedStudent(e.target.value)}>
-                  <option value="">Select Student</option>
-                  {studentsList.map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.candidateName || s.id}
-                    </option>
-                  ))}
-                </Select>
-              </FormRow>
-              <FormRow>
-                <label>Date</label>
-                <MonthInput
-                  type="date"
-                  value={attendanceDate}
-                  onChange={e => setAttendanceDate(e.target.value)}
-                />
-              </FormRow>
-              <FormRow>
-                <label>Status</label>
-                <Select
-                  value={attendanceStatus}
-                  onChange={e => setAttendanceStatus(e.target.value)}
-                >
-                  <option>Present</option>
-                  <option>Absent</option>
-                </Select>
-              </FormRow>
-              <Button onClick={saveAttendance} disabled={savingAttendance}>
-                {savingAttendance ? 'Saving…' : 'Save'}
-              </Button>
 
-              {savingAttendance && (
-                <SpinnerOverlay>
-                  <Spinner />
-                </SpinnerOverlay>
+              {/* Batch Selector */}
+              <FormRow>
+                <label>Batch</label>
+                <select value={selectedBatch} onChange={e => setSelectedBatch(e.target.value)}>
+                  <option value="">Select Batch</option>
+                  {batches.map(b => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+              </FormRow>
+
+              {/* Course Selector */}
+              <FormRow>
+                <label>Course</label>
+                <select value={selectedCourse} onChange={e => setSelectedCourse(e.target.value)}>
+                  <option value="">Select Course</option>
+                  {courses.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </FormRow>
+
+              {/* Training Mode */}
+              <FormRow>
+                <label>Training Mode</label>
+                <select value={selectedTrainingMode} onChange={e => setSelectedTrainingMode(e.target.value)}>
+                  <option value="">Select Mode</option>
+                  <option value="Online">Online</option>
+                  <option value="On-campus@ Thanjavur">On-campus@ Thanjavur</option>
+                </select>
+              </FormRow>
+
+              {/* Candidate Table */}
+              {filteredCandidates.length > 0 && (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Absent?</th>
+                      <th>Candidate ID</th>
+                      <th>Name</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCandidates.map(c => (
+                      <tr key={c._id}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={absentCandidates.includes(c._id)}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                setAbsentCandidates([...absentCandidates, c._id]);
+                              } else {
+                                setAbsentCandidates(absentCandidates.filter(id => id !== c._id));
+                              }
+                            }}
+                          />
+                        </td>
+                        <td>{c.studentId}</td>
+                        <td>{c.candidateName}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
 
-              <AttendanceList>
-                <thead>
-                  <tr><th>Date</th><th>Status</th></tr>
-                </thead>
-                <tbody>
-                  {attendanceRecords.map((r, i) => (
-                    <tr key={i}>
-                      <td>
-                        {new Date(
-                          r.date.seconds
-                            ? r.date.seconds * 1000
-                            : r.date
-                        ).toLocaleDateString()}
-                      </td>
-                      <td>{r.status}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </AttendanceList>
-              <Button variant="secondary" onClick={() => setShowAttendanceModal(false)}>
-                Close
-              </Button>
-            </ModalContent>
-          </ModalOverlay>
-        )}
+            <ModalActions>
+              <button
+                onClick={submitBatchAttendance}
+                disabled={savingAttendance || !filteredCandidates.length}
+              >
+                {savingAttendance ? 'Saving…' : 'Submit'}
+              </button>
+              <button onClick={() => setShowAttendanceModal(false)}>Close</button>
+            </ModalActions>
+          </ModalContent>
+        </ModalOverlay>
+      )}
 
         {/* Attendance Success Modal */}
         {showSuccessModal && (
