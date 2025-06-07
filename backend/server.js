@@ -92,6 +92,11 @@ const candidateSchema = new mongoose.Schema({
   dateOfVisit:        Date,
   paymentTerm:        String,
   communicationScore: Number,
+  trainingMode: {             // new
+    type: String,
+    enum: ['Online', 'On-campus@ Thanjavur'],
+    required: true
+  },
   candidatePic:       String,
   markStatement:      String,
   signature:          String,

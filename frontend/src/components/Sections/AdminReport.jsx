@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"; 
+import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { jsPDF } from "jspdf";
 import TopNavbar from "../Nav/TopNavbar";
@@ -10,6 +10,8 @@ const AdminReport = () => {
   const [reportData, setReportData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [pdfSuccess, setPdfSuccess] = useState(false);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -19,13 +21,24 @@ const AdminReport = () => {
         const students = [];
         querySnapshot.forEach((docSnap) => {
           const data = docSnap.data();
-          // console.log("Fetched student data:", data); 
-          // Only include students who have completed the quiz
           if (data.quizCompleted) {
-            students.push({ id: docSnap.id, ...data });
+            // Fallback: data.attendedDate should be a Firestore Timestamp
+            const attendedDate = data.attendedDate?.toDate
+              ? data.attendedDate.toDate()
+              : data.attendedDate
+                ? new Date(data.attendedDate)
+                : null;
+
+            students.push({
+              id: docSnap.id,
+              studentRegID: data.studentRegID,
+              name: data.name,
+              score: data.score,
+              quizCompleted: data.quizCompleted,
+              attendedDate,
+            });
           }
         });
-        // console.log("Students with quizCompleted:", students); 
         setReportData(students);
       } catch (error) {
         console.error("Error fetching student data:", error);
@@ -37,39 +50,59 @@ const AdminReport = () => {
     fetchStudents();
   }, []);
 
+  const filteredData = reportData.filter((student) => {
+    if (!startDate && !endDate) return true;
+    if (!student.attendedDate) return true;
+
+    const d = new Date(student.attendedDate);
+    const dateOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+    if (startDate && dateOnly < new Date(startDate)) return false;
+    if (endDate && dateOnly > new Date(endDate)) return false;
+    return true;
+  });
+
   const generatePDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(14);
     doc.text("Student Quiz Report", 10, 15);
-    
+
     let y = 25;
     doc.setFontSize(12);
     doc.text("S.No", 10, y);
-    doc.text("Student RegID", 30, y);
-    doc.text("Name", 70, y);
-    doc.text("Score", 140, y);
-    doc.text("Completed", 170, y);
+    doc.text("RegID", 25, y);
+    doc.text("Name", 65, y);
+    doc.text("Score", 120, y);
+    doc.text("Attended", 150, y);
+    doc.text("Completed", 185, y);
+
     y += 8;
     doc.line(10, y, 200, y);
     y += 5;
-    
-    reportData.forEach((student, index) => {
+
+    filteredData.forEach((student, idx) => {
       const regID = student.studentRegID || student.id || "N/A";
       const name = student.name || "N/A";
-      const score = student.score !== undefined ? student.score.toString() : "N/A";
+      const score = student.score != null ? student.score.toString() : "N/A";
       const completed = student.quizCompleted ? "Yes" : "No";
-      
-      doc.text(`${index + 1}`, 10, y);
-      doc.text(regID, 30, y);
-      doc.text(name, 70, y);
-      doc.text(score, 140, y);
-      doc.text(completed, 170, y);
+      const dateStr = student.attendedDate
+        ? student.attendedDate.toLocaleDateString()
+        : "N/A";
+
+      doc.text(`${idx + 1}`, 10, y);
+      doc.text(regID, 25, y);
+      doc.text(name, 65, y);
+      doc.text(score, 120, y);
+      doc.text(dateStr, 150, y);
+      doc.text(completed, 185, y);
+
       y += 8;
       if (y > 280) {
         doc.addPage();
         y = 20;
       }
     });
+
     doc.save("quiz_report.pdf");
     setPdfSuccess(true);
     setTimeout(() => setPdfSuccess(false), 3000);
@@ -80,10 +113,30 @@ const AdminReport = () => {
       <TopNavbar />
       <Content>
         <Title>Admin Report</Title>
+
         {isLoading ? (
           <LoadingMessage>Loading...</LoadingMessage>
         ) : (
           <>
+            <FilterContainer>
+              <label>
+                From:{" "}
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </label>
+              <label>
+                To:{" "}
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </label>
+            </FilterContainer>
+
             <TableContainer>
               <Table>
                 <thead>
@@ -92,22 +145,31 @@ const AdminReport = () => {
                     <th>Student RegID</th>
                     <th>Name</th>
                     <th>Score</th>
+                    {/* <th>Attended Date</th> */}
                     <th>Completed</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {reportData.map((student, index) => (
+                  {filteredData.map((student, idx) => (
                     <tr key={student.id}>
-                      <td>{index + 1}</td>
+                      <td>{idx + 1}</td>
                       <td>{student.studentRegID || "N/A"}</td>
                       <td>{student.name || "N/A"}</td>
-                      <td>{student.score !== undefined ? student.score : "N/A"}</td>
+                      <td>
+                        {student.score != null ? student.score : "N/A"}
+                      </td>
+                      {/* <td>
+                        {student.attendedDate
+                          ? student.attendedDate.toLocaleDateString()
+                          : "N/A"}
+                      </td> */}
                       <td>{student.quizCompleted ? "Yes" : "No"}</td>
                     </tr>
                   ))}
                 </tbody>
               </Table>
             </TableContainer>
+
             <GenerateButton onClick={generatePDF}>
               Generate PDF Report
             </GenerateButton>
@@ -115,12 +177,16 @@ const AdminReport = () => {
         )}
       </Content>
       <Footer />
+
       {pdfSuccess && (
         <SuccessModalOverlay>
           <SuccessModalContent>
             <SuccessTitle>
               PDF Generated Successfully!{" "}
-              <i className="fa-solid fa-circle-check fa-bounce" style={{ color: "#14a800" }}></i>
+              <i
+                className="fa-solid fa-circle-check fa-bounce"
+                style={{ color: "#14a800" }}
+              />
             </SuccessTitle>
             <ModalCloseButton onClick={() => setPdfSuccess(false)}>
               Close
@@ -134,7 +200,9 @@ const AdminReport = () => {
 
 export default AdminReport;
 
+// ——————————————————
 // Styled Components
+// ——————————————————
 
 const Wrapper = styled.div`
   display: flex;
@@ -147,6 +215,7 @@ const Content = styled.div`
   max-width: 1000px;
   margin: 80px auto;
   padding: 20px;
+
   @media (max-width: 1024px) {
     margin: 60px auto;
   }
@@ -165,11 +234,28 @@ const Title = styled.h1`
   margin-bottom: 20px;
   color: #333;
   font-size: 2rem;
+
   @media (max-width: 768px) {
     font-size: 1.6rem;
   }
   @media (max-width: 480px) {
     font-size: 1.4rem;
+  }
+`;
+
+const FilterContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 20px;
+
+  label {
+    font-size: 14px;
+
+    input {
+      margin-left: 8px;
+      padding: 4px;
+    }
   }
 `;
 
@@ -180,27 +266,32 @@ const TableContainer = styled.div`
 
 const Table = styled.table`
   width: 100%;
-  max-width: 100%;
   border-collapse: collapse;
-  th, td {
+
+  th,
+  td {
     padding: 12px;
     border: 1px solid #ddd;
     text-align: center;
     font-size: 14px;
   }
+
   th {
     background-color: #f3f3f3;
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
+
   @media (max-width: 768px) {
-    th, td {
+    th,
+    td {
       padding: 10px;
       font-size: 12px;
     }
   }
   @media (max-width: 480px) {
-    th, td {
+    th,
+    td {
       padding: 8px;
       font-size: 11px;
     }

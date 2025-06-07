@@ -403,7 +403,7 @@ const CandidatesList = () => {
         </FilterPanelAnimated>
 
         {isLoading ? (
-          <LoadingMessage>Loading candidates…</LoadingMessage>
+          <SpinnerOverlay><Spinner /></SpinnerOverlay>
         ) : isTableView ? (
           /* ── TABLE VIEW ─────────────────────────────────────────────────────────── */
           <TableWrapperAnimated delay={0.6}>
@@ -1294,3 +1294,6 @@ const DropdownList = styled.div`                                                
 `;                                                                                   // NEW
 /* ─────────────────────────────────────────────────────────────────────────────────── */
 
+const SpinnerOverlay = styled.div`position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.8);display:flex;justify-content:center;align-items:center;`;
+const spin = keyframes`0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}`;
+const Spinner = styled.div`border:4px solid #f3f3f3;border-top:4px solid #7620ff;border-radius:50%;width:40px;height:40px;animation:${spin} 1s linear infinite;`;

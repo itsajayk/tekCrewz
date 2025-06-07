@@ -20,12 +20,9 @@ const AdminPanel = () => {
   const [profileData, setProfileData] = useState({});
   const [editMode, setEditMode] = useState(false);
 
-  const [courseDocs, setCourseDocs] = useState({
-    syllabus: '',
-    syllabusOriginalName: '',
-    schedule: '',
-    scheduleOriginalName: ''
-  });
+  // 🔧 CHANGED: make courseDocs an object whose keys are course IDs
+const [courseDocs, setCourseDocs] = useState({});
+
 
   const [docType, setDocType] = useState('syllabus');
   const [assignments, setAssignments] = useState([]);
@@ -83,24 +80,26 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
         if (modalType === 'ViewAttendance') {
           // nothing else to do
         }
+
         if (modalType === 'CourseDocs') {
-          if (!selectedCourse) {
-            pushToast('Please select a course first', 'error');
-          } else {
-            // 🔧 CHANGED: fetch from the new GET route we added in server.js
-            const { data } = await axios.get(
-              `/api/admin/course-docs/upload/${encodeURIComponent(selectedCourse)}`
-            );
-            // The data will already be in the shape: 
-            //   { syllabus: <url>, syllabusOriginalName: <name>, schedule: <url>, scheduleOriginalName: <name> }
-            setCourseDocs({
+        if (!selectedCourse) {
+          pushToast('Please select a course first', 'error');
+        } else {
+          const { data } = await axios.get(
+            `/api/admin/course-docs/upload/${encodeURIComponent(selectedCourse)}`
+          );
+          // 🔧 CHANGED: store under courseDocs[selectedCourse]
+          setCourseDocs(prev => ({
+            ...prev,
+            [selectedCourse]: {
               syllabus: data.syllabus || '',
               syllabusOriginalName: data.syllabusOriginalName || '',
               schedule: data.schedule || '',
               scheduleOriginalName: data.scheduleOriginalName || ''
-            });
-          }
+            }
+          }));
         }
+      }
         if (modalType === 'ManageAssignments' && selectedStudent) {
           const { data } = await axios.get(`/api/assignments/${selectedStudent.id}`);
           setAssignments(data);
@@ -174,49 +173,56 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
   };
 
   const uploadCourseDocs = async () => {
-    if (!selectedCourse) {
-      return pushToast('Please select a course', 'error');
-    }
-    if (!syllabusFile && !scheduleFile) {
-      return pushToast('Please choose at least one PDF', 'error');
-    }
+  if (!selectedCourse) {
+    return pushToast('Please select a course', 'error');
+  }
+  if (!syllabusFile && !scheduleFile) {
+    return pushToast('Please choose at least one PDF', 'error');
+  }
 
-    const form = new FormData();
-    form.append('courseId', selectedCourse);
-    if (syllabusFile) form.append('syllabus', syllabusFile, syllabusFile.name);
-    if (scheduleFile) form.append('schedule', scheduleFile, scheduleFile.name);
+  const form = new FormData();
+  form.append('courseId', selectedCourse);
+  if (syllabusFile) form.append('syllabus', syllabusFile, syllabusFile.name);
+  if (scheduleFile) form.append('schedule', scheduleFile, scheduleFile.name);
 
-    setLoading(true);
-    try {
-      // 🔧 CHANGED: POST to the existing upload route
-      await axios.post(
-        `/api/admin/course-docs/upload/${encodeURIComponent(selectedCourse)}`,
-        form,
-        {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        }
-      );
+  setLoading(true);
+  try {
+    // 🔧 CHANGED: POST to upload endpoint
+    await axios.post(
+      `/api/admin/course-docs/upload/${encodeURIComponent(selectedCourse)}`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
 
-      pushToast('Course documents uploaded');
+    pushToast('Course documents uploaded');
 
-      // 🔧 CHANGED: Immediately re‐fetch so the UI updates with the new PDF URLs
-      const { data: newData } = await axios.get(
-        `/api/admin/course-docs/upload/${encodeURIComponent(selectedCourse)}`
-      );
-      setCourseDocs({
+    // 🔧 CHANGED: re‐fetch so we know exactly what’s saved in the DB/cloud
+    const { data: newData } = await axios.get(
+      `/api/admin/course-docs/upload/${encodeURIComponent(selectedCourse)}`
+    );
+    // 🔧 CHANGED: replace only the object at courseDocs[selectedCourse]
+    setCourseDocs(prev => ({
+      ...prev,
+      [selectedCourse]: {
         syllabus: newData.syllabus || '',
-        syllabusOriginalName: newData.syllabusOriginalName || '',
+        syllabusOriginalName: syllabusFile?.name || '',
         schedule: newData.schedule || '',
-        scheduleOriginalName: newData.scheduleOriginalName || ''
-      });
-      
-    } catch (e) {
-      console.error(e);
-      pushToast('Upload failed', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+        scheduleOriginalName: scheduleFile?.name || ''
+      }
+    }));
+
+    // 🔧 CHANGED: clear file‐input boxes
+    setSyllabusFile(null);
+    setScheduleFile(null);
+  } catch (err) {
+    console.error(err);
+    pushToast('Upload failed', 'error');
+  } finally {
+    setLoading(false);
+  }
+};
+
+
 
   const createAssignment = async () => {
   if (!selectedStudent) { pushToast('Select a student', 'error'); return; }
@@ -444,65 +450,66 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
                 </Section>
               )}
 
-              {/* Course Docs */}
-              {modalType === 'CourseDocs' && !loading && (
-                <Section>
-                  <Label>Select Course:</Label>
-                  <Select
-                    value={selectedCourse}
-                    onChange={e => setSelectedCourse(e.target.value)}
-                  >
-                    <option value="">-- Select Course --</option>
-                        <option value="Full Stack">Full Stack</option>
-                        <option value="python">Python</option>
-                        <option value="SEO & Digital Marketing">SEO & Digital Marketing</option>
-                        <option value="Graphic Designing">Graphic Designing</option>
-                        <option value="Software Testing">Software Testing</option>
-                        <option value="Business Analyst">Business Analyst</option>
-                        <option value="PHP with Laravel">PHP with Laravel</option>
-                        <option value="Dot Net">Dot Net</option>
-                  </Select>
+                    {/* Course Docs */}
+                    {modalType === 'CourseDocs' && !loading && (
+                      <Section>
+                        <Label>Select Course:</Label>
+                        <Select
+                          value={selectedCourse}
+                          onChange={e => setSelectedCourse(e.target.value)}
+                        >
+                          <option value="">-- Select Course --</option>
+                          <option value="Full Stack">Full Stack</option>
+                          <option value="Python">Python</option>
+                          <option value="SEO & Digital Marketing">SEO & Digital Marketing</option>
+                          <option value="Graphic Designing">Graphic Designing</option>
+                          <option value="Software Testing">Software Testing</option>
+                          <option value="Business Analyst">Business Analyst</option>
+                          <option value="PHP with Laravel">PHP with Laravel</option>
+                          <option value="Dot Net">Dot Net</option>
+                        </Select>
 
-                    {selectedCourse && (
-                      <>
-                        <FileInputWrapper>
-                          <Label>Syllabus PDF:</Label>
-                            <File
-                              type="file"
-                              accept="application/pdf"
-                              onChange={e => setSyllabusFile(e.target.files[0])}
-                            />
-                        </FileInputWrapper>
+                        {selectedCourse && (
+                          <>
+                            <FileInputWrapper>
+                              <Label>Syllabus PDF:</Label>
+                              <File
+                                type="file"
+                                accept="application/pdf"
+                                onChange={e => setSyllabusFile(e.target.files[0])}
+                              />
+                            </FileInputWrapper>
 
-                        <FileInputWrapper>
-                          <Label>Schedule PDF:</Label>
-                            <File
-                              type="file"
-                              accept="application/pdf"
-                              onChange={e => setScheduleFile(e.target.files[0])}
-                            />
-                        </FileInputWrapper>
+                            <FileInputWrapper>
+                              <Label>Schedule PDF:</Label>
+                              <File
+                                type="file"
+                                accept="application/pdf"
+                                onChange={e => setScheduleFile(e.target.files[0])}
+                              />
+                            </FileInputWrapper>
 
                             <Btn onClick={uploadCourseDocs}>Upload Documents</Btn>
 
-                        <List>
-                          <Li>
-                            Syllabus:&nbsp;
-                            {courseDocs[selectedCourse]?.syllabus
-                              ? courseDocs[selectedCourse].syllabusOriginalName
-                              : 'None'}
-                          </Li>
-                          <Li>
-                            Schedule:&nbsp;
-                            {courseDocs[selectedCourse]?.schedule
-                              ? courseDocs[selectedCourse].scheduleOriginalName
-                              : 'None'}
-                          </Li>
-                        </List>
-                      </>
+                            <List>
+                              <Li>
+                                Syllabus:&nbsp;
+                                {courseDocs[selectedCourse]?.syllabus
+                                  ? courseDocs[selectedCourse].syllabusOriginalName
+                                  : 'None'}
+                              </Li>
+                              <Li>
+                                Schedule:&nbsp;
+                                {courseDocs[selectedCourse]?.schedule
+                                  ? courseDocs[selectedCourse].scheduleOriginalName
+                                  : 'None'}
+                              </Li>
+                            </List>
+                          </>
+                        )}
+                      </Section>
                     )}
-                  </Section>
-                )}
+
 
               {/* Manage Assignments */}
               {modalType === 'ManageAssignments' && !loading && (

@@ -42,6 +42,7 @@ export default function AddCandidate() {
     referrerId: '',
     batchNumber: '',
     studentId: '',
+    trainingMode: '',
     candidateName: '',
     college: '',
     candidateDegree: '',
@@ -56,7 +57,7 @@ export default function AddCandidate() {
     coursesEnquired: '',
     dateOfVisit: '',
     paymentTerm: '',
-    communicationScore: ''
+    communicationScore: '',
   });
 
   // Files + cropping
@@ -189,7 +190,7 @@ export default function AddCandidate() {
   const validate = () => {
     const temp = {};
     [
-      'referrerId','batchNumber','candidateName','college','candidateDegree','programme',
+      'referrerId','batchNumber','candidateName','trainingMode','college','candidateDegree','programme',
       'candidateCourseName','marksType','score','mobile','parentMobile','email','coursesEnquired',
       'dateOfVisit','paymentTerm','communicationScore'
     ].forEach(f => {
@@ -305,6 +306,33 @@ export default function AddCandidate() {
                 placeholder="Enter batch number"
               />
             </InputGroup>
+
+            {/* Training Mode */}
+            <InputGroup>
+              <Label>Training Mode</Label>
+              <RadioGroup>
+                <label>
+                  <input
+                    type="radio"
+                    name="trainingMode"
+                    value="Online"
+                    checked={formData.trainingMode === 'Online'}
+                    onChange={handleChange}
+                  /> Online
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="trainingMode"
+                    value="On-campus@ Thanjavur"
+                    checked={formData.trainingMode === 'On-campus@ Thanjavur'}
+                    onChange={handleChange}
+                  /> On-campus @ Thanjavur
+                </label>
+              </RadioGroup>
+              {errors.trainingMode && <ErrorText>{errors.trainingMode}</ErrorText>}
+            </InputGroup>
+
 
             {/* Student ID (readonly) */}
             <InputGroup>

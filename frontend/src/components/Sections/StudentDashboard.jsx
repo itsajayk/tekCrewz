@@ -81,6 +81,16 @@ const darkTheme = {
   buttonColor: '#2f3e4e',
 };
 
+// NEW: calculate how many days until Term II is due
+function calculateDaysUntilTermIIDue(paidDate) {
+  const start = new Date(paidDate);
+  // assume Term II is due 30 days after paidDate (adjust as needed)
+  const due = new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const now = new Date();
+  const diffMs = due - now;
+  return diffMs > 0 ? Math.ceil(diffMs / (1000 * 60 * 60 * 24)) : 0;
+}
+
 // Utility functions
 function getDownloadUrl(fileUrl) {
   try {
@@ -97,11 +107,14 @@ function extractOriginalFileName(fileUrl) {
     const segments = url.pathname.split('/');
     const fileWithPrefix = segments[segments.length - 1];
     const dashIndex = fileWithPrefix.indexOf('-');
-    return dashIndex === -1 ? fileWithPrefix : fileWithPrefix.substring(dashIndex + 1);
+    return dashIndex === -1
+      ? fileWithPrefix
+      : fileWithPrefix.substring(dashIndex + 1);
   } catch (err) {
     return fileUrl;
   }
 }
+
 
 export default function StudentDashboard() {
   const API_BASE_URL = "https://tekcrewz.onrender.com";
@@ -125,7 +138,6 @@ export default function StudentDashboard() {
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
   const closeModal = () => setShowModal(false);
 
-  const [courseDocs, setCourseDocs] = useState([]);
 
     const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -152,13 +164,13 @@ export default function StudentDashboard() {
             ? [prof.courseRegistered] 
             : []);                                          // CHANGED
 
-      const docsArray = [];                                             // CHANGED
-      for (const courseId of registeredCourses) {                       // CHANGED
-        const res = await fetch(`${API_BASE_URL}/api/courses/${encodeURIComponent(courseId)}/docs`); // CHANGED
+       const docsArray = [];                                             // CHANGED :contentReference[oaicite:1]{index=1}
+      for (const courseId of registeredCourses) {                       // CHANGED :contentReference[oaicite:2]{index=2}
+        const res = await fetch(`${API_BASE_URL}/api/courses/${encodeURIComponent(courseId)}/docs`); // CHANGED :contentReference[oaicite:3]{index=3}
         if (res.ok) {
           const obj = await res.json();
           const docEntries = Object.entries(obj).map(([type, url]) => ({ type, url }));
-          docsArray.push({ courseId, docs: docEntries });               // CHANGED
+          docsArray.push({ courseId, docs: docEntries });               // CHANGED :contentReference[oaicite:4]{index=4}
         }
       }
       // ────────────────────────────────────────────────────────────────────────────────
@@ -176,7 +188,6 @@ export default function StudentDashboard() {
           const isUnlocked = unlockedUntil && unlockedUntil > now;
           return {
             ...a,
-            // only closed if past closedAt AND NOT currently unlocked
             closed: closedByTime && !isUnlocked,
             unlocked: Boolean(isUnlocked)
           };
@@ -189,10 +200,12 @@ export default function StudentDashboard() {
         email: prof.email || "",
         mobile: prof.mobile || "",
         programme: prof.programme || "",
+        candidateCourseName: prof.candidateCourseName || "",
         paymentTerm: prof.paymentTerm || "",
         studentId: prof.studentId || "",
         paidAmount: prof.paidAmount || "Not Paid",
         candidatePic: prof.candidatePic || prof.photoUrl || "",
+        paidDate: prof.paidDate || "",
         attendance,
         assignments,
         courseDocs: docsArray
@@ -391,7 +404,8 @@ export default function StudentDashboard() {
     }
   };
 
-  const { candidateName, email, mobile,paidAmount,paymentTerm,studentId,programme, candidatePic, attendance, docs, assignments } = data;
+// NEW: added paidDate to destructuring
+const { candidateName, email, mobile, paidAmount, paidDate, paymentTerm, studentId, candidateCourseName, programme, candidatePic, attendance, courseDocs: docs, assignments } = data;
 
 
  const renderProfileCard = () => {
@@ -403,7 +417,7 @@ export default function StudentDashboard() {
   return (
     // SECTION WRAPPER: constrains to parent <Main> width (no sidebar overlap)
     <SectionWrapper>
-      {/* HEADER BANNER: gradient + overlapping avatar */}
+      {/* HEADER BANNER: gradient   overlapping avatar */}
       <HeaderBanner>
         {candidatePic ? (
           <AvatarLarge src={candidatePic} alt="Profile" />
@@ -413,7 +427,7 @@ export default function StudentDashboard() {
           </AvatarPlaceholderLarge>
         )}
 
-        {/* NAME + ID: slides down/fades in */}
+        {/* NAME   ID: slides down/fades in */}
         <NameIDWrapper>
           <NameAnimated>{candidateName}</NameAnimated> {/* ← text slide‐in animation */}
           <IDAnimated>ID: {studentId}</IDAnimated>       {/* ← subtle fade‐in */}
@@ -422,26 +436,41 @@ export default function StudentDashboard() {
 
       {/* CONTENT GRID: two‐column on desktop, stacks on tablet/mobile */}
       <ContentGrid>
-        {/* LEFT COLUMN: contact + program & tuition status */}
+        {/* LEFT COLUMN: contact   program & tuition status */}
         <LeftInfo>
           <InfoBlock>
-            <BlockTitleAnimated>Contact &amp; Program</BlockTitleAnimated> {/* ← slide‐in */}
+            <BlockTitleAnimated>Profile information</BlockTitleAnimated> {/* ← slide‐in */}
             <InfoLine>
               <IconTextAnimated delay={0.3}><FiMail /> {email}</IconTextAnimated> {/* ← fade‐in delay */}
               <IconTextAnimated delay={0.5}><FiPhone /> {mobile}</IconTextAnimated> {/* ← fade‐in */}
-              <IconTextAnimated delay={0.7}><FiBookOpen /> {programme}</IconTextAnimated> {/* ← fade‐in */}
+              <span delay={0.7}><FiBookOpen /> {programme} ({candidateCourseName})</span> {/* ← fade‐in */}
             </InfoLine>
           </InfoBlock>
-          <InfoBlock>
-            <BlockTitleAnimated>Tuition Status</BlockTitleAnimated> {/* ← slide‐in */}
-            <InfoLine>
-              <InfoTextAnimated delay={0.3}>Payment Term: {paymentTerm}</InfoTextAnimated> {/* ← fade‐in */}
-              <InfoTextAnimated delay={0.5}>Paid: {paidAmount}</InfoTextAnimated>      {/* ← fade‐in */}
-            </InfoLine>
-          </InfoBlock>
+          
+            <InfoBlock>
+              <BlockTitleAnimated>Fee Summary</BlockTitleAnimated>
+              <InfoLine>
+                <InfoTextAnimated delay={0.3}>
+                  Payment Term: {paymentTerm}
+                </InfoTextAnimated>
+                <InfoTextAnimated delay={0.5}>
+                  Paid: {paidAmount}
+                </InfoTextAnimated>
+
+                {/* NEW: Timer for Term II payment due */}
+                {paymentTerm !== 'Full Term' && paidDate && (
+                  <IconTextAnimated delay={0.7}>
+                    <FiClock />
+                    {` ${calculateDaysUntilTermIIDue(paidDate)} Days left for Term II Payment`}
+                  </IconTextAnimated>
+                )}
+              </InfoLine>
+            </InfoBlock>
+
+
         </LeftInfo>
 
-        {/* RIGHT COLUMN: progress + assignments */}
+        {/* RIGHT COLUMN: progress   assignments */}
         <RightInfo>
           <ProgressCard>
             <ProgressLabelAnimated>Your Mastery Progress</ProgressLabelAnimated> {/* ← slide‐in */}
@@ -460,14 +489,14 @@ export default function StudentDashboard() {
           </ProgressCard>
 
           <AssignmentSection>
-            <SectionHeaderAnimated>All Units Status</SectionHeaderAnimated> {/* ← slide‐in */}
+            <SectionHeaderAnimated>Course Units Status</SectionHeaderAnimated> {/* ← slide‐in */}
 
             {assignments.length > 0 ? (
               <AssignmentListWide>
                 {assignments.map((a, idx) => (
                   <AssignmentItemWideAnimated
                     key={a.unit}
-                    delay={0.2 + idx * 0.1} /* staggered fade‐in for each item */
+                    delay={0.2 +  idx * 0.1} /* staggered fade‐in for each item */
                   >
                     <UnitLabel>{`Unit ${a.unit}`}</UnitLabel>
                     {a.results
@@ -527,7 +556,7 @@ const renderAttendance = () => {
       {/* ATTENDANCE CARD LIST (fades in) */}
       <AttendanceListAnimated delay={0.6}>
         {attendanceRecords.map((r, i) => (
-          <AttendanceCardAnimated key={i} delay={0.7 + i * 0.05}>
+          <AttendanceCardAnimated key={i} delay={0.7  + i * 0.05}>
             <DateDisplay>{r.date.toLocaleDateString()}</DateDisplay>
             <StatusBadge status={r.status}>{r.status}</StatusBadge>
           </AttendanceCardAnimated>
@@ -535,7 +564,7 @@ const renderAttendance = () => {
       </AttendanceListAnimated>
 
       {/* REQUEST CHANGE BUTTON (slides up & fades in) */}
-      <RequestButtonAnimated onClick={() => mailRequest('Attendance')} delay={0.7 + attendanceRecords.length * 0.05 + 0.2}>
+      <RequestButtonAnimated onClick={() => mailRequest('Attendance')} delay={0.7  + attendanceRecords.length * 0.05 +  0.2}>
         <FiMail style={{ marginRight: "6px" }} /> Request Change
       </RequestButtonAnimated>
     </AttendanceWrapper>
@@ -545,29 +574,29 @@ const renderAttendance = () => {
 
  // at top of component, after `const { docs } = data;`
 const renderDoc = (type) => {
-  if (!Array.isArray(docs) || !type) return null;
-  const match = docs.find(d =>
-    typeof d.type === 'string'
-    && typeof type === 'string'
-    && d.type.toLowerCase() === type.toLowerCase()
-  );
-  return (
-    <Card>
-      <h3>{match ? match.type : `Document: ${type}`}</h3>
-      {match && (
-        <EmbedWrapper>
-          <iframe
-            src={`https://docs.google.com/gview?url=${encodeURIComponent(match.url)}&embedded=true`}
-            width="100%"
-            height="600px"
-            frameBorder="0"
-          />
-        </EmbedWrapper>
-      )}
-      {!match && <p>No document available.</p>}
-    </Card>
-  );
-};
+    if (!Array.isArray(docs) || !type) return null;
+    const match = docs.find(d =>
+      typeof d.type === 'string'
+      && typeof type === 'string'
+      && d.type.toLowerCase() === type.toLowerCase()
+    );
+    return (
+      <Card>
+        <h3>{match ? match.type : `Document: ${type}`}</h3>
+        {match && (
+          <EmbedWrapper>
+            <iframe
+              src={`https://docs.google.com/gview?url=${encodeURIComponent(match.url)}&embedded=true`}
+              width="100%"
+              height="600px"
+              frameBorder="0"
+            />
+          </EmbedWrapper>
+        )}
+        {!match && <p>No document available.</p>}
+      </Card>
+    );
+  };
 
 
   const renderQuizList = () => (
@@ -604,7 +633,7 @@ const renderUnit = (unit) => {
       {/* TWO‑COLUMN LAYOUT on desktop, single‑column on mobile */}
       <UnitContentGrid>
 
-        {/* LEFT SIDE: Study Material + Download */}
+        {/* LEFT SIDE: Study Material   Download */}
         <LeftColumn>
           <SectionContainerAnimated delay={0.2}>
             <SectionHeading>Study Material</SectionHeading>
@@ -741,21 +770,20 @@ const renderUnit = (unit) => {
       case "Course Docs": return renderDoc()
       case "Unit":
       return renderUnit();
-    case "Syllabus": {
+     // ── SYLLABUS TAB ─────────────────────────────────────────────────────────
+      case "Syllabus": {
         return (
           <DocSectionWrapper>
-            {/* 1) SECTION HEADER: slides in from left */}
             <DocHeaderAnimated>Syllabus</DocHeaderAnimated>
             <DividerAnimated />
 
-            {/* ── CHANGED: Loop over courseDocs and show each course’s syllabus ──────── */} {/* CHANGED */}
-            {courseDocs.length > 0 ? (                                               /* CHANGED */
-              courseDocs.map(cd => {                                                /* CHANGED */
-                const item = cd.docs.find(d => d.type.toLowerCase() === 'syllabus');/* CHANGED */
+            {docs && docs.length > 0 ? (
+              docs.map(cd => {
+                const item = cd.docs.find(d => d.type.toLowerCase() === 'syllabus');
                 return (
                   <React.Fragment key={cd.courseId}>
-                    <CourseTitle>{cd.courseId} – Syllabus</CourseTitle>            {/* CHANGED */}
-                    {item ? (                                                        /* CHANGED */
+                    <CourseTitle>{cd.courseId} – Syllabus</CourseTitle>
+                    {item ? (
                       <DocContentGrid>
                         <DocViewerWrapperAnimated delay={0.4}>
                           <iframe
@@ -764,7 +792,6 @@ const renderUnit = (unit) => {
                             title={`${cd.courseId} Syllabus`}
                           />
                         </DocViewerWrapperAnimated>
-
                         <DocInfoPaneAnimated delay={0.6}>
                           <InfoBadge>Type: {item.type}</InfoBadge>
                           <InfoTextAnimate delay={0.8}>
@@ -790,27 +817,26 @@ const renderUnit = (unit) => {
                 );
               })
             ) : (
-              <NoDocAnimated delay={0.4}>No registered courses found.</NoDocAnimated> /* CHANGED */
+              <NoDocAnimated delay={0.4}>No registered courses found.</NoDocAnimated>
             )}
-            {/* ─────────────────────────────────────────────────────────────────────────── */} {/* CHANGED */}
           </DocSectionWrapper>
         );
       }
+
+      // ── SCHEDULE TAB ─────────────────────────────────────────────────────────
       case "Schedule": {
         return (
           <DocSectionWrapper>
-            {/* 1) SECTION HEADER: slides in from left */}
             <DocHeaderAnimated>Schedule</DocHeaderAnimated>
             <DividerAnimated />
 
-            {/* ── CHANGED: Loop over courseDocs and show each course’s schedule ─────── */} {/* CHANGED */}
-            {courseDocs.length > 0 ? (                                              /* CHANGED */
-              courseDocs.map(cd => {                                                /* CHANGED */
-                const item = cd.docs.find(d => d.type.toLowerCase() === 'schedule');/* CHANGED */
+            {docs && docs.length > 0 ? (
+              docs.map(cd => {
+                const item = cd.docs.find(d => d.type.toLowerCase() === 'schedule');
                 return (
                   <React.Fragment key={cd.courseId}>
-                    <CourseTitle>{cd.courseId} – Schedule</CourseTitle>            {/* CHANGED */}
-                    {item ? (                                                        /* CHANGED */
+                    <CourseTitle>{cd.courseId} – Schedule</CourseTitle>
+                    {item ? (
                       <DocContentGrid>
                         <DocViewerWrapperAnimated delay={0.4}>
                           <iframe
@@ -819,7 +845,6 @@ const renderUnit = (unit) => {
                             title={`${cd.courseId} Schedule`}
                           />
                         </DocViewerWrapperAnimated>
-
                         <DocInfoPaneAnimated delay={0.6}>
                           <InfoBadge>Type: {item.type}</InfoBadge>
                           <InfoTextAnimate delay={0.8}>
@@ -845,9 +870,8 @@ const renderUnit = (unit) => {
                 );
               })
             ) : (
-              <NoDocAnimated delay={0.4}>No registered courses found.</NoDocAnimated> /* CHANGED */
+              <NoDocAnimated delay={0.4}>No registered courses found.</NoDocAnimated>
             )}
-            {/* ─────────────────────────────────────────────────────────────────────────── */} 
           </DocSectionWrapper>
         );
       }
@@ -890,7 +914,7 @@ const renderUnit = (unit) => {
                     </Slider>
                   </SwitchLabel>
                 </ToggleWrapper>
-            <Section>Student Dashboard</Section>
+            <Section>Dashboard</Section>
             {[
               "Profile",
               "Attendance",
@@ -981,10 +1005,10 @@ const SwitchInput = styled.input`
   opacity: 0;
   width: 0;
   height: 0;
-  &:checked + span {
+  &:checked   span {
     background-color: ${p => p.theme.mainBg};
   }
-  &:checked + span:before {
+  &:checked   span:before {
     transform: translateX(26px);
   }
 `;
@@ -1022,6 +1046,7 @@ const Section = styled.h4`
   color: ${p => p.theme.sidebarColor};
   margin-bottom: 10px;
   @media (max-width: 768px) { width: 100%; text-align: center; }
+  text-align: center;
 `;
 
 const NavItem = styled.div`
