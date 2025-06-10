@@ -57,4 +57,45 @@ export default function QuizEditor({ quiz = { title:'', questions:[] }, onChange
   );
 }
 
-// … styled-components for EditorContainer, Input, Label, Button, QuestionBlock, OptionRow …
+// Styled components definitions
+const EditorContainer = styled.div`  // NEW
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  background: #f9f9f9;
+  border-radius: 8px;
+`;
+const Label = styled.label`  // NEW
+  font-weight: bold;
+  margin: 8px 0 4px;
+`;
+const Input = styled.input`  // NEW
+  padding: 8px;
+  margin-bottom: 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+`;
+const QuestionBlock = styled.div`  // NEW
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+`;
+const OptionRow = styled.div`  // NEW
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+`;
+const Button = styled.button`  // NEW
+  padding: 10px 16px;
+  margin-top: 12px;
+  border: none;
+  border-radius: 4px;
+  background: #007bff;
+  color: #fff;
+  cursor: pointer;
+  &:hover {
+    background: #0056b3;
+  }
+`;

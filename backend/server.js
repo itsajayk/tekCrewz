@@ -137,6 +137,14 @@ const assignmentSchema = new mongoose.Schema({
   studyMaterialUrl: String,
   closedAt:         Date,
   unlockedUntil:    Date,
+  unlockRequested:  {
+    type: Boolean,
+    default: false
+  },
+  wasExtended:      {
+    type: Boolean,
+    default: false
+  },
   submissionCode:   String,
   results: {
     score: Number,
@@ -296,19 +304,30 @@ app.get('/api/courses/:courseId/docs', async (req, res) => {
   docs.forEach(d => (out[d.type] = d.url));
   res.json(out);
 });
+
 app.get('/api/assignments/:studentId', async (req, res) => {
-  const all = await Assignment.find({ studentId: req.params.studentId });
-  const now = new Date();
-  res.json(all.map(a => ({
-    unit: a.unit,
-    studyMaterialUrl: a.studyMaterialUrl,
-    closed:     a.closedAt     ? now > a.closedAt     : false,
-    unlocked:   a.unlockedUntil? now < a.unlockedUntil: false,
-    submissionCode: a.submissionCode,
-    results:    a.results,
-    feedback:   a.feedback
-  })));
+  try {
+    const assignments = await Assignment.find({ studentId: req.params.studentId }).lean();
+    const now = new Date();
+    const result = assignments.map(a => {
+      const closedByTime = a.closedAt && now > new Date(a.closedAt);
+      const isUnlocked = a.unlockedUntil && now < new Date(a.unlockedUntil);
+      const open = (!closedByTime) || isUnlocked;
+      return {
+        ...a,
+        closed: !open,                      // true if fully closed
+        unlocked: Boolean(isUnlocked),      // true if in extension window
+        unlockRequested: Boolean(a.unlockRequested),
+        wasExtended: Boolean(a.wasExtended),
+      };
+    });
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
+
 app.post('/api/assignments/:studentId/submit', async (req, res) => {
   await Assignment.findOneAndUpdate(
     { studentId: req.params.studentId, unit: req.body.unit },
@@ -317,11 +336,31 @@ app.post('/api/assignments/:studentId/submit', async (req, res) => {
   res.sendStatus(204);
 });
 app.post('/api/assignments/:studentId/unlock', async (req, res) => {
-  await Assignment.findOneAndUpdate(
-    { studentId: req.params.studentId, unit: req.body.unit },
-    { unlockedUntil: new Date(Date.now() + 2*86400000) }
-  );
-  res.sendStatus(204);
+  try {
+    const { studentId } = req.params;
+    const { unit } = req.body;
+    const assignment = await Assignment.findOne({ studentId, unit });
+    if (!assignment) return res.status(404).json({ error: 'Assignment not found' });
+
+    const now = new Date();
+    const closedByTime = assignment.closedAt && now > assignment.closedAt;
+    const isUnlocked = assignment.unlockedUntil && now < assignment.unlockedUntil;
+    if (!closedByTime && !isUnlocked) {
+      return res.status(400).json({ error: 'Cannot request unlock: assignment still open' });
+    }
+    if (assignment.unlockRequested) {
+      return res.status(400).json({ error: 'Unlock already requested' });
+    }
+    if (assignment.wasExtended) {
+      return res.status(400).json({ error: 'No further extensions allowed' });
+    }
+    assignment.unlockRequested = true;
+    await assignment.save();
+    res.sendStatus(204);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 app.post('/api/assignments/:studentId/feedback', async (req, res) => {
   await Assignment.findOneAndUpdate(
@@ -469,44 +508,34 @@ app.post(
 );
 
 // Admin: Manage Assignments / Results / Unlock / Feedback
-app.post(
-  '/api/admin/students/:id/manageAssignments',
-  uploadAssignment.single('studyMaterial'),
-  async (req, res) => {
-    try {
-      const { unit, closeDays } = req.body;
-      if (!unit) return res.status(400).json({ error: 'unit is required' });
+app.post('/api/admin/students/:id/manageAssignments', uploadAssignment.single('studyMaterial'), async (req, res) => {
+  try {
+    const { unit } = req.body;
+    if (!unit) return res.status(400).json({ error: 'unit is required' });
 
-      const days = parseInt(closeDays, 10);
-      if (isNaN(days))
-        return res.status(400).json({ error: 'closeDays must be a number' });
+    const now = Date.now();
+    const materialUrl = req.file ? req.file.path : req.body.studyMaterialUrl;
 
-      // pick the uploaded file URL or fallback to body URL
-      const materialUrl = req.file
-        ? req.file.path
-        : req.body.studyMaterialUrl;
+    await Assignment.findOneAndUpdate(
+      { studentId: req.params.id, unit },
+      {
+        studyMaterialUrl: materialUrl,
+        createdAt:       new Date(now),
+        closedAt:        new Date(now + 3 * 86400000),
+        unlockedUntil:   null,
+        unlockRequested: false,
+        wasExtended:     false
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
 
-      await Assignment.findOneAndUpdate(
-        { studentId: req.params.id, unit },
-        {
-          studyMaterialUrl: materialUrl,
-          closedAt: new Date(Date.now() + days * 86400000)
-        },
-        { upsert: true }
-      );
-
-      // respond
-      res.set('Access-Control-Allow-Origin', req.get('Origin'));
-      res.sendStatus(204);
-    } catch (err) {
-      console.error(err);
-      res
-        .status(500)
-        .set('Access-Control-Allow-Origin', req.get('Origin'))
-        .json({ error: err.message });
-    }
+    res.set('Access-Control-Allow-Origin', req.get('Origin'));
+    res.sendStatus(204);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
   }
-);
+});
 
 app.post('/api/admin/students/:id/enterResults', async (req, res) => {
   await Assignment.findOneAndUpdate(
@@ -517,11 +546,28 @@ app.post('/api/admin/students/:id/enterResults', async (req, res) => {
 });
 
 app.post('/api/admin/students/:id/approveUnlock', async (req, res) => {
-  await Assignment.findOneAndUpdate(
-    { studentId: req.params.id, unit: req.body.unit },
-    { unlockedUntil: new Date(Date.now() + 2*86400000) }
-  );
-  res.sendStatus(204);
+  try {
+    const studentId = req.params.id;
+    const { unit } = req.body;
+    const assignment = await Assignment.findOne({ studentId, unit });
+    if (!assignment) return res.status(404).json({ error: 'Assignment not found' });
+
+    if (!assignment.unlockRequested) {
+      return res.status(400).json({ error: 'No unlock request pending' });
+    }
+    if (assignment.wasExtended) {
+      return res.status(400).json({ error: 'Assignment already extended once' });
+    }
+    const now = Date.now();
+    assignment.unlockedUntil = new Date(now + 2 * 86400000);
+    assignment.unlockRequested = false;
+    assignment.wasExtended = true;
+    await assignment.save();
+    res.sendStatus(204);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 app.post('/api/admin/students/:id/reviewFeedback', (_req, res) => {

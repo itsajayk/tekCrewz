@@ -271,48 +271,32 @@ export default function StudentDashboard() {
   };
 
 
-  const requestUnlock = async unit => {
+  const requestUnlock = async (unit) => {
+    const { dbId } = data; // change: destructure dbId so dbId is define
   try {
-    const res = await fetch(
-      `${API_BASE_URL}/api/assignments/${data.dbId}/unlock`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ unit }),
-      }
-    );
-    if (!res.ok) throw new Error(`Server responded ${res.status}`);
-
-    // Re-fetch that student’s assignments:
-    const fresh = await fetch(`${API_BASE_URL}/api/assignments/${data.dbId}`);
-    if (!fresh.ok) throw new Error(`Assignments reload failed: ${fresh.status}`);
-    const updated = await fresh.json();
-
-    // Recompute closed & unlocked flags just like on load:
-    const now = new Date();
-    const withFlags = updated.map(a => {
-      const closedByTime = a.closedAt ? now > new Date(a.closedAt) : false;
-      const unlockedUntil = a.unlockedUntil ? new Date(a.unlockedUntil) : null;
-      const isUnlocked = unlockedUntil && unlockedUntil > now;
-
-      return {
-        ...a,
-        closed: closedByTime && !isUnlocked,
-        unlocked: Boolean(isUnlocked)
-      };
+    const res = await fetch(`${API_BASE_URL}/api/assignments/${dbId}/unlock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ unit })
     });
-
-    // Update your dashboard state so the UI refreshes:
-    setData(d => ({ ...d, assignments: withFlags }));
-
-    setModalMsg('Unlock request sent! Await admin approval.');
-    setShowModal(true);
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err.error || 'Unlock request failed');
+    } else {
+      // update local state: set unlockRequested for that unit
+      setData(d => {
+        const newAssignments = d.assignments.map(a =>
+          a.unit === unit ? { ...a, unlockRequested: true } : a
+        );
+        return { ...d, assignments: newAssignments };
+      });
+    }
   } catch (err) {
-    console.error(err);
-    setModalMsg(`Failed to send unlock request: ${err.message}`);
-    setShowModal(true);
+    console.error('Unlock request error:', err);
+    alert('Error requesting unlock');
   }
 };
+
 
 
 
@@ -491,25 +475,48 @@ const { candidateName, email, mobile, paidAmount, paidDate, paymentTerm, student
           <AssignmentSection>
             <SectionHeaderAnimated>Course Units Status</SectionHeaderAnimated> {/* ← slide‐in */}
 
-            {assignments.length > 0 ? (
-              <AssignmentListWide>
-                {assignments.map((a, idx) => (
-                  <AssignmentItemWideAnimated
-                    key={a.unit}
-                    delay={0.2 +  idx * 0.1} /* staggered fade‐in for each item */
-                  >
-                    <UnitLabel>{`Unit ${a.unit}`}</UnitLabel>
-                    {a.results
-                      ? (
-                        <ResultText passed={a.results.passed}>
-                          {a.results.passed ? 'Passed' : 'Failed'} ({a.results.score ?? '—'})
-                        </ResultText>
-                      ) : a.submissionCode
-                        ? <PendingText>Code Submitted</PendingText>
-                        : <PendingText>Pending Submission</PendingText>
-                    }
-                  </AssignmentItemWideAnimated>
-                ))}
+                        {assignments.length > 0 ? (
+                          <AssignmentListWide>
+                            {data.assignments.map(a => {
+              // a.unit, a.closed, a.unlocked, a.unlockRequested, a.wasExtended
+              let statusText;
+              let actionButton = null;
+
+              if (!a.closed) {
+                // still open: either initial window or within unlockedUntil
+                statusText = a.unlocked ? 'Open (extension)' : 'Open';
+                actionButton = (
+                  <Button onClick={() => submitCode(a.unit)}> {/* or submitAssignment */}
+                    Submit Assignment
+                  </Button>
+                );
+              } else {
+                // fully closed
+                if (a.unlockRequested) {
+                  statusText = 'Unlock Requested';
+                  actionButton = null;
+                } else if (!a.wasExtended) {
+                  statusText = 'Closed';
+                  actionButton = (
+                    <Button onClick={() => requestUnlock(a.unit)}>
+                      Request Unlock
+                    </Button>
+                  );
+                } else {
+                  statusText = 'Closed (no further extension)';
+                  actionButton = null;
+                }
+              }
+
+              return (
+                <UnitRow key={a.unit}>
+                  <UnitName>{a.unit}</UnitName>
+                  <StatusText>{statusText}</StatusText>
+                  {actionButton}
+                </UnitRow>
+              );
+            })}
+
               </AssignmentListWide>
             ) : (
               <NoAssignmentsWideAnimated delay={0.5}>
@@ -2084,9 +2091,23 @@ const FeedbackButton = styled.button`
   }
 `;
 
-
 const EmbedWrapper = styled.div`
   width: 100%;
   height: 600px;
   margin-bottom: 16px;
+`;
+
+const UnitRow = styled.div` /* new */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid #ddd;
+`;
+const UnitName = styled.div` /* new */
+  font-weight: 600;
+`;
+const StatusText = styled.div` /* new */
+  font-style: italic;
+  margin-left: 1rem;
 `;

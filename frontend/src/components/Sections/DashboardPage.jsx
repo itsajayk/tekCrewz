@@ -6,21 +6,23 @@ import {
   doc,
   getDocs,
   onSnapshot,
-  collection,
+  collectionGroup,
   query,
   where,
   updateDoc,
   serverTimestamp,
-  addDoc
+  addDoc,
+  writeBatch,
+  doc as fbDoc,
+  collection as fbCol,
 } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
-import { writeBatch, doc as fbDoc, collection as fbCol, getDocs as fbGetDocs } from 'firebase/firestore'; // new
-
 import TopNavbar from '../Nav/TopNavbar';
 import Footer from './Footer';
 import { AuthContext } from '../../contexts/AuthContext';
+import QuizEditor from './QuizEditor'; // NEW
 
 // Helper to format YYYY-MM to "Month YYYY"
 const formatMonth = (ym) => {
@@ -30,6 +32,7 @@ const formatMonth = (ym) => {
 };
 
 const DashboardPage = () => {
+  const API_BASE_URL = "https://tekcrewz.onrender.com";
   const navigate = useNavigate();
   const { role } = useContext(AuthContext);
   const [profile, setProfile] = useState(null);
@@ -41,6 +44,9 @@ const DashboardPage = () => {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState(null);
 
+  const [loading, setLoading] = useState(false);     // NEW
+  const [quizState, setQuizState] = useState({    title: '',   questions: [] });
+
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substr(0,7));
   const [payrollData, setPayrollData] = useState([]);
   const [projectsData, setProjectsData] = useState({ completed: [], inProgress: [] });
@@ -51,16 +57,18 @@ const DashboardPage = () => {
 
   const userId = auth.currentUser?.displayName;
 
-  // Attendance feature for tutors
-  const [showAttendanceModal, setShowAttendanceModal] = useState(false);
-  const [studentsList, setStudentsList] = useState([]);
-  const [selectedStudent, setSelectedStudent] = useState('');
-  const [attendanceRecords, setAttendanceRecords] = useState([]);
-  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().substr(0,10));
-  const [attendanceStatus, setAttendanceStatus] = useState('Present');
-  const [savingAttendance, setSavingAttendance] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showWarningModal, setShowWarningModal] = useState(false);
+const [showAttendanceModal, setShowAttendanceModal] = useState(false);
+const [batches, setBatches] = useState([]);
+const [courses, setCourses] = useState([]);
+const [selectedBatch, setSelectedBatch] = useState('');
+const [selectedCourse, setSelectedCourse] = useState('');
+const [selectedTrainingMode, setSelectedTrainingMode] = useState('');
+const [filteredCandidates, setFilteredCandidates] = useState([]);
+const [absentCandidates, setAbsentCandidates] = useState([]);
+const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().substr(0, 10));
+const [savingAttendance, setSavingAttendance] = useState(false);
+const [showSuccessModal, setShowSuccessModal] = useState(false);
+const [showWarningModal, setShowWarningModal] = useState(false);
 
   // ONLY tutors: IDs starting EMPDT or EMPTR
   const isTutor = userId?.startsWith('EMPDT') || userId?.startsWith('EMPTR');
@@ -71,51 +79,141 @@ const DashboardPage = () => {
   const [selectedStudentForAssign, setSelectedStudentForAssign] = useState('');
   const [resultsInputs, setResultsInputs] = useState({}); 
   const [assignLoading, setAssignLoading] = useState(false);
+  // ── For Assignments dropdown ─────────────────────────────────────────
+  const [studentsList, setStudentsList] = useState([]); // new
+  const [trainingModes, setTrainingModes] = useState([]);
+
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [unlockRequests, setUnlockRequests] = useState([]);
+  
+
+  const [selectedBatchForAssign, setSelectedBatchForAssign] = useState('');               // new
+  const [selectedCourseForAssign, setSelectedCourseForAssign] = useState('');             // new
+  const [selectedTrainingModeForAssign, setSelectedTrainingModeForAssign] = useState(''); // new
+  const [filteredAssignCandidates, setFilteredAssignCandidates] = useState([]);           // new
+
+  const [toasts, setToasts] = useState([]);
+  
+
+  const [newAssignment, setNewAssignment] = useState({
+    unit: '',
+    studyMaterialUrl: '',
+    studyMaterialFile: null,
+    closeDays: 3
+  });
 
   // Ensure arrays exist
   const projects = Array.isArray(profile?.projects) ? profile.projects : [];
   const tasks = Array.isArray(profile?.tasks) ? profile.tasks : [];
 
-const [batches, setBatches] = useState([]); // new
-const [courses, setCourses] = useState([]); // new
-const [selectedBatch, setSelectedBatch] = useState(''); // new
-const [selectedCourse, setSelectedCourse] = useState(''); // new
-const [selectedTrainingMode, setSelectedTrainingMode] = useState(''); // new
-const [filteredCandidates, setFilteredCandidates] = useState([]); // new
-const [absentCandidates, setAbsentCandidates] = useState([]); // new
+  const pushToast = (message, type='success') => {
+    const id = Date.now();
+    setToasts(t => [...t, { id, message, type }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
+  };
 
-
-  // Fetch batches from Firebase
 useEffect(() => {
-  fbGetDocs(fbCol(db, 'batch')).then(snap => {
-    setBatches(snap.docs.map(d => d.id));
-  });
+    axios.get(`${API_BASE_URL}/api/candidates`)
+      .then(res => {
+        const unique = [...new Set(res.data
+          .map(c => {
+            const m = c.studentId.match(/BT(\d+)FS/);
+            return m ? m[1] : null;
+          })
+          .filter(b => b))];
+        setBatches(unique.sort((a, b) => a - b));
+      })
+      .catch(console.error);
+  }, []); // new
+
+
+// Fetch all courses from Mongo (using the correct field name)
+useEffect(() => {
+  axios.get(`${API_BASE_URL}/api/candidates`)
+    .then(res => {
+      // use c.courseRegistered, not candidateCourseName
+      const uniques = [...new Set(res.data.flatMap(c => c.courseRegistered))];
+      setCourses(uniques);
+    })
+    .catch(console.error);
 }, []);
 
-// Fetch all courses from Mongo
-useEffect(() => {
-  axios.get('/api/candidates').then(res => {
-    const uniques = [...new Set(res.data.map(c => c.candidateCourseName))];
-    setCourses(uniques);
-  });
-}, []);
+    useEffect(() => {
+      axios.get(`${API_BASE_URL}/api/candidates`)
+        .then(res => {
+          const modes = [...new Set(res.data.map(c => c.trainingMode))];
+          setTrainingModes(modes);
+        })
+        .catch(console.error);
+    }, []);
 
-// Load candidates based on selected filters
+  // Reload candidates when filters change
+  useEffect(() => {
+    if (!selectedBatch || !selectedCourse || !selectedTrainingMode) {
+      setFilteredCandidates([]);
+      return;
+    }
+    axios.get('/api/candidates')
+      .then(res => {
+        const list = res.data.filter(c =>
+          c.studentId.includes(`BT${selectedBatch}FS`) &&          // filter by batch
+          Array.isArray(c.courseRegistered) &&                      // ensure array
+          c.courseRegistered.includes(selectedCourse) &&           // change: use includes for array
+          c.trainingMode === selectedTrainingMode                  // filter by mode
+        );
+        setFilteredCandidates(list);
+        setAbsentCandidates([]);
+      })
+      .catch(console.error);
+  }, [selectedBatch, selectedCourse, selectedTrainingMode]); // new
+
+// CHANGED: Reset quiz when student changes
 useEffect(() => {
-  if (!selectedBatch || !selectedCourse || !selectedTrainingMode) {
-    setFilteredCandidates([]);
+  setQuizState({ title: '', questions: [] });
+  setAssignmentsList([]);
+  setResultsInputs({});
+  setUnlockRequests([]); // NEW
+}, [selectedStudentForAssign]);
+
+    // Fetch all candidates for the “Mark Assignments” dropdown
+      useEffect(() => {
+        if (!isTutor) return; 
+        axios.get(`${API_BASE_URL}/api/candidates`)
+          .then(res => setStudentsList(res.data))
+          .catch(console.error);
+      }, [isTutor]);
+
+      useEffect(() => {
+      axios.get(`${API_BASE_URL}/api/candidates`)
+        .then(res => {
+          setBatches([...new Set(res.data.map(c => {
+            const m = c.studentId.match(/BT(\d+)FS/);
+            return m?.[1];
+          }).filter(Boolean))].sort((a,b)=>a-b));
+          setCourses([...new Set(res.data.flatMap(c => c.courseRegistered))]);
+          setTrainingModes([...new Set(res.data.map(c => c.trainingMode))]);
+        })
+        .catch(console.error);
+    }, []);
+
+
+    // ── Filter candidates on dropdown/radio change ────────────────────────────────────
+useEffect(() => {                                                                        // new
+  if (!selectedBatchForAssign || !selectedCourseForAssign || !selectedTrainingModeForAssign) {
+    setFilteredAssignCandidates([]);
     return;
   }
-  axios.get('/api/candidates').then(res => {
-    const list = res.data.filter(c =>
-      c.batchNumber === selectedBatch &&
-      c.candidateCourseName === selectedCourse &&
-      c.trainingMode === selectedTrainingMode
-    );
-    setFilteredCandidates(list);
-    setAbsentCandidates([]);
-  });
-}, [selectedBatch, selectedCourse, selectedTrainingMode]);
+  axios.get(`${API_BASE_URL}/api/candidates`)
+    .then(res => {
+      setFilteredAssignCandidates(res.data.filter(c =>
+        c.studentId.includes(`BT${selectedBatchForAssign}FS`) &&
+        Array.isArray(c.courseRegistered) &&
+        c.courseRegistered.includes(selectedCourseForAssign) &&
+        c.trainingMode === selectedTrainingModeForAssign
+      ));
+    })
+    .catch(console.error);
+}, [selectedBatchForAssign, selectedCourseForAssign, selectedTrainingModeForAssign]);
 
 
   // Fetch profile & split projects
@@ -149,80 +247,61 @@ useEffect(() => {
     );
   }, [selectedMonth, profile]);
 
-  // Fetch students for attendance & assignments
-  useEffect(() => {
-    if (!isTutor) return;
-    const q = query(collection(db, 'users'), where('role', '==', 'student'));
-    getDocs(q).then(snap => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setStudentsList(list);
-    });
-  }, [isTutor]);
-
-  // Save attendance record with checks
-  const saveAttendance = async () => {
-    if (!selectedStudent) return;
-    // Check for existing record same day
-    const sameDay = attendanceRecords.find(r => {
-      const recDate = r.date?.toDate ? r.date.toDate() : new Date(r.date);
-      return recDate.toISOString().substr(0,10) === attendanceDate;
-    });
-    if (sameDay) {
-      setShowWarningModal(true);
-      return;
-    }
-
-    setSavingAttendance(true);
-    try {
-      await addDoc(collection(db,'attendance'), {
-        studentId: selectedStudent,
-        date: new Date(attendanceDate),
-        status: attendanceStatus,
-        timestamp: serverTimestamp()
-      });
-      setShowSuccessModal(true);
-    } catch (err) {
-      console.error(err);
-      alert('Failed to save attendance');
-    } finally {
-      setSavingAttendance(false);
-    }
-  };
-
-  const submitBatchAttendance = async () => {
-  setSavingAttendance(true);
+// Example: approving unlock for a particular assignment unit for a student
+const approveUnlock = async (studentId, unit) => {
   try {
-    const batch = writeBatch(db);
-    filteredCandidates.forEach(c => {
-      const ref = fbDoc(fbCol(db, 'attendance'));
-      batch.set(ref, {
-        studentId: c.studentId,
-        date: new Date(attendanceDate),
-        status: absentCandidates.includes(c._id) ? 'Absent' : 'Present',
-        timestamp: serverTimestamp()
-      });
-    });
-    await batch.commit();
-    setShowSuccessModal(true);
+    await axios.post(`${API_BASE_URL}/api/admin/students/${studentId}/approveUnlock`, { unit });
+    // Optionally refetch assignments list or update local state:
+    // e.g., reload assignments for that student:
+    const res = await axios.get(`${API_BASE_URL}/api/assignments/${studentId}`);
+    // update state where you store assignments
   } catch (err) {
-    console.error(err);
-    setShowWarningModal(true);
-  } finally {
-    setSavingAttendance(false);
+    console.error('Failed to approve unlock:', err.response?.data || err);
+    alert(err.response?.data?.error || 'Error approving unlock');
   }
 };
 
 
-  // Subscribe attendance records when a student selected
-  useEffect(() => {
-    if (!selectedStudent) return;
-    const q = query(collection(db, 'attendance'), where('studentId', '==', selectedStudent));
-    const unsub = onSnapshot(q, snap => {
-      const recs = snap.docs.map(d => d.data());
-      setAttendanceRecords(recs.sort((a,b) => new Date(b.date) - new Date(a.date)));
-    });
-    return unsub;
-  }, [selectedStudent]);
+      const submitBatchAttendance = async () => {
+      setSavingAttendance(true);
+      try {
+        const batch = writeBatch(db);
+        filteredCandidates.forEach(c => {
+          const ref = fbDoc(fbCol(db, 'attendance'));
+          const status = absentCandidates.includes(c._id) ? 'Absent' : 'Present'; // new
+          batch.set(ref, {
+            studentId: c.studentId,
+            candidateName: c.candidateName,
+            batchNumber: selectedBatch,
+            courseRegistered: selectedCourse,
+            trainingMode: selectedTrainingMode,
+            status,                                                  // new
+            date: attendanceDate,
+            createdAt: serverTimestamp(),
+          });
+        });
+        await batch.commit();
+        setShowSuccessModal(true);
+      } catch (err) {
+        console.error('Attendance save error:', err);
+        setShowWarningModal(true);
+      } finally {
+        setSavingAttendance(false);
+      }
+    };
+
+    // CHANGED: hit the admin‐quiz upsert endpoint
+        const saveQuiz = async (studentId, quiz) => {
+  setAssignLoading(true);
+  try {
+    await axios.post(`${API_BASE_URL}/api/admin/quizzes`, { studentId, ...quiz });
+    pushToast('Quiz assigned');
+  } catch {
+    pushToast('Failed to save quiz', 'error');
+  } finally {
+    setAssignLoading(false);
+  }
+};
 
   // Open project edit modal
   const openEditModal = (idx) => {
@@ -307,7 +386,7 @@ useEffect(() => {
   useEffect(() => {
     if (!selectedStudentForAssign) return;
     setAssignLoading(true);
-    axios.get(`https://tekcrewz.onrender.com/api/assignments/${selectedStudentForAssign}`)
+    axios.get(`${API_BASE_URL}/api/assignments/${selectedStudentForAssign}`)
       .then(res => {
         // res.data is array of assignments for that student
         setAssignmentsList(res.data);
@@ -329,18 +408,50 @@ useEffect(() => {
       .finally(() => setAssignLoading(false));
   }, [selectedStudentForAssign]);
 
+  const createAssignment = async () => {
+  if (!selectedStudentForAssign) { pushToast('Select a student', 'error'); return; } // CHANGED
+  setAssignLoading(true);
+  try {
+    const form = new FormData();
+    form.append('unit', newAssignment.unit);
+    form.append('closeDays', newAssignment.closeDays);
+    if (newAssignment.studyMaterialFile) {
+      form.append('studyMaterial', newAssignment.studyMaterialFile);
+    } else {
+      form.append('studyMaterialUrl', newAssignment.studyMaterialUrl);
+    }
+
+    await axios.post(
+      `/api/admin/students/${selectedStudentForAssign}/manageAssignments`, // CHANGED: use selectedStudentForAssign directly
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+
+    // refresh list
+    const { data } = await axios.get(`/api/assignments/${selectedStudentForAssign}`); // CHANGED
+    setAssignmentsList(data);
+    pushToast('Assignment created');
+    setNewAssignment({ unit:'', studyMaterialUrl:'', studyMaterialFile:null, closeDays:3 });
+  } catch (err) {
+    console.error(err);
+    pushToast('Failed to create assignment', 'error');
+  } finally {
+    setAssignLoading(false); // CHANGED: use assignLoading state
+  }
+};
+
   // Save a single assignment result
   const saveAssignmentResult = async (unit) => {
     if (!selectedStudentForAssign) return;
     const { score, passed } = resultsInputs[unit];
     try {
       await axios.post(
-        `https://tekcrewz.onrender.com/api/admin/students/${selectedStudentForAssign}/enterResults`,
+        `${API_BASE_URL}/api/admin/students/${selectedStudentForAssign}/enterResults`,
         { unit, results: { score: Number(score), passed } }
       );
       // Optionally, show a small “saved” indicator or reload assignmentsList
       // For now, just reload that student’s assignments:
-      const res = await axios.get(`https://tekcrewz.onrender.com/api/assignments/${selectedStudentForAssign}`);
+      const res = await axios.get(`${API_BASE_URL}/api/assignments/${selectedStudentForAssign}`);
       setAssignmentsList(res.data);
       // Ensure resultsInputs updated from new data
       const updatedInputs = { ...resultsInputs };
@@ -389,11 +500,11 @@ useEffect(() => {
             <>
               <Card onClick={() => setShowAttendanceModal(true)}>
                 <CardIcon>📝</CardIcon>
-                <CardTitle>Attendance</CardTitle>
+                <CardTitle>Mark Attendance</CardTitle>
               </Card>
               <Card onClick={() => setShowAssignmentsModal(true)}>
                 <CardIcon>📚</CardIcon>
-                <CardTitle>Mark Assignments</CardTitle>
+                <CardTitle>Assignment Settings</CardTitle>
               </Card>
             </>
           )}
@@ -611,20 +722,18 @@ useEffect(() => {
           </ModalOverlay>
         )}
 
-        {/* Attendance Modal */}
-        {showAttendanceModal && (
+                    {/* Attendance Modal */}
+              {showAttendanceModal && (
           <ModalOverlay onClick={() => setShowAttendanceModal(false)}>
             <ModalContent onClick={e => e.stopPropagation()}>
-              <ModalHeader>Mark Attendance</ModalHeader>
+              <ModalHeader>Mark Attendance</ModalHeader> {/* change */}
 
               {/* Batch Selector */}
               <FormRow>
                 <label>Batch</label>
                 <select value={selectedBatch} onChange={e => setSelectedBatch(e.target.value)}>
                   <option value="">Select Batch</option>
-                  {batches.map(b => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
+                  {batches.map(b => <option key={b} value={b}>{`Batch ${b}`}</option>)}
                 </select>
               </FormRow>
 
@@ -633,201 +742,206 @@ useEffect(() => {
                 <label>Course</label>
                 <select value={selectedCourse} onChange={e => setSelectedCourse(e.target.value)}>
                   <option value="">Select Course</option>
-                  {courses.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
+                  {courses.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </FormRow>
 
-              {/* Training Mode */}
+              {/* Training Mode Selector */}
               <FormRow>
-                <label>Training Mode</label>
-                <select value={selectedTrainingMode} onChange={e => setSelectedTrainingMode(e.target.value)}>
-                  <option value="">Select Mode</option>
-                  <option value="Online">Online</option>
-                  <option value="On-campus@ Thanjavur">On-campus@ Thanjavur</option>
-                </select>
+                <label>Training Mode</label> {/* new */}
+                <div>
+                  <label>
+                    <input
+                      type="radio"
+                      name="trainingMode"
+                      value="Online"
+                      checked={selectedTrainingMode === 'Online'}
+                      onChange={e => setSelectedTrainingMode(e.target.value)}
+                    /> Online
+                  </label>
+                  <label style={{ marginLeft: '1rem' }}>
+                    <input
+                      type="radio"
+                      name="trainingMode"
+                      value="On-campus@ Thanjavur"
+                      checked={selectedTrainingMode === 'On-campus@ Thanjavur'}
+                      onChange={e => setSelectedTrainingMode(e.target.value)}
+                    /> On-campus @ Thanjavur
+                  </label>
+                </div>
               </FormRow>
 
-              {/* Candidate Table */}
-              {filteredCandidates.length > 0 && (
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Absent?</th>
-                      <th>Candidate ID</th>
-                      <th>Name</th>
+              {/* Candidates List */}
+              <AttendanceList>
+                <thead>
+                  <tr>
+                    <th>Absent?</th>
+                    <th>Candidate ID</th>
+                    <th>Name</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredCandidates.map(c => (
+                    <tr key={c._id}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={absentCandidates.includes(c._id)}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setAbsentCandidates([...absentCandidates, c._id]);
+                            } else {
+                              setAbsentCandidates(absentCandidates.filter(id => id !== c._id));
+                            }
+                          }}
+                        />
+                      </td>
+                      <td>{c.studentId}</td>
+                      <td>{c.candidateName}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {filteredCandidates.map(c => (
-                      <tr key={c._id}>
-                        <td>
-                          <input
-                            type="checkbox"
-                            checked={absentCandidates.includes(c._id)}
-                            onChange={e => {
-                              if (e.target.checked) {
-                                setAbsentCandidates([...absentCandidates, c._id]);
-                              } else {
-                                setAbsentCandidates(absentCandidates.filter(id => id !== c._id));
-                              }
-                            }}
-                          />
-                        </td>
-                        <td>{c.studentId}</td>
-                        <td>{c.candidateName}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-
-            <ModalActions>
-              <button
-                onClick={submitBatchAttendance}
-                disabled={savingAttendance || !filteredCandidates.length}
-              >
-                {savingAttendance ? 'Saving…' : 'Submit'}
-              </button>
-              <button onClick={() => setShowAttendanceModal(false)}>Close</button>
-            </ModalActions>
-          </ModalContent>
-        </ModalOverlay>
-      )}
-
-        {/* Attendance Success Modal */}
-        {showSuccessModal && (
-          <ModalOverlay onClick={() => setShowSuccessModal(false)}>
-            <ModalContent onClick={e => e.stopPropagation()}>
-              <p>Attendance marked successfully!</p>
-              <Button onClick={() => setShowSuccessModal(false)}>OK</Button>
-            </ModalContent>
-          </ModalOverlay>
-        )}
-
-        {/* Attendance Warning Modal */}
-        {showWarningModal && (
-          <ModalOverlay onClick={() => setShowWarningModal(false)}>
-            <ModalContent onClick={e => e.stopPropagation()}>
-              <p>Attendance for this student on this date has already been recorded.</p>
-              <Button onClick={() => setShowWarningModal(false)}>OK</Button>
-            </ModalContent>
-          </ModalOverlay>
-        )}
-
-        {/* Assignments Modal (Tutor only) */}
-        {showAssignmentsModal && (
-          <ModalOverlay onClick={() => setShowAssignmentsModal(false)}>
-            <ModalContent onClick={e => e.stopPropagation()}>
-              <ModalHeader>Mark Assignments</ModalHeader>
-              <FormRow>
-                <Select
-                  value={selectedStudentForAssign}
-                  onChange={e => setSelectedStudentForAssign(e.target.value)}
-                >
-                  <option value="">Select Student</option>
-                  {studentsList.map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.candidateName || s.id}
-                    </option>
                   ))}
-                </Select>
-              </FormRow>
-
-              {assignLoading ? (
-                <p>Loading assignments…</p>
-              ) : (
-                <>
-                  {assignmentsList.length > 0 ? (
-                    <ProjectDetailsTable>
-                      <thead>
-                        <tr>
-                          <th>#</th>
-                          <th>Unit</th>
-                          <th>Uploaded File</th>
-                          <th>Score</th>
-                          <th>Passed</th>
-                          <th>Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {assignmentsList.map((a, idx) => (
-                          <tr key={a.unit}>
-                            <td>{idx + 1}</td>
-                            <td>{a.unit}</td>
-                            <td>
-                              {a.submissionFileUrl ? (
-                                <a
-                                  href={a.submissionFileUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  View File
-                                </a>
-                              ) : a.submissionCode ? (
-                                <pre style={{ whiteSpace: 'pre-wrap', maxWidth: '200px' }}>
-                                  {a.submissionCode}
-                                </pre>
-                              ) : (
-                                '—'
-                              )}
-                            </td>
-                            <td>
-                              <Input
-                                type="number"
-                                value={resultsInputs[a.unit]?.score || ''}
-                                onChange={e => {
-                                  const val = e.target.value;
-                                  setResultsInputs(ri => ({
-                                    ...ri,
-                                    [a.unit]: {
-                                      ...ri[a.unit],
-                                      score: val
-                                    }
-                                  }));
-                                }}
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="checkbox"
-                                checked={resultsInputs[a.unit]?.passed || false}
-                                onChange={e => {
-                                  const checked = e.target.checked;
-                                  setResultsInputs(ri => ({
-                                    ...ri,
-                                    [a.unit]: {
-                                      ...ri[a.unit],
-                                      passed: checked
-                                    }
-                                  }));
-                                }}
-                              />
-                            </td>
-                            <td>
-                              <ActionBtn onClick={() => saveAssignmentResult(a.unit)}>
-                                Save
-                              </ActionBtn>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </ProjectDetailsTable>
-                  ) : (
-                    <NoData>No assignments submitted by this student yet.</NoData>
-                  )}
-                </>
-              )}
+                </tbody>
+              </AttendanceList>
 
               <ModalActions>
-                <Button variant="secondary" onClick={() => setShowAssignmentsModal(false)}>
+                <Button
+                  onClick={submitBatchAttendance}
+                  disabled={savingAttendance || !filteredCandidates.length}
+                >
+                  {savingAttendance ? 'Saving…' : 'Submit'}
+                </Button>
+                <Button variant="secondary" onClick={() => setShowAttendanceModal(false)}>
                   Close
                 </Button>
               </ModalActions>
+
+              {/* Success & Warning Modals */}
+              {showSuccessModal && (
+                <ModalOverlay onClick={() => setShowSuccessModal(false)}>
+                  <ModalContent>
+                    <ModalHeader>Success</ModalHeader>
+                    <p>Attendance marked successfully!</p>
+                    <ModalActions>
+                      <Button onClick={() => setShowSuccessModal(false)}>OK</Button>
+                    </ModalActions>
+                  </ModalContent>
+                </ModalOverlay>
+              )}
+              {showWarningModal && (
+                <ModalOverlay onClick={() => setShowWarningModal(false)}>
+                  <ModalContent>
+                    <ModalHeader>Warning</ModalHeader>
+                    <p>Attendance for this date has already been recorded.</p>
+                    <ModalActions>
+                      <Button onClick={() => setShowWarningModal(false)}>OK</Button>
+                    </ModalActions>
+                  </ModalContent>
+                </ModalOverlay>
+              )}
+
             </ModalContent>
           </ModalOverlay>
         )}
+
+              {/* Assignments Modal (Tutor only) */}
+              {showAssignmentsModal && (
+              <ModalOverlay onClick={() => setShowAssignmentsModal(false)}>
+                <ModalContent onClick={e => e.stopPropagation()}>
+                  <ModalHeader>Assignment Settings</ModalHeader>
+
+                  {/* Steps 1–4: filters & candidates */}
+                  <FormRow>
+                    <Label>Batch</Label>
+                    <Select value={selectedBatchForAssign} onChange={e=>setSelectedBatchForAssign(e.target.value)}>
+                      <option value="">Select Batch</option>
+                      {batches.map(b=><option key={b} value={b}>{`Batch ${b}`}</option>)}
+                    </Select>
+                  </FormRow>
+                  <FormRow>
+                    <Label>Course</Label>
+                    <Select value={selectedCourseForAssign} onChange={e=>setSelectedCourseForAssign(e.target.value)}>
+                      <option value="">Select Course</option>
+                      {courses.map(c=><option key={c} value={c}>{c}</option>)}
+                    </Select>
+                  </FormRow>
+                  <FormRow>
+                    <Label>Training Mode</Label>
+                    <div>{trainingModes.map(m=>(<label key={m}><input type="radio" name="mode" value={m} checked={selectedTrainingModeForAssign===m} onChange={e=>setSelectedTrainingModeForAssign(e.target.value)}/> {m}</label>))}</div>
+                  </FormRow>
+                  <Section>
+              <Label>Candidates</Label>
+              {filteredAssignCandidates.length ? (
+                filteredAssignCandidates.map(c => (
+                  <Item
+                      key={c._id}
+                      selected={selectedStudentForAssign === c.studentId}             // change: compare to studentId
+                      onClick={() => setSelectedStudentForAssign(c.studentId)}        // change: store studentId
+                    >
+                      {c.studentId} — {c.candidateName}
+                    </Item>
+                ))
+              ) : (
+                <NoData>No candidates match those filters.</NoData>
+              )}
+            </Section>
+
+                  {selectedStudentForAssign && <>
+                    {/* 3.1 Code Work */}
+                    <Section>
+                      <Label>Assign Code Work</Label>
+                      <Input placeholder="Unit" value={newAssignment.unit} onChange={e=>setNewAssignment(p=>({...p,unit:e.target.value}))}/>
+                      <Input type="url" placeholder="Material URL" value={newAssignment.studyMaterialUrl} onChange={e=>setNewAssignment(p=>({...p,studyMaterialUrl:e.target.value}))}/> {/* NEW */}
+                      <Input type="file" accept="application/pdf" onChange={e=>setNewAssignment(p=>({...p,studyMaterialFile:e.target.files[0]}))}/> {/* NEW */}
+                      <Btn onClick={createAssignment}>Create</Btn>
+                    </Section>
+
+                    {/* 3.2 Quiz */}
+                    <Section>
+                      <Label>Assign Quiz</Label>
+                      <QuizEditor quiz={quizState} onChange={setQuizState} onSave={()=>saveQuiz(selectedStudentForAssign,quizState)}/>
+                    </Section>
+
+                    {/* 3.3 Results */}
+                    <Section>
+                      <Label>Assignment Results</Label>
+                      {assignLoading ? <p>Loading…</p> : assignmentsList.length ? (
+                        <ProjectDetailsTable>…</ProjectDetailsTable>
+                      ) : <NoData>No assignments.</NoData>}
+                    </Section>
+
+                    {/* 3.4 Unlock Requests */} {/* NEW */}
+                    <Section>
+                      <Label>Unlock Requests</Label>
+                      {unlockRequests.length ? unlockRequests.map(r=>(
+                        <div key={r._id} style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+                          <span>{r.unit} — {r.reason}</span>
+                          <span>
+                            <ActionBtn onClick={()=>approveUnlock(r._id,true)}>Approve</ActionBtn>
+                            <ActionBtn onClick={()=>approveUnlock(r._id,false)}>Reject</ActionBtn>
+                          </span>
+                        </div>
+                      )) : <NoData>No unlock requests.</NoData>}
+                    </Section>
+                  </>}
+
+                  <ModalActions>
+                    <Button variant="secondary" onClick={()=>setShowAssignmentsModal(false)}>Close</Button>
+                  </ModalActions>
+                </ModalContent>
+              </ModalOverlay>
+            )}
+
+
+
+            {/* Toast Container */}
+            <ToastContainer>
+              {toasts.map(t=>(
+                <Toast key={t.id} type={t.type}>
+                  {t.message}
+                  <CloseToast onClick={()=>setToasts(ts=>ts.filter(x=>x.id!==t.id))}>✕</CloseToast>
+                </Toast>
+              ))}
+            </ToastContainer>
 
       </Content>
       <Footer />
@@ -836,6 +950,28 @@ useEffect(() => {
 };
 
 export default DashboardPage;
+
+
+/* Styled Components */
+const ToastContainer = styled.div`
+  position: fixed;
+  top: 16px; right: 16px;
+  display: flex; flex-direction: column; gap: 8px;
+  z-index: 1000;
+`;
+const Toast = styled.div`
+  background: ${p=>p.type==='error'? '#f56260':'#60d394'};
+  color: white;
+  padding: 12px 16px;
+  border-radius: 4px;
+  font-weight: 500;
+  display: flex; align-items: center; justify-content: space-between;
+`;
+const CloseToast = styled.span`
+  cursor: pointer;
+  margin-left: 12px;
+  font-size: 14px;
+`;
 
 // Styled Components
 const Container = styled.div`
@@ -895,7 +1031,7 @@ const ModalOverlay = styled.div`
 `;
 const ModalContent = styled.div`
   background: #fff;
-  padding: 30px;
+  padding: 50px;
   border-radius: 8px;
   width: 100%;
   max-width: 700px;
@@ -1062,3 +1198,11 @@ const Spinner = styled.div`
   height: 40px;
   animation: ${spin} 1s linear infinite;
 `;
+
+const Label = styled.label`font-weight:600;`;
+
+const Section = styled.div`display:flex;flex-direction:column;gap:12px;`;
+
+const Item = styled.li`padding:8px;border-bottom:1px solid #ddd;background:${p=>p.selected?'#e6f7ff':'transparent'};cursor:pointer;&:hover{background:#f0f0f0;}`;
+
+const Btn = styled.button`padding:8px 16px;background:#4caf50;color:#fff;border:none;border-radius:8px;cursor:pointer;align-self:flex-start;&:hover{background:#45a047;}`;
