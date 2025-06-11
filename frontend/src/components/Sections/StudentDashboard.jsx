@@ -19,6 +19,9 @@ import {
   FiMail,
   FiPhone,
   FiBookOpen,
+  FiHelpCircle,
+  FiCoffee,
+  FiLoader, 
 } from "react-icons/fi";
 import axios from "axios";
 
@@ -81,15 +84,18 @@ const darkTheme = {
   buttonColor: '#2f3e4e',
 };
 
-// NEW: calculate how many days until Term II is due
+// NEW: calculate how many days until Term II is due, returns null if invalid date
 function calculateDaysUntilTermIIDue(paidDate) {
+  if (!paidDate) return null;
   const start = new Date(paidDate);
-  // assume Term II is due 30 days after paidDate (adjust as needed)
+  if (isNaN(start.getTime())) return null; // invalid date
+  // assume Term II is due 30 days after paidDate (adjust if needed)
   const due = new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
   const now = new Date();
   const diffMs = due - now;
   return diffMs > 0 ? Math.ceil(diffMs / (1000 * 60 * 60 * 24)) : 0;
 }
+
 
 // Utility functions
 function getDownloadUrl(fileUrl) {
@@ -115,6 +121,9 @@ function extractOriginalFileName(fileUrl) {
   }
 }
 
+// Replace or expand this according to your quiz-rendering logic.
+
+
 
 export default function StudentDashboard() {
   const API_BASE_URL = "https://tekcrewz.onrender.com";
@@ -135,9 +144,80 @@ export default function StudentDashboard() {
     // Track uploaded files per unit
   const [uploadedFiles, setUploadedFiles] = useState({});
 
+    // ─── StudentDashboard.jsx ─── inside component, with other useState ─────────
+  const [unlockLoading, setUnlockLoading] = useState(false);    // new: loading spinner for unlock requests
+  const [toastMsg, setToastMsg] = useState('');                 // new: message for toast
+  const [showToast, setShowToast] = useState(false);            // new: control toast visibility
+
+  // new states for quiz fetching
+  const [unitQuizData, setUnitQuizData] = useState(null);       // holds quiz data for current unit
+  const [quizLoading, setQuizLoading] = useState(false);        // loading state for quiz fetch
+  const [quizError, setQuizError] = useState(null);             // error fetching quiz
+
+  const [activeUnit, setActiveUnit] = useState(null);
+  const [unitQuiz, setUnitQuiz] = useState(null);
+  const [quizResult, setQuizResult] = useState(null);
+
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
   const closeModal = () => setShowModal(false);
 
+  function QuizComponent({ quizData, studentId, unit }) {
+  const [answers, setAnswers] = useState(() =>
+    quizData.questions.map(() => null)
+  );
+  const [submitStatus, setSubmitStatus] = useState(null);
+
+  const handleAnswerChange = (qIndex, optionIndex) => {
+    setAnswers(ans => {
+      const copy = [...ans];
+      copy[qIndex] = optionIndex;
+      return copy;
+    });
+  };
+
+  const submitQuiz = async (answers) => {
+  try {
+    const res = await fetch(
+      `https://tekcrewz.onrender.com/api/quizzes/${data.dbId}/unit/${activeTab}/submit`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answers }) }
+    );
+    if (!res.ok) throw new Error();
+    setSubmitStatus('submitted');
+    // Fetch and display result summary
+    const result = await res.json();
+    setQuizResult(result);
+  } catch {
+    setSubmitStatus('error');
+  }
+};
+
+  return (
+    <QuizContainer>
+      <h4>{quizData.title || `Quiz for Unit ${unit}`}</h4>
+      {quizData.questions.map((q, qi) => (
+        <QuestionBlock key={qi}>
+          <p>{q.question}</p>
+          {q.options.map((opt, oi) => (
+            <OptionRow key={oi}>
+              <input
+                type="radio"
+                name={`quiz-${unit}-q${qi}`}
+                checked={answers[qi] === oi}
+                onChange={() => handleAnswerChange(qi, oi)}
+              />
+              <OptionLabel>{opt}</OptionLabel>
+            </OptionRow>
+          ))}
+        </QuestionBlock>
+      ))}
+      <SubmitQuizButton onClick={submitQuiz} disabled={submitStatus === 'submitted'}>
+        {submitStatus === 'submitted' ? 'Submitted' : 'Submit Quiz'}
+      </SubmitQuizButton>
+      {submitStatus === 'error' && <ErrorText>Submission failed. Try again.</ErrorText>}
+      {submitStatus === 'submitted' && <SuccessText>Quiz submitted!</SuccessText>}
+    </QuizContainer>
+  );
+}
 
     const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -244,6 +324,19 @@ export default function StudentDashboard() {
     };
   }, [authUid, navigate, fetchAll]);
 
+      // new: effect to fetch quiz data when activeTab unit changes and assignment is submitted
+      useEffect(() => {
+    if (!data || !activeUnit) return;
+    const assignment = data.assignments.find(a => a.unit === activeUnit);
+    if (assignment?.status === 'submitted') {
+      axios.get(`/api/quizzes/${assignment._id}`)
+        .then(res => setUnitQuiz(res.data))
+        .catch(err => setQuizError('Quiz not available'));
+    } else {
+      setUnitQuiz(null);
+    }
+  }, [data, activeUnit]);
+
 
   const submitCode = async (unit) => {
     const { dbId } = data;
@@ -271,35 +364,53 @@ export default function StudentDashboard() {
   };
 
 
-  const requestUnlock = async (unit) => {
-    const { dbId } = data; // change: destructure dbId so dbId is define
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/assignments/${dbId}/unlock`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ unit })
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      alert(err.error || 'Unlock request failed');
-    } else {
-      // update local state: set unlockRequested for that unit
-      setData(d => {
-        const newAssignments = d.assignments.map(a =>
-          a.unit === unit ? { ...a, unlockRequested: true } : a
-        );
-        return { ...d, assignments: newAssignments };
+    const requestUnlock = async (unit) => {
+    if (!data) return;
+    const { dbId } = data; // ensure dbId is defined                        // change
+    setUnlockLoading(true);                                                 // new
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/assignments/${dbId}/unlock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unit })
       });
+      const resBody = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // Likely 400 because assignment still open or already requested/extended
+        const errMsg = resBody.error || 'Unlock request failed';
+        // Show toast/modal with error message
+        setToastMsg(errMsg);                                                 // new
+        setShowToast(true);                                                  // new
+      } else {
+        // Success: unlock request recorded. Fetch updated assignments to reflect unlockRequested flag
+        const fresh = await fetch(`${API_BASE_URL}/api/assignments/${dbId}`);
+        if (fresh.ok) {
+          const updated = await fresh.json();
+          setData(d => ({ ...d, assignments: updated }));
+        } else {
+          // fallback: mark locally
+          setData(d => ({
+            ...d,
+            assignments: d.assignments.map(a =>
+              a.unit === unit ? { ...a, unlockRequested: true } : a
+            )
+          }));
+        }
+        // Show success toast/modal
+        setToastMsg('Unlock request sent! Await admin approval.');            // new
+        setShowToast(true);                                                  // new
+      }
+    } catch (err) {
+      console.error('Unlock request error:', err);
+      setToastMsg(`Error sending unlock request: ${err.message}`);           // new
+      setShowToast(true);                                                    // new
+    } finally {
+      setUnlockLoading(false);                                               // new
     }
-  } catch (err) {
-    console.error('Unlock request error:', err);
-    alert('Error requesting unlock');
-  }
-};
+  };
 
-
-
-
+    const handleRefresh = () => { fetchAll(); };
+    
 
   const submitFeedback = async (unit) => {
     try {
@@ -391,6 +502,40 @@ export default function StudentDashboard() {
 // NEW: added paidDate to destructuring
 const { candidateName, email, mobile, paidAmount, paidDate, paymentTerm, studentId, candidateCourseName, programme, candidatePic, attendance, courseDocs: docs, assignments } = data;
 
+// 2. Helper to detect Full Term (case-insensitive)
+  const isFullTermPaid = () => {
+    return typeof paymentTerm === 'string' && paymentTerm.trim().toLowerCase() === 'full term';
+  };
+
+  // 3. Build the timer element or null
+  const renderTermIITimer = () => {
+    if (isFullTermPaid()) {
+      return null;
+    }
+    if (!paidDate) {
+      return (
+        <IconTextAnimated delay={0.7}>
+          <FiClock />
+          {" Date unavailable"}
+        </IconTextAnimated>
+      );
+    }
+    const daysLeft = calculateDaysUntilTermIIDue(paidDate);
+    if (daysLeft === null) {
+      return (
+        <IconTextAnimated delay={0.7}>
+          <FiClock />
+          {" Date unavailable"}
+        </IconTextAnimated>
+      );
+    }
+    return (
+      <IconTextAnimated delay={0.7}>
+        <FiClock />
+        {` ${daysLeft} Days left for Term II Payment`}
+      </IconTextAnimated>
+    );
+  };
 
  const renderProfileCard = () => {
   // Calculate assignment completion
@@ -442,12 +587,7 @@ const { candidateName, email, mobile, paidAmount, paidDate, paymentTerm, student
                 </InfoTextAnimated>
 
                 {/* NEW: Timer for Term II payment due */}
-                {paymentTerm !== 'Full Term' && paidDate && (
-                  <IconTextAnimated delay={0.7}>
-                    <FiClock />
-                    {` ${calculateDaysUntilTermIIDue(paidDate)} Days left for Term II Payment`}
-                  </IconTextAnimated>
-                )}
+                {renderTermIITimer()}
               </InfoLine>
             </InfoBlock>
 
@@ -498,8 +638,13 @@ const { candidateName, email, mobile, paidAmount, paidDate, paymentTerm, student
                 } else if (!a.wasExtended) {
                   statusText = 'Closed';
                   actionButton = (
-                    <Button onClick={() => requestUnlock(a.unit)}>
-                      Request Unlock
+                    <Button
+                      onClick={() => requestUnlock(a.unit)}
+                      disabled={unlockLoading || a.unlockRequested}   // disable while loading or already requested
+                    >
+                      {unlockLoading
+                        ? <SpinnerSmall />                            // new: a small spinner component
+                        : 'Request Unlock'}
                     </Button>
                   );
                 } else {
@@ -525,6 +670,11 @@ const { candidateName, email, mobile, paidAmount, paidDate, paymentTerm, student
             )}
           </AssignmentSection>
         </RightInfo>
+        {showToast && (
+            <ToastContainer onClick={() => setShowToast(false)}>  {/* new */}
+              {toastMsg}
+            </ToastContainer>
+          )}
       </ContentGrid>
     </SectionWrapper>
   );
@@ -761,6 +911,34 @@ const renderUnit = (unit) => {
               Send Feedback
             </FeedbackButton>
           </SectionContainerAnimated>
+
+          {/* ── Quiz Section: only if assignment submitted ────────────────────── */}
+            <SectionContainerAnimated delay={3.2}> {/* new */}
+              <SectionHeading>Quiz</SectionHeading> {/* new */}
+              { /* Determine if assignment submitted: check submissionCode or submissionFileUrl */ }
+              {(u.submissionCode || u.submissionFileUrl) ? (          // new
+                quizLoading ? (
+                  <p>Loading quiz...</p>                              // new
+                ) : quizError ? (
+                  <p style={{ color: 'red' }}>{quizError}</p>        // new
+                ) : unitQuizData ? (
+                  <QuizWrapperAnimated>                            {/* new: styled with fadeIn */}
+                    <QuizComponent                                     // new: render actual quiz
+                      quizData={unitQuizData}
+                      studentId={data.dbId}
+                      unit={unit}
+                    />
+                  </QuizWrapperAnimated>
+                ) : (
+                  <p>No quiz assigned yet.</p>                      // new
+                )
+              ) : (
+                <DisabledQuiz title="Complete assignment to unlock quiz!"> {/* new */}
+                  <FiHelpCircle style={{ marginRight: '6px' }} /> Complete assignment to unlock quiz!
+                </DisabledQuiz>
+              )}
+            </SectionContainerAnimated>  {/* new */}
+
         </RightColumn>
       </UnitContentGrid>
     </UnitSectionWrapper>
@@ -909,6 +1087,7 @@ const renderUnit = (unit) => {
         <ThemeProvider theme={theme === 'light' ? lightTheme : darkTheme}>
       <Page>
         <TopNavbar onLogout={async() => { await signOut(auth); navigate('/s-loginPage'); }} />
+          
         {showModal && <ModalOverlay onClick={closeModal}><Modal onClick={e=>e.stopPropagation()}><p>{modalMsg}</p><Button onClick={closeModal}>Close</Button></Modal></ModalOverlay>}
         <Layout>
           <Sidebar>
@@ -2110,4 +2289,89 @@ const UnitName = styled.div` /* new */
 const StatusText = styled.div` /* new */
   font-style: italic;
   margin-left: 1rem;
+`;
+
+const SpinnerSmall = styled.div` /* new */
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #7620ff;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  animation: spin 1s linear infinite;
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+
+const ToastContainer = styled.div`
+  position: fixed;
+  top: 16px; right: 16px;
+  display: flex; flex-direction: column; gap: 8px;
+  z-index: 1000;
+`;
+
+const QuizWrapperAnimated = styled.div` /* new */
+  animation: ${fadeInQuick} 0.5s ease-in;
+  margin-top: 12px;
+  /* add any styling needed for quiz container */
+`;
+const DisabledQuiz = styled.div` // new
+  color: #888;
+  display: flex;
+  align-items: center;
+  font-style: italic;
+  margin-top: 8px;
+`;
+
+const QuizContainer = styled.div` // new
+  background: ${({ theme }) => theme.cardBg};
+  padding: 16px;
+  border-radius: 8px;
+  animation: ${fadeInQuick} 0.4s ease-in;
+  margin-top: 8px;
+`;
+const QuestionBlock = styled.div` // new inside QuizComponent
+  margin-bottom: 12px;
+`;
+const OptionRow = styled.div` // new inside QuizComponent
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+`;
+const OptionLabel = styled.label` // new inside QuizComponent
+  margin-left: 6px;
+`;
+const SubmitQuizButton = styled.button` // new inside QuizComponent
+  padding: 8px 16px;
+  background: #4caf50;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 8px;
+  &:disabled {
+    background: #aaa;
+    cursor: not-allowed;
+  }
+`;
+const ErrorText = styled.p` // new
+  color: red;
+  margin-top: 6px;
+`;
+const SuccessText = styled.p` // new
+  color: green;
+  margin-top: 6px;
+`;
+const LoadingText = styled.p` // new
+  display: flex;
+  align-items: center;
+  & .spin {
+    margin-right: 6px;
+    animation: ${spin} 1s linear infinite;
+  }
+`;
+const InfoText = styled.p` // new
+  color: #555;
+  margin-top: 6px;
 `;

@@ -45,7 +45,9 @@ const DashboardPage = () => {
   const [aiResult, setAiResult] = useState(null);
 
   const [loading, setLoading] = useState(false);     // NEW
-  const [quizState, setQuizState] = useState({    title: '',   questions: [] });
+  const [quizState, setQuizState] = useState({ title: '', questions: [] });
+  const [isEditing, setIsEditing] = useState(false);
+  const [isEditingQuiz, setIsEditingQuiz] = useState(false);
 
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substr(0,7));
   const [payrollData, setPayrollData] = useState([]);
@@ -85,7 +87,9 @@ const [showWarningModal, setShowWarningModal] = useState(false);
 
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [unlockRequests, setUnlockRequests] = useState([]);
-  
+  const [approveLoading, setApproveLoading] = useState(false);    // new: loading state
+  const [approveToast, setApproveToast] = useState('');           // new: toast message
+  const [showApproveToast, setShowApproveToast] = useState(false);// new
 
   const [selectedBatchForAssign, setSelectedBatchForAssign] = useState('');               // new
   const [selectedCourseForAssign, setSelectedCourseForAssign] = useState('');             // new
@@ -249,15 +253,27 @@ useEffect(() => {                                                               
 
 // Example: approving unlock for a particular assignment unit for a student
 const approveUnlock = async (studentId, unit) => {
+  setApproveLoading(true); // new
   try {
-    await axios.post(`${API_BASE_URL}/api/admin/students/${studentId}/approveUnlock`, { unit });
-    // Optionally refetch assignments list or update local state:
-    // e.g., reload assignments for that student:
-    const res = await axios.get(`${API_BASE_URL}/api/assignments/${studentId}`);
-    // update state where you store assignments
+    // studentId here must be something like "BT7FS001"
+    const res = await axios.post(
+      `${API_BASE_URL}/api/admin/students/${studentId}/approveUnlock`,
+      { unit }
+    );
+    // if backend returns 204 or OK:
+    pushToast('Unlock approved'); // or use your toast system
+    // Refetch assignments and pending unlocks:
+    const { data: assignments } = await axios.get(`${API_BASE_URL}/api/assignments/${studentId}`);
+    setAssignmentsList(assignments);
+    // update unlockRequests list:
+    const pending = assignments.filter(a => a.unlockRequested);
+    setUnlockRequests(pending);
   } catch (err) {
     console.error('Failed to approve unlock:', err.response?.data || err);
-    alert(err.response?.data?.error || 'Error approving unlock');
+    const msg = err.response?.data?.error || 'Error approving unlock';
+    pushToast(msg, 'error');
+  } finally {
+    setApproveLoading(false); // new
   }
 };
 
@@ -291,18 +307,33 @@ const approveUnlock = async (studentId, unit) => {
     };
 
     // CHANGED: hit the admin‐quiz upsert endpoint
-        const saveQuiz = async (studentId, quiz) => {
-  setAssignLoading(true);
+    const saveQuiz = async () => {
+  if (!quizState.title || quizState.questions.length === 0) {
+    return alert('Quiz must have a title and at least one question.');
+  }
+  if (!quizState.assignmentId) {
+    return alert('No assignment selected for this quiz.');
+  }
   try {
-    await axios.post(`${API_BASE_URL}/api/admin/quizzes`, { studentId, ...quiz });
-    pushToast('Quiz assigned');
-  } catch {
-    pushToast('Failed to save quiz', 'error');
-  } finally {
-    setAssignLoading(false);
+    const payload = {
+      assignmentId: quizState.assignmentId,
+      unit: quizState.unit,
+      title: quizState.title,
+      questions: quizState.questions,
+    };
+    const res = await axios.post(
+      `${API_BASE_URL}/api/admin/quizzes`,
+      payload
+    );
+    setQuizState(res.data);
+    setIsEditingQuiz(false);
+    pushToast('Quiz saved successfully');
+  } catch (err) {
+    console.error(err);
+    alert('Failed to save quiz');
   }
 };
-
+      
   // Open project edit modal
   const openEditModal = (idx) => {
     const proj = projects[idx];
@@ -408,6 +439,21 @@ const approveUnlock = async (studentId, unit) => {
       .finally(() => setAssignLoading(false));
   }, [selectedStudentForAssign]);
 
+  // After student requests unlock, tutor should see it:
+useEffect(() => {
+  if (!isTutor) return;
+  // Periodically or on opening “Assignment Settings” modal, fetch assignments:
+  if (selectedStudentForAssign) {
+    axios.get(`${API_BASE_URL}/api/assignments/${selectedStudentForAssign}`)
+      .then(res => {
+        // find those with unlockRequested === true
+        const pending = res.data.filter(a => a.unlockRequested);
+        setUnlockRequests(pending);  // new: store pending unlock requests
+      });
+  }
+}, [showAssignmentsModal, selectedStudentForAssign]);
+
+
   const createAssignment = async () => {
   if (!selectedStudentForAssign) { pushToast('Select a student', 'error'); return; } // CHANGED
   setAssignLoading(true);
@@ -439,6 +485,8 @@ const approveUnlock = async (studentId, unit) => {
     setAssignLoading(false); // CHANGED: use assignLoading state
   }
 };
+
+
 
   // Save a single assignment result
   const saveAssignmentResult = async (unit) => {
@@ -898,7 +946,13 @@ const approveUnlock = async (studentId, unit) => {
                     {/* 3.2 Quiz */}
                     <Section>
                       <Label>Assign Quiz</Label>
-                      <QuizEditor quiz={quizState} onChange={setQuizState} onSave={()=>saveQuiz(selectedStudentForAssign,quizState)}/>
+                            {isEditing && (
+                            <QuizEditor
+                              quiz={quizState}
+                              onChange={setQuizState} 
+                              onSave={saveQuiz}
+                            />
+                            )}
                     </Section>
 
                     {/* 3.3 Results */}
@@ -916,8 +970,8 @@ const approveUnlock = async (studentId, unit) => {
                         <div key={r._id} style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
                           <span>{r.unit} — {r.reason}</span>
                           <span>
-                            <ActionBtn onClick={()=>approveUnlock(r._id,true)}>Approve</ActionBtn>
-                            <ActionBtn onClick={()=>approveUnlock(r._id,false)}>Reject</ActionBtn>
+                            <ActionBtn onClick={() => approveUnlock(selectedStudentForAssign, r.unit)}>Approve</ActionBtn>
+                            {/* <ActionBtn onClick={()=>approveUnlock(r._id,false)}>Reject</ActionBtn> */}
                           </span>
                         </div>
                       )) : <NoData>No unlock requests.</NoData>}
@@ -948,8 +1002,8 @@ const approveUnlock = async (studentId, unit) => {
     </Container>
   );
 };
-
 export default DashboardPage;
+
 
 
 /* Styled Components */

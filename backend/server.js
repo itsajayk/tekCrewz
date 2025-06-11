@@ -592,13 +592,16 @@ const QuestionSchema = new mongoose.Schema({
 });
 
 // 2) Define the main QuizSchema
-const QuizSchema = new mongoose.Schema({
-  title:     String,
-  questions: [QuestionSchema]
+const quizSchema = new mongoose.Schema({
+  assignmentId: { type: mongoose.Types.ObjectId, required: true },
+  unit: String,
+  title: String,
+  questions: [
+    { question: String, options: [String], correctIndex: Number }
+  ]
 }, { timestamps: true });
 
-// 3) Register the Quiz model
-const Quiz = mongoose.model('Quiz', QuizSchema);
+const Quiz = mongoose.model('Quiz', quizSchema);
 
 // 4) Define and register the StudentQuiz model
 const StudentQuizSchema = new mongoose.Schema({
@@ -613,13 +616,48 @@ const StudentQuiz = mongoose.model('StudentQuiz', StudentQuizSchema);
 
 // Admin: Create or update a quiz
 app.post('/api/admin/quizzes', async (req, res) => {
-  const { id, title, questions } = req.body;
-  const quiz = await Quiz.findOneAndUpdate(
-    { _id: id },
-    { title, questions },
-    { upsert: true, new: true }
-  );
-  res.json(quiz);
+  try {
+    const { assignmentId, unit, title, questions } = req.body;
+    const quiz = await Quiz.findOneAndUpdate(
+      { assignmentId },
+      { assignmentId, unit, title, questions },
+      { upsert: true, new: true }
+    );
+    res.json(quiz);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/quizzes/:assignmentId', async (req, res) => {
+  try {
+    const quiz = await Quiz.findOne({ assignmentId: req.params.assignmentId });
+    if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
+    res.json(quiz);
+  } catch {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/quizzes/:quizId/submit', async (req, res) => {
+  try {
+    const { studentId, assignmentId, answers } = req.body;
+    const quiz = await Quiz.findById(req.params.quizId);
+    let score = 0;
+    quiz.questions.forEach((q, i) => {
+      if (answers[i] === q.correctIndex) score++;
+    });
+
+    // Save into Assignment.results
+    await Assignment.findOneAndUpdate(
+      { _id: assignmentId, studentId },
+      { $set: { 'result.quizScore': score, 'result.passed': score >= quiz.questions.length * 0.7 } }
+    );
+
+    res.json({ score, passed: score >= quiz.questions.length * 0.7 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Public: list all quizzes
