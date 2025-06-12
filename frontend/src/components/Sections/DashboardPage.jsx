@@ -200,6 +200,32 @@ useEffect(() => {
         .catch(console.error);
     }, []);
 
+    const handleAssignmentChange = async (e) => {
+  const aid = e.target.value;
+  const asn = assignmentsList.find(a => a._id === aid) || {};
+  
+  // Reset quiz state initially
+  setQuizState({ assignmentId: aid, unit: asn.unit || '', title: '', questions: [] });
+
+  if (!aid) return;
+
+  try {
+    const res = await axios.get(`${API_BASE_URL}/api/quizzes/${aid}`);
+    setQuizState({
+      assignmentId: res.data.assignmentId,
+      unit: res.data.unit || asn.unit || '',
+      title: res.data.title || '',
+      questions: res.data.questions || []
+    });
+  } catch (err) {
+    // No quiz found — keep title/questions empty
+    setQuizState(prev => ({
+      ...prev,
+      // title and questions remain empty
+    }));
+  }
+};
+
 
     // ── Filter candidates on dropdown/radio change ────────────────────────────────────
 useEffect(() => {                                                                        // new
@@ -945,15 +971,34 @@ useEffect(() => {
 
                     {/* 3.2 Quiz */}
                     <Section>
-                      <Label>Assign Quiz</Label>
-                            {isEditing && (
-                            <QuizEditor
-                              quiz={quizState}
-                              onChange={setQuizState} 
-                              onSave={saveQuiz}
-                            />
+                            <Label>Assign Quiz</Label>
+                            {assignLoading ? (
+                              <p>Loading assignments…</p>
+                            ) : (
+                              <Select
+                                value={quizState.assignmentId}
+                                onChange={handleAssignmentChange}
+                              >
+                                <option value="">Select Assignment</option>
+                                {assignmentsList.map(a => (
+                                  <option key={a._id} value={a._id}>{a.unit}</option>
+                                ))}
+                              </Select>
                             )}
-                    </Section>
+
+                            <Button onClick={() => setIsEditingQuiz(true)} disabled={!quizState.assignmentId}>
+                              Edit Quiz
+                            </Button>
+
+                            {isEditingQuiz && (
+                              <QuizEditor
+                                quiz={quizState}
+                                onChange={setQuizState}
+                                onSave={saveQuiz}
+                              />
+                            )}
+                          </Section>
+
 
                     {/* 3.3 Results */}
                     <Section>

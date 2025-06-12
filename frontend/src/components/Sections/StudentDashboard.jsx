@@ -150,11 +150,9 @@ export default function StudentDashboard() {
   const [showToast, setShowToast] = useState(false);            // new: control toast visibility
 
   // new states for quiz fetching
-  const [unitQuizData, setUnitQuizData] = useState(null);       // holds quiz data for current unit
   const [quizLoading, setQuizLoading] = useState(false);        // loading state for quiz fetch
   const [quizError, setQuizError] = useState(null);             // error fetching quiz
 
-  const [activeUnit, setActiveUnit] = useState(null);
   const [unitQuiz, setUnitQuiz] = useState(null);
   const [quizResult, setQuizResult] = useState(null);
 
@@ -178,7 +176,7 @@ export default function StudentDashboard() {
   const submitQuiz = async (answers) => {
   try {
     const res = await fetch(
-      `https://tekcrewz.onrender.com/api/quizzes/${data.dbId}/unit/${activeTab}/submit`,
+      `https://tekcrewz.onrender.com/api/quizzes/${quizData._id}/submit`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answers }) }
     );
     if (!res.ok) throw new Error();
@@ -324,18 +322,43 @@ export default function StudentDashboard() {
     };
   }, [authUid, navigate, fetchAll]);
 
-      // new: effect to fetch quiz data when activeTab unit changes and assignment is submitted
-      useEffect(() => {
-    if (!data || !activeUnit) return;
-    const assignment = data.assignments.find(a => a.unit === activeUnit);
-    if (assignment?.status === 'submitted') {
-      axios.get(`/api/quizzes/${assignment._id}`)
-        .then(res => setUnitQuiz(res.data))
-        .catch(err => setQuizError('Quiz not available'));
-    } else {
-      setUnitQuiz(null);
-    }
-  }, [data, activeUnit]);
+    // new: effect to fetch quiz data when activeTab unit changes and assignment is submitted
+  useEffect(() => {
+  if (!data) return;
+
+  // Only run when switching to a unit tab
+  if (["Profile", "Attendance", "Syllabus", "Schedule", "Quiz"].includes(activeTab)) {
+    // Clear any previous quiz state when not on a unit
+    setUnitQuiz(null);
+    setQuizError(null);
+    setQuizLoading(false);
+    return;
+  }
+
+  const assignment = data.assignments.find(a => a.unit === activeTab);
+  if (assignment && (assignment.submissionCode || assignment.submissionFileUrl)) {
+    // Fetch quiz
+    setQuizLoading(true);
+    setQuizError(null);
+    setUnitQuiz(null);
+    axios.get(`${API_BASE_URL}/api/quizzes/${assignment._id}`)
+      .then(res => {
+        setUnitQuiz(res.data);
+      })
+      .catch(err => {
+        setQuizError('Quiz not available');
+      })
+      .finally(() => {
+        setQuizLoading(false);
+      });
+  } else {
+    // Not submitted yet; clear quiz
+    setUnitQuiz(null);
+    setQuizError(null);
+    setQuizLoading(false);
+  }
+}, [data, activeTab]); // ✅ Properly closed and added dependency array
+
 
 
   const submitCode = async (unit) => {
@@ -913,31 +936,30 @@ const renderUnit = (unit) => {
           </SectionContainerAnimated>
 
           {/* ── Quiz Section: only if assignment submitted ────────────────────── */}
-            <SectionContainerAnimated delay={3.2}> {/* new */}
-              <SectionHeading>Quiz</SectionHeading> {/* new */}
-              { /* Determine if assignment submitted: check submissionCode or submissionFileUrl */ }
-              {(u.submissionCode || u.submissionFileUrl) ? (          // new
-                quizLoading ? (
-                  <p>Loading quiz...</p>                              // new
-                ) : quizError ? (
-                  <p style={{ color: 'red' }}>{quizError}</p>        // new
-                ) : unitQuizData ? (
-                  <QuizWrapperAnimated>                            {/* new: styled with fadeIn */}
-                    <QuizComponent                                     // new: render actual quiz
-                      quizData={unitQuizData}
-                      studentId={data.dbId}
-                      unit={unit}
-                    />
-                  </QuizWrapperAnimated>
-                ) : (
-                  <p>No quiz assigned yet.</p>                      // new
-                )
-              ) : (
-                <DisabledQuiz title="Complete assignment to unlock quiz!"> {/* new */}
-                  <FiHelpCircle style={{ marginRight: '6px' }} /> Complete assignment to unlock quiz!
-                </DisabledQuiz>
-              )}
-            </SectionContainerAnimated>  {/* new */}
+            <SectionContainerAnimated delay={3.2}>
+                  <SectionHeading>Quiz</SectionHeading>
+                  {(u.submissionCode || u.submissionFileUrl) ? (
+                    quizLoading ? (
+                      <p>Loading quiz...</p>
+                    ) : quizError ? (
+                      <p style={{ color: 'red' }}>{quizError}</p>
+                    ) : unitQuiz ? (
+                      <QuizWrapperAnimated>
+                        <QuizComponent
+                          quizData={unitQuiz}
+                          studentId={data.dbId}
+                          unit={unit}
+                        />
+                      </QuizWrapperAnimated>
+                    ) : (
+                      <p>No quiz assigned yet.</p>
+                    )
+                  ) : (
+                    <DisabledQuiz title="Complete assignment to unlock quiz!">
+                      <FiHelpCircle style={{ marginRight: '6px' }} /> Complete assignment to unlock quiz!
+                    </DisabledQuiz>
+                  )}
+                </SectionContainerAnimated> 
 
         </RightColumn>
       </UnitContentGrid>
