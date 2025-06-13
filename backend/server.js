@@ -701,24 +701,81 @@ app.get('/api/quizzes/:quizId', async (req, res) => {
 
 // Student: submit quiz answers
 app.post('/api/students/:studentId/quizzes/:quizId/submit', async (req, res) => {
-  const { answers } = req.body;
-  const quiz = await Quiz.findById(req.params.quizId).lean();
-  let score = 0;
-  quiz.questions.forEach((q, i) => {
-    if (q.correctIndex === answers[i]) score++;
-  });
-  const percent = Math.round((score / quiz.questions.length) * 100);
+  try {
+    const { answers } = req.body;
+    const studentId = req.params.studentId;
+    const quizId = req.params.quizId;
+    const quiz = await Quiz.findById(quizId).lean();
+    if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
 
-  // Save the student's result
-  await StudentQuiz.create({
-    studentId: req.params.studentId,
-    quizId:    req.params.quizId,
-    answers,
-    score:     percent
-  });
+    const breakdown = quiz.questions.map((q, i) => ({
+      question: q.question,
+      correct: answers[i] === q.correctIndex
+    }));
+    const scoreCount = breakdown.reduce((sum, item) => sum + (item.correct ? 1 : 0), 0);
+    const total = quiz.questions.length;
+    const percent = Math.round((scoreCount / total) * 100);
 
-  res.json({ score: percent, total: quiz.questions.length });
+    // Save the student's result (overwrite if exists)
+    await StudentQuiz.findOneAndUpdate(
+  { studentId, quizId },
+  { studentId, quizId, answers, score: scoreCount },    // ← save count, not percent
+  { upsert: true, new: true }
+);
+res.json({ score: scoreCount, total, breakdown });
+
+
+    res.json({ score: scoreCount, total, breakdown });
+  } catch (err) {
+    console.error("Quiz submit error:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
+
+app.get('/api/students/:studentId/quizzes/:quizId/result', async (req, res) => {
+  try {
+    const entry = await StudentQuiz.findOne({
+      studentId: req.params.studentId,
+      quizId: req.params.quizId
+    }).lean();
+    if (!entry) return res.status(404).json({ error: 'No submission found' });
+    // Fetch quiz to rebuild breakdown if desired
+    const quiz = await Quiz.findById(req.params.quizId).lean();
+    const breakdown = quiz.questions.map((q, i) => ({
+      question: q.question,
+      selected: entry.answers[i],
+      correctIndex: q.correctIndex,
+      correct: entry.answers[i] === q.correctIndex
+    }));
+    res.json({ score: entry.score, total: quiz.questions.length, breakdown });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin: fetch a student's quiz submission result
+app.get('/api/admin/students/:studentId/quizzes/:quizId/result', async (req, res) => {
+  try {
+    const { studentId, quizId } = req.params;
+    const entry = await StudentQuiz.findOne({ studentId, quizId }).lean();
+    if (!entry) return res.status(404).json({ error: 'No submission found' });
+    const quiz = await Quiz.findById(quizId).lean();
+    if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
+    const breakdown = quiz.questions.map((q, i) => ({
+      question: q.question,
+      selected: entry.answers[i],
+      correctIndex: q.correctIndex,
+      correct: entry.answers[i] === q.correctIndex
+    }));
+    res.json({ score: entry.score, total: quiz.questions.length, breakdown });
+  } catch (err) {
+    console.error("Admin fetch quiz result error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 
 // ── Start Server ───────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;

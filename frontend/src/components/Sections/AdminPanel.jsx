@@ -74,7 +74,7 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
           setStudents(batch);
         }
         if (modalType === 'StudentDetails') {
-          const { data: cands } = await axios.get('/api/candidates');
+          const { data: cands } = await axios.get(`${API_BASE_URL}/api/candidates`);
           setStudents(batch.map(u => ({ ...u, ...(cands.find(c => c.studentId === u.id) || {}) })));
         }
         if (modalType === 'ViewAttendance') {
@@ -86,7 +86,7 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
           pushToast('Please select a course first', 'error');
         } else {
           const { data } = await axios.get(
-            `/api/admin/course-docs/upload/${encodeURIComponent(selectedCourse)}`
+            `${API_BASE_URL}/api/admin/course-docs/upload/${encodeURIComponent(selectedCourse)}`
           );
           // 🔧 CHANGED: store under courseDocs[selectedCourse]
           setCourseDocs(prev => ({
@@ -101,15 +101,15 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
         }
       }
         if (modalType === 'ManageAssignments' && selectedStudent) {
-          const { data } = await axios.get(`/api/assignments/${selectedStudent.id}`);
+          const { data } = await axios.get(`${API_BASE_URL}/api/assignments/${selectedStudent.id}`);
           setAssignments(data);
         }
         if (modalType === 'AssignmentResults') {
-          const { data } = await axios.get('/api/admin/assignments/results');
+          const { data } = await axios.get(`${API_BASE_URL}/api/admin/assignments/results`);
           setResults(data);
         }
         if (modalType === 'ReviewFeedback') {
-          const { data } = await axios.get('/api/admin/feedback');
+          const { data } = await axios.get(`${API_BASE_URL}/api/admin/feedback`);
           setFeedbackList(data);
         }
       } catch (e) {
@@ -126,7 +126,7 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
       useEffect(() => {
       if (!showModal || modalType !== 'UnlockRequests' || !selectedStudent) return;
       setLoading(true);
-      axios.get(`/api/assignments/${selectedStudent.id}`)
+      axios.get(`${API_BASE_URL}/api/assignments/${selectedStudent.id}`)
       .then(({ data }) => {
         // Show assignments that have been unlocked (i.e. requested for unlock)
         const pending = data.filter(a => a.closed && a.unlocked);
@@ -159,7 +159,7 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
     if (!selectedStudent) { pushToast('Select a student first', 'error'); return; }
     setLoading(true);
     try {
-      const { data } = await axios.put(`/api/candidates/${selectedStudent._id}`, profileData);
+      const { data } = await axios.put(`${API_BASE_URL}/api/candidates/${selectedStudent._id}`, profileData);
       setSelectedStudent(data);
       setStudents(students.map(s => s._id === data._id ? data : s));
       setEditMode(false);
@@ -189,7 +189,7 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
   try {
     // 🔧 CHANGED: POST to upload endpoint
     await axios.post(
-      `/api/admin/course-docs/upload/${encodeURIComponent(selectedCourse)}`,
+      `${API_BASE_URL}/api/admin/course-docs/upload/${encodeURIComponent(selectedCourse)}`,
       form,
       { headers: { 'Content-Type': 'multipart/form-data' } }
     );
@@ -198,7 +198,7 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
 
     // 🔧 CHANGED: re‐fetch so we know exactly what’s saved in the DB/cloud
     const { data: newData } = await axios.get(
-      `/api/admin/course-docs/upload/${encodeURIComponent(selectedCourse)}`
+      `${API_BASE_URL}/api/admin/course-docs/upload/${encodeURIComponent(selectedCourse)}`
     );
     // 🔧 CHANGED: replace only the object at courseDocs[selectedCourse]
     setCourseDocs(prev => ({
@@ -239,13 +239,13 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
     }
 
     await axios.post(
-      `/api/admin/students/${selectedStudent.id}/manageAssignments`,
+      `${API_BASE_URL}/api/admin/students/${selectedStudent.id}/manageAssignments`,
       form,
       { headers: { 'Content-Type': 'multipart/form-data' } }
     );
 
     // refresh list
-    const { data } = await axios.get(`/api/assignments/${selectedStudent.id}`);
+    const { data } = await axios.get(`${API_BASE_URL}/api/assignments/${selectedStudent.id}`);
     setAssignments(data);
     pushToast('Assignment created');
     // reset form
@@ -261,7 +261,7 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
   const requestUnlock = async unit => {
     if (!selectedStudent) { pushToast('Select a student', 'error'); return; }
     try {
-      await axios.post(`/api/assignments/${selectedStudent.id}/unlock`, { unit });
+      await axios.post(`${API_BASE_URL}/api/assignments/${selectedStudent.id}/unlock`, { unit });
       pushToast('Unlock requested');
     } catch {
       pushToast('Failed to request unlock', 'error');
@@ -272,7 +272,7 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
     if (!selectedStudent) { pushToast('Select a student', 'error'); return; }
     setLoading(true);
     try {
-      await axios.post(`/api/admin/students/${selectedStudent.id}/approveUnlock`, { unit });
+      await axios.post(`${API_BASE_URL}/api/admin/students/${selectedStudent.id}/approveUnlock`, { unit });
       setUnlockRequests(u => u.filter(a => a.unit !== unit));
       pushToast('Unlock approved');
     } catch {
@@ -286,8 +286,8 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
     if (!selectedStudent) { pushToast('Select a student', 'error'); return; }
     setLoading(true);
     try {
-      await axios.post(`/api/admin/students/${selectedStudent.id}/enterResults`, { unit, results:{score,passed} });
-      const { data } = await axios.get('/api/admin/assignments/results');
+      await axios.post(`${API_BASE_URL}/api/admin/students/${selectedStudent.id}/enterResults`, { unit, results:{score,passed} });
+      const { data } = await axios.get(`${API_BASE_URL}/api/admin/assignments/results`);
       setResults(data);
       pushToast('Results saved');
     } catch {
@@ -302,8 +302,8 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
     if (!feedbackUnit) { pushToast('Select a unit', 'error'); return; }
     setLoading(true);
     try {
-      await axios.post(`/api/admin/students/${selectedStudent.id}/reviewFeedback`, { unit:feedbackUnit, feedback:feedbackText });
-      const { data } = await axios.get('/api/admin/feedback');
+      await axios.post(`${API_BASE_URL}/api/admin/students/${selectedStudent.id}/reviewFeedback`, { unit:feedbackUnit, feedback:feedbackText });
+      const { data } = await axios.get(`${API_BASE_URL}/api/admin/feedback`);
       setFeedbackList(data);
       setFeedbackText('');
       setFeedbackUnit('');

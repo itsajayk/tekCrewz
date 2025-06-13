@@ -96,6 +96,11 @@ const [showWarningModal, setShowWarningModal] = useState(false);
   const [selectedTrainingModeForAssign, setSelectedTrainingModeForAssign] = useState(''); // new
   const [filteredAssignCandidates, setFilteredAssignCandidates] = useState([]);           // new
 
+  const [quizzesForAssignment, setQuizzesForAssignment] = useState({});
+  const [quizResultsByUnit, setQuizResultsByUnit] = useState({});
+
+
+
   const [toasts, setToasts] = useState([]);
   
 
@@ -115,6 +120,19 @@ const [showWarningModal, setShowWarningModal] = useState(false);
     setToasts(t => [...t, { id, message, type }]);
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
   };
+
+  const fetchStudentQuizResult = async (unit, quizId) => {
+  try {
+    const res = await axios.get(
+      `${API_BASE_URL}/api/admin/students/${selectedStudentForAssign}/quizzes/${quizId}/result`
+    );
+    setQuizResultsByUnit(prev => ({ ...prev, [unit]: res.data }));
+  } catch (err) {
+    console.error("Failed to fetch quiz result:", err);
+    pushToast('Unable to fetch quiz result', 'error');
+  }
+};
+
 
 useEffect(() => {
     axios.get(`${API_BASE_URL}/api/candidates`)
@@ -157,7 +175,7 @@ useEffect(() => {
       setFilteredCandidates([]);
       return;
     }
-    axios.get('/api/candidates')
+    axios.get(`${API_BASE_URL}/api/candidates`)
       .then(res => {
         const list = res.data.filter(c =>
           c.studentId.includes(`BT${selectedBatch}FS`) &&          // filter by batch
@@ -235,7 +253,6 @@ const handleResultInputChange = (unit, field, value) => {
     }
   }));
 };
-
 
 
     // ── Filter candidates on dropdown/radio change ────────────────────────────────────
@@ -450,29 +467,30 @@ const approveUnlock = async (studentId, unit) => {
     XLSX.writeFile(wb, `Payroll_${userId}_${selectedMonth}.xlsx`);
   };
 
-  // Assignments (Tutor) – Fetch whenever a student is selected
-  useEffect(() => {
-    if (!selectedStudentForAssign) return;
-    setAssignLoading(true);
-    axios.get(`${API_BASE_URL}/api/assignments/${selectedStudentForAssign}`)
-  .then(res => {
-    setAssignmentsList(res.data);
-    const initial = {};
-    res.data.forEach(a => {
-      initial[a.unit] = {
-        score: a.results?.score || '',
-        passed: a.results?.passed || false
-      };
-    });
-    setResultsInputs(initial);
-  })
-      .catch(err => {
-        console.error("Failed to fetch assignments:", err);
-        setAssignmentsList([]);
-        setResultsInputs({});
-      })
-      .finally(() => setAssignLoading(false));
-  }, [selectedStudentForAssign]);
+        // Assignments (Tutor) – Fetch whenever a student is selected
+        useEffect(() => {
+        if (!selectedStudentForAssign) return;
+        setAssignLoading(true);
+        axios.get(`${API_BASE_URL}/api/assignments/${selectedStudentForAssign}`)
+          .then(res => {
+            setAssignmentsList(res.data);
+            const initial = {};
+            res.data.forEach(a => {
+              initial[a.unit] = {
+                score: a.results?.score || '',
+                passed: a.results?.passed || false
+              };
+            });
+            setResultsInputs(initial);
+          })
+          .catch(err => {
+                console.error("Failed to fetch assignments:", err);
+                setAssignmentsList([]);
+                setResultsInputs({});
+              })
+          .finally(() => setAssignLoading(false));
+      }, [selectedStudentForAssign]);
+
 
   // After student requests unlock, tutor should see it:
 useEffect(() => {
@@ -503,7 +521,7 @@ useEffect(() => {
     }
 
     await axios.post(
-      `/api/admin/students/${selectedStudentForAssign}/manageAssignments`, // CHANGED: use selectedStudentForAssign directly
+      `${API_BASE_URL}/api/admin/students/${selectedStudentForAssign}/manageAssignments`, // CHANGED: use selectedStudentForAssign directly
       form,
       { headers: { 'Content-Type': 'multipart/form-data' } }
     );
@@ -1017,52 +1035,92 @@ useEffect(() => {
                           <ProjectDetailsTable>
                             <thead>
                                 <tr>
-                                  <ResultTh>Student ID</ResultTh>
-                                  <ResultTh>Unit</ResultTh>
-                                  <ResultTh>Score</ResultTh>
-                                  <ResultTh>Passed</ResultTh>
-                                  <ResultTh>Action</ResultTh>
+                                        <ResultTh>Student ID</ResultTh>
+                                        <ResultTh>Unit</ResultTh>
+                                        <ResultTh>Code Submission</ResultTh>
+                                        <ResultTh>File Submission</ResultTh>
+                                        <ResultTh>Assignment Score</ResultTh>
+                                        <ResultTh>Passed</ResultTh>
+                                        <ResultTh>Quiz Score</ResultTh>
+                                        <ResultTh>Action</ResultTh>
                                 </tr>
                               </thead>
                             <tbody>
-                                  {assignmentsList.map(a => {
-                                    const unit = a.unit;
-                                    const inputState = resultsInputs[unit] || { score: '', passed: false };
-                                    return (
-                                      <tr key={`${selectedStudentForAssign}-${unit}`}>
-                                        <ResultTd>{selectedStudentForAssign}</ResultTd>
-                                        <ResultTd>{unit}</ResultTd>
-                                        {/* Score input */}
-                                        <ResultTd>
-                                          <input
-                                            type="number"
-                                            min="0"
-                                            value={inputState.score}
-                                            onChange={e => handleResultInputChange(unit, 'score', e.target.value)}
-                                            style={{ width: '60px' }}
-                                          />
-                                        </ResultTd>
-                                        {/* Passed checkbox */}
-                                        <ResultTd>
-                                          <input
-                                            type="checkbox"
-                                            checked={inputState.passed}
-                                            onChange={e => handleResultInputChange(unit, 'passed', e.target.checked)}
-                                          />
-                                        </ResultTd>
-                                        {/* Save action */}
-                                        <ResultTd>
-                                          <Button
-                                            onClick={() => saveAssignmentResult(unit)}
-                                            disabled={assignLoading} // or disable if you want while loading
-                                          >
-                                            Save
-                                          </Button>
-                                        </ResultTd>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
+                            {assignmentsList.map(a => {
+                              const unit = a.unit;
+                              // Locate quiz for this assignment:
+                              const quiz = quizzesForAssignment[unit]; // we will fetch this below
+                              // Locate student's quiz result:
+                              const quizResult = quizResultsByUnit[unit]; // from state
+                              const inputState = resultsInputs[unit] || { score: '', passed: false }; // ✅ DEFINE IT HERE
+                              return (
+                                <tr key={`${selectedStudentForAssign}-${unit}`}>
+                                  <ResultTd>{selectedStudentForAssign}</ResultTd>
+                                  <ResultTd>{unit}</ResultTd>
+                                  {/* Code cell */}
+                                  <ResultTd>
+                                    {a.submissionCode ? (
+                                      <>
+                                        <pre style={{ maxHeight: '100px', overflow: 'auto', background: '#f5f5f5', padding: '8px' }}>
+                                          {a.submissionCode}
+                                        </pre>
+                                        <a
+                                          href={`data:text/plain;charset=utf-8,${encodeURIComponent(a.submissionCode)}`}
+                                          download={`${selectedStudentForAssign}_${unit}_submission.txt`}
+                                        >
+                                          Download Code
+                                        </a>
+                                      </>
+                                    ) : (
+                                      <span style={{ color: '#888' }}>—</span>
+                                    )}
+                                  </ResultTd>
+                                  {/* File cell */}
+                                  <ResultTd>
+                                    {a.submissionFileUrl ? (
+                                      <a href={a.submissionFileUrl} download target="_blank" rel="noopener noreferrer">
+                                        Download File
+                                      </a>
+                                    ) : (
+                                      <span style={{ color: '#888' }}>—</span>
+                                    )}
+                                  </ResultTd>
+                                  {/* Assignment results */}
+                                    <ResultTd>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        value={inputState.score}
+                                        onChange={e => handleResultInputChange(unit, 'score', e.target.value)}
+                                        style={{ width: '60px' }}
+                                      />
+                                    </ResultTd>
+                                  <ResultTd>
+                                      <input
+                                        type="checkbox"
+                                        checked={inputState.passed}
+                                        onChange={e => handleResultInputChange(unit, 'passed', e.target.checked)}
+                                      />
+                                    </ResultTd>
+                                  {/* Quiz result */}
+                                  <ResultTd>
+                                    {quizResult
+                                      ? `${quizResult.score} / ${quizResult.total}`
+                                      : <span style={{ color: '#888' }}>—</span>}
+                                  </ResultTd>
+                                  {/* Potential Action column: e.g., Refresh Quiz Result */}
+                                  <ResultTd>
+                                        <Button
+                                          onClick={() => saveAssignmentResult(unit)}
+                                          disabled={assignLoading}
+                                        >
+                                          Save
+                                        </Button>
+                                      </ResultTd>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
 
                           </ProjectDetailsTable>
                         ) : <NoData>No assignments.</NoData>}

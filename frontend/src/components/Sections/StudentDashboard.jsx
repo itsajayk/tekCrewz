@@ -172,6 +172,23 @@ export default function StudentDashboard() {
     quizData.questions.map(() => null)
   );
   const [submitStatus, setSubmitStatus] = useState(null);
+  const [quizResult, setQuizResult] = useState(null);
+
+   // NEW: load prior result
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/students/${studentId}/quizzes/${quizData._id}/result`)
+      .then(res => {
+        if (!res.ok) throw new Error('No result yet');
+        return res.json();
+      })
+      .then(json => {
+        setSubmitStatus('submitted');
+        setQuizResult({ score: json.score, total: json.total, breakdown: json.breakdown });
+      })
+      .catch(() => {
+        // no prior submission — OK
+      });
+  }, [quizData._id, studentId]);
 
   const handleAnswerChange = (qIndex, optionIndex) => {
     setAnswers(ans => {
@@ -181,21 +198,31 @@ export default function StudentDashboard() {
     });
   };
 
-  const submitQuiz = async (answers) => {
-  try {
-    const res = await fetch(
-      `https://tekcrewz.onrender.com/api/quizzes/${quizData._id}/submit`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answers }) }
-    );
-    if (!res.ok) throw new Error();
-    setSubmitStatus('submitted');
-    // Fetch and display result summary
-    const result = await res.json();
-    setQuizResult(result);
-  } catch {
-    setSubmitStatus('error');
-  }
-};
+  const submitQuiz = async () => {
+    // Prevent re-submit
+    if (submitStatus === 'submitted') return;
+    try {
+      setSubmitStatus('submitting');
+      // Call student-specific endpoint:
+      const res = await fetch(
+        `${API_BASE_URL}/api/students/${studentId}/quizzes/${quizData._id}/submit`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answers })
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Submission failed');
+      // Expect backend returns { score: <number>, total: <number> } plus we will extend breakdown
+      // Compute breakdown client-side? But quizData from GET strips correctIndex, so we need backend to return breakdown.
+      setSubmitStatus('submitted');
+      setQuizResult(json); // { score, total, breakdown: [{ question, correct: boolean }] }
+    } catch (err) {
+      console.error("Quiz submission error:", err);
+      setSubmitStatus('error');
+    }
+  };
 
   return (
     <QuizContainer>
@@ -216,11 +243,29 @@ export default function StudentDashboard() {
           ))}
         </QuestionBlock>
       ))}
-      <SubmitQuizButton onClick={submitQuiz} disabled={submitStatus === 'submitted'}>
-        {submitStatus === 'submitted' ? 'Submitted' : 'Submit Quiz'}
+      <SubmitQuizButton
+        onClick={submitQuiz}
+        disabled={submitStatus === 'submitted' || submitStatus === 'submitting'}
+      >
+        {submitStatus === 'submitted'
+          ? 'Submitted'
+          : submitStatus === 'submitting'
+          ? 'Submitting...'
+          : 'Submit Quiz'}
       </SubmitQuizButton>
-      {submitStatus === 'error' && <ErrorText>Submission failed. Try again.</ErrorText>}
-      {submitStatus === 'submitted' && <SuccessText>Quiz submitted!</SuccessText>}
+      {submitStatus === 'error' && (
+        <ErrorText>Submission failed. Try again.</ErrorText>
+      )}
+      {submitStatus === 'submitted' && quizResult && (
+        <QuizResultWrapper>
+          <p>Your Score: {quizResult.score} / {quizResult.total}</p>
+          {quizResult.breakdown && quizResult.breakdown.map((item, idx) => (
+            <p key={idx}>
+              {item.correct ? '✅' : '❌'} {item.question}
+            </p>
+          ))}
+        </QuizResultWrapper>
+      )}
     </QuizContainer>
   );
 }
@@ -948,17 +993,18 @@ const renderUnit = (unit) => {
             <SectionHeading>Upload File (Optional)</SectionHeading>
             <FileInputWrapper>
                 <FileInput
-                  type="file"
-                  accept="*/*"
-                  disabled={u.closed || submitting}
-                  onChange={(e) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                      setSelectedFile(file);
-                      setFilePreviewUrl(URL.createObjectURL(file));
-                    }
-                  }}
-                />
+                        type="file"
+                        accept="*/*"
+                        disabled={u.closed || submitting}
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            setSelectedFile(file);
+                            setFilePreviewUrl(URL.createObjectURL(file));
+                          }
+                        }}
+                      />
+
               <UploadLabel animate={!u.closed && !submitting}>
                 Choose File
               </UploadLabel>
@@ -2298,11 +2344,13 @@ const FileInputWrapper = styled.div`
 
 const FileInput = styled.input`
   opacity: 0;
-  // position: absolute;
-  left: 0; top: 0;
-  width: 100%; height: 100%;
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
   cursor: pointer;
 `;
+
 
 const UploadLabel = styled.label`
   display: inline-block;
@@ -2317,6 +2365,7 @@ const UploadLabel = styled.label`
   &:hover { background: darken(${(p) => p.theme.buttonBg}, 10%); }
   @media (max-width: 480px) { font-size: 0.9rem; }
 `;
+
 
 const UploadedInfoAnimated = styled.div`
   margin-top: 6px;
@@ -2517,4 +2566,13 @@ const LoadingText = styled.p` // new
 const InfoText = styled.p` // new
   color: #555;
   margin-top: 6px;
+`;
+
+const QuizResultWrapper = styled.div`
+  margin-top: 16px;
+  background: #f6f6f6;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.6;
 `;

@@ -19,6 +19,7 @@ const numberToWords = (num) => {
 };
 
 export default function EmpDashboard() {
+  const API_BASE_URL = 'https://tekcrewz.onrender.com';
   const navigate = useNavigate();
   const [employees, setEmployees] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -87,7 +88,7 @@ export default function EmpDashboard() {
         );
         return unsub;
       });
-      fetch('/api/admin/students')
+      fetch(`${API_BASE_URL}/api/admin/students`)
         .then(r => r.json())
         .then(setStudents)
         .catch(console.error);
