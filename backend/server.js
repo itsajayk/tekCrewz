@@ -714,7 +714,7 @@ app.post('/api/students/:studentId/quizzes/:quizId/submit', async (req, res) => 
     }));
     const scoreCount = breakdown.reduce((sum, item) => sum + (item.correct ? 1 : 0), 0);
     const total = quiz.questions.length;
-    const percent = Math.round((scoreCount / total) * 100);
+    const percent = Math.round((scoreCount / total)*10);
 
     // Save the student's result (overwrite if exists)
     await StudentQuiz.findOneAndUpdate(

@@ -258,10 +258,10 @@ export default function StudentDashboard() {
       )}
       {submitStatus === 'submitted' && quizResult && (
         <QuizResultWrapper>
-          <p>Your Score: {quizResult.score} / {quizResult.total}</p>
+          <p>Your Score: {quizResult.total} / {quizResult.score}</p>
           {quizResult.breakdown && quizResult.breakdown.map((item, idx) => (
             <p key={idx}>
-              {item.correct ? '✅' : '❌'} {item.question}
+              {item.correct ? '✅' : '❌'} {item.idx}
             </p>
           ))}
         </QuizResultWrapper>
