@@ -156,6 +156,14 @@ export default function StudentDashboard() {
   const [unitQuiz, setUnitQuiz] = useState(null);
   const [quizResult, setQuizResult] = useState(null);
 
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState(null);
+
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const [submitSuccess, setSubmitSuccess] = useState(null);
+
+
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
   const closeModal = () => setShowModal(false);
 
@@ -325,39 +333,53 @@ export default function StudentDashboard() {
     // new: effect to fetch quiz data when activeTab unit changes and assignment is submitted
   useEffect(() => {
   if (!data) return;
-
-  // Only run when switching to a unit tab
-  if (["Profile", "Attendance", "Syllabus", "Schedule", "Quiz"].includes(activeTab)) {
-    // Clear any previous quiz state when not on a unit
+  // If activeTab is not a unit tab, clear quiz state
+  if (["Profile","Attendance","Syllabus","Schedule","Quiz"].includes(activeTab)) {
+    console.log("[QuizEffect] Non-unit tab selected:", activeTab);
     setUnitQuiz(null);
     setQuizError(null);
     setQuizLoading(false);
     return;
   }
-
   const assignment = data.assignments.find(a => a.unit === activeTab);
+  console.log("[QuizEffect] activeTab:", activeTab, "assignment found:", assignment);
   if (assignment && (assignment.submissionCode || assignment.submissionFileUrl)) {
-    // Fetch quiz
+    console.log("[QuizEffect] Fetching quiz for assignmentId:", assignment._id);
     setQuizLoading(true);
     setQuizError(null);
     setUnitQuiz(null);
     axios.get(`${API_BASE_URL}/api/quizzes/${assignment._id}`)
       .then(res => {
+        console.log("[QuizEffect] Quiz GET success:", res.data);
         setUnitQuiz(res.data);
+        setQuizError(null);
       })
       .catch(err => {
-        setQuizError('Quiz not available');
+        if (err.response) {
+          console.error("[QuizEffect] GET error status:", err.response.status, err.response.data);
+          if (err.response.status === 404) {
+            // No quiz exists yet
+            setUnitQuiz(null);
+            setQuizError(null);
+          } else {
+            setQuizError('Error loading quiz');
+          }
+        } else {
+          console.error("[QuizEffect] GET error:", err);
+          setQuizError('Error loading quiz');
+        }
       })
       .finally(() => {
         setQuizLoading(false);
       });
   } else {
-    // Not submitted yet; clear quiz
+    console.log("[QuizEffect] Assignment not submitted or not found, clearing quiz");
     setUnitQuiz(null);
     setQuizError(null);
     setQuizLoading(false);
   }
-}, [data, activeTab]); // ✅ Properly closed and added dependency array
+}, [data, activeTab]);
+
 
 
 
@@ -385,6 +407,66 @@ export default function StudentDashboard() {
       alert(err.message);
     }
   };
+
+        const handleUnifiedSubmit = async (unit) => {
+        if (!data) return;
+        const { dbId } = data;
+        if (!codeInput.trim() && !selectedFile) {
+          setSubmitError('Please provide code or select a file.');
+          return;
+        }
+        setSubmitting(true);
+        setSubmitError(null);
+        setSubmitSuccess(null);
+        try {
+          // Build FormData for unified endpoint
+          const formData = new FormData();
+          formData.append('unit', unit);
+          if (codeInput.trim()) {
+            formData.append('code', codeInput.trim());
+          }
+          if (selectedFile) {
+            formData.append('file', selectedFile);
+          }
+          const res = await fetch(
+            `${API_BASE_URL}/api/assignments/${dbId}/submit-combined`,
+            {
+              method: 'POST',
+              body: formData
+            }
+          );
+          const json = await res.json();
+          if (!res.ok) {
+            throw new Error(json.error || 'Submission failed');
+          }
+          // Update local state: assignment submissionCode & submissionFileUrl
+          setData(d => ({
+            ...d,
+            assignments: d.assignments.map(a =>
+              a.unit === unit
+                ? {
+                    ...a,
+                    submissionCode: codeInput.trim() ? codeInput.trim() : a.submissionCode,
+                    submissionFileUrl: json.assignment.submissionFileUrl || a.submissionFileUrl
+                  }
+                : a
+            )
+          }));
+          setSubmitSuccess('Submitted successfully.');
+          // Clear local inputs
+          setCodeInput('');
+          if (filePreviewUrl) {
+            URL.revokeObjectURL(filePreviewUrl);
+            setFilePreviewUrl(null);
+          }
+          setSelectedFile(null);
+        } catch (err) {
+          console.error('Unified submit error:', err);
+          setSubmitError(err.message);
+        } finally {
+          setSubmitting(false);
+        }
+      };
 
 
     const requestUnlock = async (unit) => {
@@ -847,19 +929,12 @@ const renderUnit = (unit) => {
           <SectionContainerAnimated delay={0.8}>
             <SectionHeading>Submit Code</SectionHeading>
             <CodeTextArea
-              rows={6}
-              disabled={u.closed}
-              placeholder={u.closed ? "Submissions closed" : "Paste your code here…"}
-              value={codeInput}
-              onChange={(e) => setCodeInput(e.target.value)}
-              animate={u.closed ? false : true}
-            />
-            <SubmitButton
-              disabled={u.closed}
-              onClick={() => submitCode(unit)}
-            >
-              {u.closed ? "Closed" : "Submit Code"}
-            </SubmitButton>
+                rows={6}
+                disabled={u.closed || submitting}
+                placeholder={u.closed ? "Submissions closed" : "Paste your code here…"}
+                value={codeInput}
+                onChange={(e) => setCodeInput(e.target.value)}
+              />
 
             {u.closed && !u.unlocked && (
               <UnlockFormAnimated onSubmit={e => { e.preventDefault(); requestUnlock(unit); }}>
@@ -872,16 +947,19 @@ const renderUnit = (unit) => {
           <SectionContainerAnimated delay={1.4}>
             <SectionHeading>Upload File (Optional)</SectionHeading>
             <FileInputWrapper>
-              <FileInput
-                type="file"
-                accept="*/*"
-                disabled={u.closed}
-                onChange={(e) => {
-                  const file = e.target.files[0];
-                  if (file) uploadFile(unit, file);
-                }}
-              />
-              <UploadLabel animate={!u.closed}>
+                <FileInput
+                  type="file"
+                  accept="*/*"
+                  disabled={u.closed || submitting}
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      setSelectedFile(file);
+                      setFilePreviewUrl(URL.createObjectURL(file));
+                    }
+                  }}
+                />
+              <UploadLabel animate={!u.closed && !submitting}>
                 Choose File
               </UploadLabel>
             </FileInputWrapper>
@@ -893,6 +971,40 @@ const renderUnit = (unit) => {
                 </UploadedLink>
               </UploadedInfoAnimated>
             )}
+            {selectedFile && (
+                <div className="file-preview" style={{ marginTop: '8px', display: 'flex', alignItems: 'center' }}>
+                  <span style={{ marginRight: '8px' }}>{selectedFile.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedFile(null);
+                      if (filePreviewUrl) {
+                        URL.revokeObjectURL(filePreviewUrl);
+                        setFilePreviewUrl(null);
+                      }
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '16px',
+                      color: '#888'
+                    }}
+                  >
+                    X
+                  </button>
+                </div>
+              )}
+
+              <SubmitButton
+                  disabled={u.closed || submitting || (!codeInput.trim() && !selectedFile)}
+                  onClick={() => handleUnifiedSubmit(unit)}
+                  style={{ marginTop: '12px' }}
+                >
+                  {u.closed ? "Closed" : submitting ? "Submitting..." : "Submit"}
+                </SubmitButton>
+                {submitError && <p style={{ color: 'red', marginTop: '6px' }}>{submitError}</p>}
+                {submitSuccess && <p style={{ color: 'green', marginTop: '6px' }}>{submitSuccess}</p>}
           </SectionContainerAnimated>
 
           {/* Results Section (only if results exist) */}
@@ -2186,7 +2298,7 @@ const FileInputWrapper = styled.div`
 
 const FileInput = styled.input`
   opacity: 0;
-  position: absolute;
+  // position: absolute;
   left: 0; top: 0;
   width: 100%; height: 100%;
   cursor: pointer;
@@ -2196,12 +2308,12 @@ const UploadLabel = styled.label`
   display: inline-block;
   background: ${(p) => p.theme.buttonBg};
   color: #fff;
-  padding: 8px 14px;
+  padding: 4px 7px;
   border-radius: 6px;
   cursor: pointer;
   opacity: ${(p) => (p.animate ? 1 : 0.6)};
   transition: opacity 0.3s ease;
-  font-size: 0.95rem;
+  font-size: 0.7rem;
   &:hover { background: darken(${(p) => p.theme.buttonBg}, 10%); }
   @media (max-width: 480px) { font-size: 0.9rem; }
 `;
@@ -2245,8 +2357,17 @@ const ResultTable = styled.table`
   }
 `;
 
-const ResultTh = styled.th``;
-const ResultTd = styled.td``;
+const ResultTh = styled.th`
+  padding: 8px;
+  text-align: left;
+  background-color: #f5f5f5;
+  font-weight: bold;
+`;
+
+const ResultTd = styled.td`
+  padding: 8px;
+  border-bottom: 1px solid #ddd;
+`;
 
 const ResultStatus = styled.span`
   color: ${(props) => (props.passed ? "#28a745" : "#dc3545")};

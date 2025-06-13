@@ -146,6 +146,7 @@ const assignmentSchema = new mongoose.Schema({
     default: false
   },
   submissionCode:   String,
+  submissionFileUrl: String,       // <-- add this
   results: {
     score: Number,
     passed: Boolean
@@ -371,29 +372,42 @@ app.post('/api/assignments/:studentId/feedback', async (req, res) => {
 });
 
 // ── NEW: Upload student‐submitted file ─────────────────────────────────
+// Existing multer setup for student files:
 app.post(
-  '/api/assignments/:studentId/upload',
+  '/api/assignments/:studentId/submit-combined',
   uploadStudentFile.single('file'),
   async (req, res) => {
     try {
       const studentId = req.params.studentId;
       const unit = req.body.unit;
-      const fileUrl = req.file.path; // Cloudinary‐returned URL
-
-      // Update the Assignment document to store this file URL
-      await Assignment.findOneAndUpdate(
+      const code = req.body.code;           // may be undefined or empty
+      let update = {};
+      if (typeof code === 'string' && code.trim() !== '') {
+        update.submissionCode = code;
+      }
+      if (req.file && req.file.path) {
+        update.submissionFileUrl = req.file.path;
+      }
+      if (Object.keys(update).length === 0) {
+        return res.status(400).json({ error: 'No code or file provided' });
+      }
+      // Update assignment in one go
+      const assignment = await Assignment.findOneAndUpdate(
         { studentId, unit },
-        { submissionFileUrl: fileUrl },
-        { upsert: false }
+        update,
+        { new: true }
       );
-
-      res.json({ fileUrl });
+      if (!assignment) {
+        return res.status(404).json({ error: 'Assignment not found' });
+      }
+      res.json({ message: 'Submission saved', assignment });
     } catch (err) {
-      console.error(err);
+      console.error('Unified submission error:', err);
       res.status(500).json({ error: err.message });
     }
   }
 );
+
 
 // Admin Aggregations
 app.get('/api/admin/students', async (req, res) => {
@@ -537,13 +551,22 @@ app.post('/api/admin/students/:id/manageAssignments', uploadAssignment.single('s
   }
 });
 
-app.post('/api/admin/students/:id/enterResults', async (req, res) => {
-  await Assignment.findOneAndUpdate(
-    { studentId: req.params.id, unit: req.body.unit },
-    { results: req.body.results }
-  );
-  res.sendStatus(204);
+app.post('/api/admin/students/:studentId/enterResults', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const { unit, results } = req.body; // results: { score: Number, passed: Boolean }
+    const assignment = await Assignment.findOneAndUpdate(
+      { studentId, unit },
+      { results },
+      { new: true }
+    );
+    if (!assignment) return res.status(404).json({ error: 'Assignment not found' });
+    res.json({ message: 'Result entered', assignment });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
+
 
 app.post('/api/admin/students/:id/approveUnlock', async (req, res) => {
   try {

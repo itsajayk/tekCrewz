@@ -226,6 +226,17 @@ useEffect(() => {
   }
 };
 
+const handleResultInputChange = (unit, field, value) => {
+  setResultsInputs(prev => ({
+    ...prev,
+    [unit]: {
+      ...prev[unit],
+      [field]: value
+    }
+  }));
+};
+
+
 
     // ── Filter candidates on dropdown/radio change ────────────────────────────────────
 useEffect(() => {                                                                        // new
@@ -444,19 +455,17 @@ const approveUnlock = async (studentId, unit) => {
     if (!selectedStudentForAssign) return;
     setAssignLoading(true);
     axios.get(`${API_BASE_URL}/api/assignments/${selectedStudentForAssign}`)
-      .then(res => {
-        // res.data is array of assignments for that student
-        setAssignmentsList(res.data);
-        // Initialize resultsInputs: { unit1: {score:'', passed:false}, ...}
-        const initial = {};
-        res.data.forEach(a => {
-          initial[a.unit] = {
-            score: a.results?.score || '',
-            passed: a.results?.passed || false
-          };
-        });
-        setResultsInputs(initial);
-      })
+  .then(res => {
+    setAssignmentsList(res.data);
+    const initial = {};
+    res.data.forEach(a => {
+      initial[a.unit] = {
+        score: a.results?.score || '',
+        passed: a.results?.passed || false
+      };
+    });
+    setResultsInputs(initial);
+  })
       .catch(err => {
         console.error("Failed to fetch assignments:", err);
         setAssignmentsList([]);
@@ -516,31 +525,32 @@ useEffect(() => {
 
   // Save a single assignment result
   const saveAssignmentResult = async (unit) => {
-    if (!selectedStudentForAssign) return;
-    const { score, passed } = resultsInputs[unit];
-    try {
-      await axios.post(
-        `${API_BASE_URL}/api/admin/students/${selectedStudentForAssign}/enterResults`,
-        { unit, results: { score: Number(score), passed } }
-      );
-      // Optionally, show a small “saved” indicator or reload assignmentsList
-      // For now, just reload that student’s assignments:
-      const res = await axios.get(`${API_BASE_URL}/api/assignments/${selectedStudentForAssign}`);
-      setAssignmentsList(res.data);
-      // Ensure resultsInputs updated from new data
-      const updatedInputs = { ...resultsInputs };
-      res.data.forEach(a => {
-        updatedInputs[a.unit] = {
-          score: a.results?.score || '',
-          passed: a.results?.passed || false
-        };
-      });
-      setResultsInputs(updatedInputs);
-    } catch (err) {
-      console.error("Failed to save assignment result:", err);
-      alert("Unable to save result.");
-    }
-  };
+  if (!selectedStudentForAssign) return;
+  const { score, passed } = resultsInputs[unit];
+  try {
+    await axios.post(
+      `${API_BASE_URL}/api/admin/students/${selectedStudentForAssign}/enterResults`,
+      { unit, results: { score: Number(score), passed } }
+    );
+    // reload assignmentsList
+    const res = await axios.get(`${API_BASE_URL}/api/assignments/${selectedStudentForAssign}`);
+    setAssignmentsList(res.data);
+    // re-init resultsInputs
+    const updatedInputs = {};
+    res.data.forEach(a => {
+      updatedInputs[a.unit] = {
+        score: a.results?.score || '',
+        passed: a.results?.passed || false
+      };
+    });
+    setResultsInputs(updatedInputs);
+    pushToast('Result saved');
+  } catch (err) {
+    console.error("Failed to save assignment result:", err);
+    pushToast("Unable to save result.", 'error');
+  }
+};
+
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -1002,11 +1012,62 @@ useEffect(() => {
 
                     {/* 3.3 Results */}
                     <Section>
-                      <Label>Assignment Results</Label>
-                      {assignLoading ? <p>Loading…</p> : assignmentsList.length ? (
-                        <ProjectDetailsTable>…</ProjectDetailsTable>
-                      ) : <NoData>No assignments.</NoData>}
-                    </Section>
+                        <Label>Assignment Results</Label>
+                        {assignLoading ? <Spinner /> : assignmentsList.length ? (
+                          <ProjectDetailsTable>
+                            <thead>
+                                <tr>
+                                  <ResultTh>Student ID</ResultTh>
+                                  <ResultTh>Unit</ResultTh>
+                                  <ResultTh>Score</ResultTh>
+                                  <ResultTh>Passed</ResultTh>
+                                  <ResultTh>Action</ResultTh>
+                                </tr>
+                              </thead>
+                            <tbody>
+                                  {assignmentsList.map(a => {
+                                    const unit = a.unit;
+                                    const inputState = resultsInputs[unit] || { score: '', passed: false };
+                                    return (
+                                      <tr key={`${selectedStudentForAssign}-${unit}`}>
+                                        <ResultTd>{selectedStudentForAssign}</ResultTd>
+                                        <ResultTd>{unit}</ResultTd>
+                                        {/* Score input */}
+                                        <ResultTd>
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            value={inputState.score}
+                                            onChange={e => handleResultInputChange(unit, 'score', e.target.value)}
+                                            style={{ width: '60px' }}
+                                          />
+                                        </ResultTd>
+                                        {/* Passed checkbox */}
+                                        <ResultTd>
+                                          <input
+                                            type="checkbox"
+                                            checked={inputState.passed}
+                                            onChange={e => handleResultInputChange(unit, 'passed', e.target.checked)}
+                                          />
+                                        </ResultTd>
+                                        {/* Save action */}
+                                        <ResultTd>
+                                          <Button
+                                            onClick={() => saveAssignmentResult(unit)}
+                                            disabled={assignLoading} // or disable if you want while loading
+                                          >
+                                            Save
+                                          </Button>
+                                        </ResultTd>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+
+                          </ProjectDetailsTable>
+                        ) : <NoData>No assignments.</NoData>}
+                      </Section>
+
 
                     {/* 3.4 Unlock Requests */} {/* NEW */}
                     <Section>
@@ -1305,3 +1366,15 @@ const Section = styled.div`display:flex;flex-direction:column;gap:12px;`;
 const Item = styled.li`padding:8px;border-bottom:1px solid #ddd;background:${p=>p.selected?'#e6f7ff':'transparent'};cursor:pointer;&:hover{background:#f0f0f0;}`;
 
 const Btn = styled.button`padding:8px 16px;background:#4caf50;color:#fff;border:none;border-radius:8px;cursor:pointer;align-self:flex-start;&:hover{background:#45a047;}`;
+
+const ResultTh = styled.th`
+  padding: 8px;
+  text-align: left;
+  background-color: #f5f5f5;
+  font-weight: bold;
+`;
+
+const ResultTd = styled.td`
+  padding: 8px;
+  border-bottom: 1px solid #ddd;
+`;
