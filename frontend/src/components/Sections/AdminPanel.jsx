@@ -41,11 +41,29 @@ const [newAssignment, setNewAssignment] = useState({
   const [unlockRequests, setUnlockRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState('');
-const [syllabusFile,   setSyllabusFile]   = useState(null);
-const [scheduleFile,   setScheduleFile]   = useState(null);
+  const [syllabusFile,   setSyllabusFile]   = useState(null);
+  const [scheduleFile,   setScheduleFile]   = useState(null);
 
   // toasts: { id, message, type: 'success' | 'error' }
   const [toasts, setToasts] = useState([]);
+
+  // Add:
+  const [batches, setBatches] = useState([]);              // list of batch identifiers
+  const [courses, setCourses] = useState([]);              // list of course names
+  const [trainingModes, setTrainingModes] = useState([]);  // e.g., ['Online','On-campus@ Thanjavur']
+  const [selectedBatch, setSelectedBatch] = useState('');
+  const [selectedTrainingMode, setSelectedTrainingMode] = useState('');
+  const [filteredCandidates, setFilteredCandidates] = useState([]); // after filter applied
+  const [attendanceMap, setAttendanceMap] = useState({});  // map studentId → attendance records
+
+  const [selectedBatchRes, setSelectedBatchRes] = useState('');
+  const [selectedCourseRes, setSelectedCourseRes] = useState('');
+  const [selectedTrainingModeRes, setSelectedTrainingModeRes] = useState('');
+  const [filteredAssignCandidates, setFilteredAssignCandidates] = useState([]); // same structure as filteredCandidates
+  const [filteredResults, setFilteredResults] = useState([]); // assignment results after filtering
+  // For quiz results mapping: key `${studentId}_${unit}` → { score, total, breakdown }
+  const [quizResultsMap, setQuizResultsMap] = useState({});
+
 
   // helper to push a toast
   const pushToast = (message, type='success') => {
@@ -172,6 +190,77 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
     }
   };
 
+  const fetchAttendanceForCandidate = async (candidate) => {
+  const sid = candidate.studentId;
+  if (attendanceMap[sid]) {
+    // Already fetched: hide
+    setAttendanceMap(prev => {
+      const next = { ...prev };
+      delete next[sid];
+      return next;
+    });
+    return;
+  }
+  // Fetch from Firestore as before
+  try {
+    // Show loading indicator if desired
+    const q = query(collection(db, 'attendance'), where('studentId', '==', sid));
+    const snap = await getDocs(q);
+    const recs = snap.docs.map(d => ({
+      date: d.data().date.toDate ? d.data().date.toDate() : new Date(d.data().date),
+      status: d.data().status
+    }));
+    recs.sort((a, b) => b.date - a.date);
+    setAttendanceMap(prev => ({ ...prev, [sid]: recs }));
+  } catch (err) {
+    console.error('Failed to fetch attendance for', sid, err);
+    pushToast(`Failed to fetch attendance for ${sid}`, 'error');
+  }
+};
+
+    useEffect(() => {
+  if (!selectedBatchRes || !selectedCourseRes || !selectedTrainingModeRes) {
+    setFilteredAssignCandidates([]);
+    setFilteredResults([]);
+    return;
+  }
+  axios.get(`${API_BASE_URL}/api/candidates`)
+    .then(res => {
+      const list = res.data.filter(c =>
+        c.studentId.includes(`BT${selectedBatchRes}FS`) &&
+        Array.isArray(c.courseRegistered) &&
+        c.courseRegistered.includes(selectedCourseRes) &&
+        c.trainingMode === selectedTrainingModeRes
+      );
+      setFilteredAssignCandidates(list);
+      setFilteredResults([]); // clear previous
+    })
+    .catch(err => console.error('Error filtering assignment candidates:', err));
+}, [selectedBatchRes, selectedCourseRes, selectedTrainingModeRes]);
+
+    useEffect(() => {
+  if (filteredAssignCandidates.length === 0) {
+    setFilteredResults([]);
+    return;
+  }
+  setLoading(true);
+  axios.get(`${API_BASE_URL}/api/admin/assignments/results`)
+    .then(res => {
+      // res.data is array of assignment docs with studentId, unit, results
+      const validIds = new Set(filteredAssignCandidates.map(c => c.studentId));
+      const matched = res.data.filter(r => validIds.has(r.studentId));
+      setFilteredResults(matched);
+    })
+    .catch(err => {
+      console.error('Failed to fetch assignment results:', err);
+      pushToast('Failed to load assignment results', 'error');
+      setFilteredResults([]);
+    })
+    .finally(() => setLoading(false));
+}, [filteredAssignCandidates]);
+
+
+
   const uploadCourseDocs = async () => {
   if (!selectedCourse) {
     return pushToast('Please select a course', 'error');
@@ -222,6 +311,57 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
   }
 };
 
+    useEffect(() => {
+  // Fetch all candidates from backend to build courseRegistered and trainingMode lists
+  axios.get(`${API_BASE_URL}/api/candidates`)
+    .then(res => {
+      const data = res.data;
+      // Batches: extract numeric part from studentId matching “BT<number>FS”
+      const batchSet = new Set();
+      data.forEach(c => {
+        const m = c.studentId.match(/BT(\d+)FS/);
+        if (m) batchSet.add(m[1]);
+      });
+      setBatches(Array.from(batchSet).sort((a,b) => Number(a) - Number(b)));
+      // Courses: c.courseRegistered is array
+      const courseSet = new Set();
+      data.forEach(c => {
+        if (Array.isArray(c.courseRegistered)) {
+          c.courseRegistered.forEach(cr => courseSet.add(cr));
+        }
+      });
+      setCourses(Array.from(courseSet));
+      // Training modes
+      const modeSet = new Set(data.map(c => c.trainingMode).filter(Boolean));
+      setTrainingModes(Array.from(modeSet));
+    })
+    .catch(err => console.error('Failed to fetch candidates for filters:', err));
+}, []);
+
+          useEffect(() => {
+      if (!selectedBatch || !selectedCourse || !selectedTrainingMode) {
+        setFilteredCandidates([]);
+        return;
+      }
+      axios.get(`${API_BASE_URL}/api/candidates`)
+        .then(res => {
+          const list = res.data.filter(c =>
+            // match batch: studentId includes “BT{selectedBatch}FS”
+            c.studentId.includes(`BT${selectedBatch}FS`) &&
+            Array.isArray(c.courseRegistered) &&
+            c.courseRegistered.includes(selectedCourse) &&
+            c.trainingMode === selectedTrainingMode
+          );
+          setFilteredCandidates(list);
+          // Clear previous attendanceMap entries if needed
+          setAttendanceMap({});
+        })
+        .catch(err => {
+          console.error('Error filtering candidates:', err);
+          pushToast('Failed to filter candidates', 'error');
+        });
+    }, [selectedBatch, selectedCourse, selectedTrainingMode]);
+
 
 
   const createAssignment = async () => {
@@ -267,6 +407,43 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
       pushToast('Failed to request unlock', 'error');
     }
   };
+
+    const fetchQuizResultForAdmin = async (studentId, unit) => {
+  // Need to find the corresponding quizId for this assignment unit.
+  // First, fetch the quiz for this assignment: assume an endpoint GET /api/quizzes/:assignmentId or GET /api/quizzes?studentId/unit
+  // If your backend stores quizzes by assignmentId, you can call:
+  try {
+    // First, get the assignment document to retrieve its _id:
+    const asnRes = await axios.get(`${API_BASE_URL}/api/assignments/${studentId}`);
+    const asns = asnRes.data;
+    const asn = asns.find(a => a.unit === unit);
+    if (!asn) {
+      pushToast(`Assignment record not found for ${unit}`, 'error');
+      return;
+    }
+    // Now fetch quiz by assignmentId:
+    let quiz;
+    try {
+      const qres = await axios.get(`${API_BASE_URL}/api/quizzes/${asn._id}`);
+      quiz = qres.data;
+    } catch {
+      pushToast(`No quiz assigned for unit ${unit}`, 'info');
+      return;
+    }
+    const quizId = quiz._id;
+    // Now fetch admin quiz result endpoint:
+    const res = await axios.get(
+      `${API_BASE_URL}/api/admin/students/${studentId}/quizzes/${quizId}/result`
+    );
+    // res.data: { score, total, breakdown }
+    const keyBase = `${studentId}_${unit}`;
+    setQuizResultsMap(prev => ({ ...prev, [keyBase]: res.data }));
+  } catch (err) {
+    console.error('Failed to fetch quiz result for admin:', err);
+    pushToast('Failed to fetch quiz result', 'error');
+  }
+};
+
 
   const approveUnlock = async unit => {
     if (!selectedStudent) { pushToast('Select a student', 'error'); return; }
@@ -394,61 +571,113 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
 
               {/* View Attendance */}
               {modalType === 'ViewAttendance' && !loading && (
-                <Section>
-                  <Select
-                    value={selectedStudent?.id || ''}
-                    onChange={async e => {
-                      const id = e.target.value;
-                      const s = students.find(x => x.id === id) || null;
-                      setSelectedStudent(s);
-                      if (!s) {
-                        return setAttendance([]);
-                      }
+                      <Section>
+                        {/* Filter controls */}
+                        <FormRow>
+                          <Label>Batch</Label>
+                          <Select value={selectedBatch} onChange={e => setSelectedBatch(e.target.value)}>
+                            <option value="">Select Batch</option>
+                            {batches.map(b => (
+                              <option key={b} value={b}>{`Batch ${b}`}</option>
+                            ))}
+                          </Select>
+                        </FormRow>
+                        <FormRow>
+                          <Label>Course</Label>
+                          <Select value={selectedCourse} onChange={e => setSelectedCourse(e.target.value)}>
+                            <option value="">Select Course</option>
+                            {courses.map(c => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                          </Select>
+                        </FormRow>
+                        <FormRow>
+                          <Label>Training Mode</Label>
+                          {/* Render radio buttons */}
+                          {trainingModes.map(mode => (
+                            <label key={mode} style={{ marginRight: '12px' }}>
+                              <input
+                                type="radio"
+                                name="attendanceMode"
+                                value={mode}
+                                checked={selectedTrainingMode === mode}
+                                onChange={e => setSelectedTrainingMode(e.target.value)}
+                              />
+                              {mode}
+                            </label>
+                          ))}
+                        </FormRow>
 
-                      // Firestore query to fetch attendance for that student
-                      const q = query(
-                        collection(db, 'attendance'),
-                        where('studentId', '==', s.id)
-                      );
-                      const snap = await getDocs(q);
-                      const recs = snap.docs.map(d => ({
-                        date: d.data().date.toDate
-                          ? d.data().date.toDate()
-                          : new Date(d.data().date),
-                        status: d.data().status
-                      }));
-                      recs.sort((a, b) => b.date - a.date);
-                      setAttendance(recs);
-                    }}
-                  >
-                    <option value="">Select Student</option>
-                    {students.map(s => (
-                      <option key={s.id} value={s.id}>
-                        {s.candidateName || s.id}
-                      </option>
-                    ))}
-                  </Select>
+                        {/* If filters incomplete, prompt */}
+                        {(!selectedBatch || !selectedCourse || !selectedTrainingMode) && (
+                          <p style={{ color: '#888', marginTop: '8px' }}>
+                            Please select Batch, Course, and Training Mode.
+                          </p>
+                        )}
 
-                  {attendance.length > 0 && (
-                    <Table>
-                      <thead>
-                        <tr>
-                          <Th>Date</Th>
-                          <Th>Status</Th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {attendance.map(a => (
-                          <tr key={a.date.toISOString()}>
-                            <Td>{a.date.toLocaleDateString()}</Td>
-                            <Td>{a.status}</Td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </Table>
-                  )}
-                </Section>
-              )}
+                        {/* Show filtered candidates */}
+                        {selectedBatch && selectedCourse && selectedTrainingMode && (
+                          <>
+                            {filteredCandidates.length === 0 ? (
+                              <p>No candidates found for selected filters.</p>
+                            ) : (
+                              <Table style={{ marginTop: '12px' }}>
+                                <thead>
+                                  <tr>
+                                    <Th>Student ID</Th>
+                                    <Th>Name</Th>
+                                    <Th>Action</Th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {filteredCandidates.map(c => {
+                                    const sid = c.studentId;
+                                    const recs = attendanceMap[sid] || null;
+                                    return (
+                                      <React.Fragment key={sid}>
+                                        <tr>
+                                          <Td>{sid}</Td>
+                                          <Td>{c.candidateName || sid}</Td>
+                                          <Td>
+                                            <ActionBtn onClick={() => fetchAttendanceForCandidate(c)}>
+                                              {attendanceMap[sid] ? 'Hide' : 'View Attendance'}
+                                            </ActionBtn>
+                                          </Td>
+                                        </tr>
+                                        {/* If fetched, show attendance below */}
+                                        {attendanceMap[sid] && (
+                                          <tr>
+                                            <Td colSpan={3} style={{ padding: 0 }}>
+                                              <Table style={{ margin: '8px', width: '100%' }}>
+                                                <thead>
+                                                  <tr>
+                                                    <Th>Date</Th>
+                                                    <Th>Status</Th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {attendanceMap[sid].map(rec => (
+                                                    <tr key={rec.date.toISOString()}>
+                                                      <Td>{new Date(rec.date).toLocaleDateString()}</Td>
+                                                      <Td>{rec.status}</Td>
+                                                    </tr>
+                                                  ))}
+                                                </tbody>
+                                              </Table>
+                                            </Td>
+                                          </tr>
+                                        )}
+                                      </React.Fragment>
+                                    );
+                                  })}
+                                </tbody>
+                              </Table>
+                            )}
+                          </>
+                        )}
+                      </Section>
+                    )}
+
 
                     {/* Course Docs */}
                     {modalType === 'CourseDocs' && !loading && (
@@ -620,71 +849,127 @@ const [scheduleFile,   setScheduleFile]   = useState(null);
 
 
               {/* Assignment Results */}
-              {modalType === 'AssignmentResults' && !loading && (
-                <Section>
-                  {results.length === 0 ? (
-                    <p>No assignment results have been entered yet.</p>
-                  ) : (
-                    <ResultsTable>
-                      <thead>
-                        <tr>
-                          <Th>Student</Th>
-                          <Th>Unit</Th>
-                          <Th>Score</Th>
-                          <Th>Passed</Th>
-                          <Th>Action</Th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {results.map(r => {
-                          // find the candidateName from your students cache (if you fetched it)
-                          const student = students.find(s => s.id === r.studentId);
-                          const name    = student?.candidateName || r.studentId;
-                          return (
-                            <tr key={`${r.studentId}-${r.unit}`}>
-                              <Td>{name}</Td>
-                              <Td>{r.unit}</Td>
-                              <Td>
-                                <Input
-                                  type="number"
-                                  defaultValue={r.results.score}
-                                  onBlur={e =>
-                                    enterResults(r.unit, e.target.value, r.results.passed)
-                                  }
-                                />
-                              </Td>
-                              <Td>
-                                <select
-                                  defaultValue={r.results.passed ? 'true' : 'false'}
-                                  onChange={e =>
-                                    enterResults(
-                                      r.unit,
-                                      r.results.score,
-                                      e.target.value === 'true'
-                                    )
-                                  }
-                                >
-                                  <option value="true">Yes</option>
-                                  <option value="false">No</option>
-                                </select>
-                              </Td>
-                              <Td>
-                                <ActionBtn
-                                  onClick={() =>
-                                    enterResults(r.unit, r.results.score, r.results.passed)
-                                  }
-                                >
-                                  Save
-                                </ActionBtn>
-                              </Td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </ResultsTable>
-                  )}
-                </Section>
-              )}
+              {/* Assignment Results */}
+{modalType === 'AssignmentResults' && (
+  <Section>
+    {/* Filter controls */}
+    <FormRow>
+      <Label>Batch</Label>
+      <Select value={selectedBatchRes} onChange={e => setSelectedBatchRes(e.target.value)}>
+        <option value="">Select Batch</option>
+        {batches.map(b => <option key={b} value={b}>{`Batch ${b}`}</option>)}
+      </Select>
+    </FormRow>
+    <FormRow>
+      <Label>Course</Label>
+      <Select value={selectedCourseRes} onChange={e => setSelectedCourseRes(e.target.value)}>
+        <option value="">Select Course</option>
+        {courses.map(c => <option key={c} value={c}>{c}</option>)}
+      </Select>
+    </FormRow>
+    <FormRow>
+      <Label>Training Mode</Label>
+      {trainingModes.map(mode => (
+        <label key={mode} style={{ marginRight: '12px' }}>
+          <input
+            type="radio"
+            name="resTrainingMode"
+            value={mode}
+            checked={selectedTrainingModeRes === mode}
+            onChange={e => setSelectedTrainingModeRes(e.target.value)}
+          />
+          {mode}
+        </label>
+      ))}
+    </FormRow>
+
+    {/* Prompt if filters incomplete */}
+    {(!selectedBatchRes || !selectedCourseRes || !selectedTrainingModeRes) && (
+      <p style={{ color: '#888', marginTop: '8px' }}>
+        Select Batch, Course, and Training Mode to view assignment results.
+      </p>
+    )}
+
+    {/* Results table when filteredResults loaded */}
+    {selectedBatchRes && selectedCourseRes && selectedTrainingModeRes && (
+      <>
+        {loading ? (
+          <p>Loading results…</p>
+        ) : filteredResults.length === 0 ? (
+          <p>No assignment results for selected filters.</p>
+        ) : (
+          <ResultsTable>
+            <thead>
+              <tr>
+                <Th>Student ID</Th>
+                <Th>Name</Th>
+                <Th>Unit</Th>
+                <Th>Assignment Score</Th>
+                <Th>Passed</Th>
+                <Th>Quiz Result</Th>
+                <Th>Action</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredResults.map(r => {
+                const sid = r.studentId;
+                const student = filteredAssignCandidates.find(c => c.studentId === sid);
+                const name = student?.candidateName || sid;
+                const keyBase = `${sid}_${r.unit}`;
+                const quizRes = quizResultsMap[keyBase];
+                return (
+                  <tr key={keyBase}>
+                    <Td>{sid}</Td>
+                    <Td>{name}</Td>
+                    <Td>{r.unit}</Td>
+                    <Td>
+                      <Input
+                        type="number"
+                        defaultValue={r.results.score}
+                        onBlur={e => enterResults(r.unit, e.target.value, r.results.passed)}
+                        style={{ width: '60px' }}
+                      />
+                    </Td>
+                    <Td>
+                      <select
+                        defaultValue={r.results.passed ? 'true' : 'false'}
+                        onChange={e =>
+                          enterResults(r.unit, r.results.score, e.target.value === 'true')
+                        }
+                      >
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                      </select>
+                    </Td>
+                    <Td>
+                      {quizRes
+                        ? `Score: ${quizRes.score} / ${quizRes.total}`
+                        : 'Not Attempted'}
+                    </Td>
+                    <Td>
+                      { /* Save assignment result */ }
+                      <ActionBtn onClick={() => enterResults(r.unit, r.results.score, r.results.passed)}>
+                        Save
+                      </ActionBtn>
+                      { /* Refresh quiz result */ }
+                      <ActionBtn
+                        onClick={() => fetchQuizResultForAdmin(sid, r.unit)}
+                        style={{ marginLeft: '8px' }}
+                      >
+                        {quizRes ? 'Refresh Quiz' : 'Fetch Quiz'}
+                      </ActionBtn>
+                    </Td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </ResultsTable>
+        )}
+      </>
+    )}
+  </Section>
+)}
+
 
 
               {/* Review Feedback */}
@@ -827,3 +1112,10 @@ const RemoveIcon = styled.span`
   font-weight: bold;
 `;
 
+const FormRow = styled.div`
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+`;

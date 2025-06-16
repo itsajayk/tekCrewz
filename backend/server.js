@@ -155,6 +155,19 @@ const assignmentSchema = new mongoose.Schema({
 }, { timestamps: true });
 const Assignment = mongoose.model('Assignment', assignmentSchema);
 
+// ── NEW: FeeSetting schema/model for dynamic fee summary ─────────────────
+const feeSettingSchema = new mongoose.Schema({
+  batch: { type: String, required: true },
+  course: { type: String, required: true },
+  trainingMode: { type: String, required: true },
+  termIIAmount: { type: Number, required: true },
+  startDate: { type: Date, required: true },
+  endDate: { type: Date, required: true }
+}, { timestamps: true });
+
+const FeeSetting = mongoose.model('FeeSetting', feeSettingSchema);
+
+
 // at top, instead of your existing assignmentStorage:
 const assignmentStorage = new CloudinaryStorage({
   cloudinary,
@@ -774,6 +787,58 @@ app.get('/api/admin/students/:studentId/quizzes/:quizId/result', async (req, res
     res.status(500).json({ error: err.message });
   }
 });
+
+// ── NEW: Create or update FeeSetting ─────────────────────────────────
+app.post('/api/admin/fee-settings', async (req, res) => {
+  try {
+    const { batch, course, trainingMode, termIIAmount, startDate, endDate } = req.body;
+    // Validate presence
+    if (!batch || !course || !trainingMode || termIIAmount == null || !startDate || !endDate) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+    // Validate numeric and date logic
+    const amount = Number(termIIAmount);
+    if (isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ error: 'termIIAmount must be a positive number' });
+    }
+    const sDate = new Date(startDate);
+    const eDate = new Date(endDate);
+    if (isNaN(sDate.getTime()) || isNaN(eDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format' });
+    }
+    if (sDate > eDate) {
+      return res.status(400).json({ error: 'startDate must be before or equal to endDate' });
+    }
+    // Upsert based on unique combination
+    const filter = { batch, course, trainingMode };
+    const update = { termIIAmount: amount, startDate: sDate, endDate: eDate };
+    const opts = { upsert: true, new: true, setDefaultsOnInsert: true };
+    const feeSetting = await FeeSetting.findOneAndUpdate(filter, update, opts);
+    return res.status(201).json(feeSetting);
+  } catch (err) {
+    console.error('FeeSettings POST error:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── NEW: Get FeeSetting by batch/course/trainingMode ────────────────────
+app.get('/api/admin/fee-settings', async (req, res) => {
+  try {
+    const { batch, course, trainingMode } = req.query;
+    if (!batch || !course || !trainingMode) {
+      return res.status(400).json({ error: 'batch, course, and trainingMode query params are required' });
+    }
+    const feeSetting = await FeeSetting.findOne({ batch, course, trainingMode }).lean();
+    if (!feeSetting) {
+      return res.status(404).json({ error: 'No fee setting found' });
+    }
+    return res.json(feeSetting);
+  } catch (err) {
+    console.error('FeeSettings GET error:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 
 
 
