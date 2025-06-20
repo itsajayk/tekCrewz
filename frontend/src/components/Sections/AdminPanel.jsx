@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
 import { db } from '../Pages/firebase';
 import axios from 'axios';
+import { device } from '../../style/device'; // adjust path as needed
 
 // Base URL for API requests
 const API_BASE_URL = 'https://tekcrewz.onrender.com';
@@ -64,6 +65,14 @@ const [newAssignment, setNewAssignment] = useState({
   // For quiz results mapping: key `${studentId}_${unit}` → { score, total, breakdown }
   const [quizResultsMap, setQuizResultsMap] = useState({});
 
+  // ── Fee Settings state ─────────────────────────
+  const [selectedBatchFee, setSelectedBatchFee] = useState('');
+  const [selectedCourseFee, setSelectedCourseFee] = useState('');
+  const [selectedTrainingModeFee, setSelectedTrainingModeFee] = useState('');
+  const [termIIAmount, setTermIIAmount] = useState('');
+  const [startDateFee, setStartDateFee] = useState('');
+  const [endDateFee, setEndDateFee] = useState('');
+  const [filteredFeeCandidates, setFilteredFeeCandidates] = useState([]);
 
   // helper to push a toast
   const pushToast = (message, type='success') => {
@@ -157,6 +166,70 @@ const [newAssignment, setNewAssignment] = useState({
       .finally(() => setLoading(false));
   }, [showModal, modalType, selectedStudent]);
 
+  // ── Filter candidates for Fee Settings ─────────────────────────────────
+useEffect(() => {
+  if (!selectedBatchFee || !selectedCourseFee || !selectedTrainingModeFee) {
+    setFilteredFeeCandidates([]);
+    return;
+  }
+  axios.get(`${API_BASE_URL}/api/candidates`)
+    .then(res => {
+      const list = res.data.filter(c =>
+        // match batch: studentId includes “BT{selectedBatchFee}FS”
+        typeof c.studentId === 'string'
+          && c.studentId.includes(`BT${selectedBatchFee}FS`)
+        // courseRegistered may be array
+        && Array.isArray(c.courseRegistered)
+        && c.courseRegistered.includes(selectedCourseFee)
+        && c.trainingMode === selectedTrainingModeFee
+        // exclude full-term paid
+        && !(typeof c.paymentTerm === 'string' && c.paymentTerm.trim().toLowerCase() === 'full term')
+      );
+      setFilteredFeeCandidates(list);
+    })
+    .catch(err => {
+      console.error('Error filtering candidates for fee settings:', err);
+      pushToast('Failed to filter candidates for fee settings', 'error');
+    });
+}, [selectedBatchFee, selectedCourseFee, selectedTrainingModeFee]);
+
+      const submitFeeSettings = async () => {
+      // Validate all fields
+      if (!selectedBatchFee || !selectedCourseFee || !selectedTrainingModeFee
+          || !termIIAmount || !startDateFee || !endDateFee) {
+        return pushToast('Complete all fields correctly', 'error');
+      }
+      const amount = Number(termIIAmount);
+      if (isNaN(amount) || amount <= 0) {
+        return pushToast('Term II Payment Amount must be positive', 'error');
+      }
+      const sDate = new Date(startDateFee);
+      const eDate = new Date(endDateFee);
+      if (isNaN(sDate.getTime()) || isNaN(eDate.getTime()) || sDate > eDate) {
+        return pushToast('Invalid date range', 'error');
+      }
+      try {
+        const payload = {
+          batch: selectedBatchFee,
+          course: selectedCourseFee,
+          trainingMode: selectedTrainingModeFee,
+          termIIAmount: amount,
+          startDate: startDateFee,
+          endDate: endDateFee
+        };
+        const res = await axios.post(`${API_BASE_URL}/api/admin/fee-settings`, payload);
+        pushToast(`Fee settings saved for ${filteredFeeCandidates.length} candidates`);
+        // Optionally keep selections or clear:
+        // setSelectedBatchFee(''); etc.
+      } catch (err) {
+        console.error('Failed to save fee settings:', err);
+        const msg = err.response?.data?.error || 'Failed to save fee settings';
+        pushToast(msg, 'error');
+      }
+    };
+
+
+
   const openModal = type => {
     setModalType(type);
     setShowModal(true);
@@ -170,6 +243,17 @@ const [newAssignment, setNewAssignment] = useState({
     setUnlockRequests([]);
     setFeedbackText('');
     setFeedbackUnit('');
+    if (type === 'FeeSettings') {
+    setSelectedBatchFee('');
+    setSelectedCourseFee('');
+    setSelectedTrainingModeFee('');
+    setTermIIAmount('');
+    setStartDateFee('');
+    setEndDateFee('');
+    setFilteredFeeCandidates([]);
+  }
+  setModalType(type);
+  setShowModal(true);
   };
   const closeModal = () => setShowModal(false);
 
@@ -516,7 +600,9 @@ const [newAssignment, setNewAssignment] = useState({
             { label: 'Manage Assignments', icon: '📝', modal: 'ManageAssignments' },
             { label: 'Unlock Requests', icon: '🔓', modal: 'UnlockRequests' },
             { label: 'Assignment Results', icon: '📈', modal: 'AssignmentResults' },
-            { label: 'Review Feedback', icon: '💬', modal: 'ReviewFeedback' }
+            { label: 'Review Feedback', icon: '💬', modal: 'ReviewFeedback' },
+            { label: 'Fee Settings', icon: '💰', modal: 'FeeSettings' },
+
           ].map(({ label, icon, route, modal }, idx) => (
             <MenuCard key={idx} onClick={() => route ? navigate(route) : openModal(modal)}>
               <CardIcon>{icon}</CardIcon>
@@ -971,6 +1057,97 @@ const [newAssignment, setNewAssignment] = useState({
 )}
 
 
+                      {modalType === 'FeeSettings' && !loading && (
+                    <Section>
+                      {/* Filters */}
+                      <FormRow>
+                        <Label>Batch</Label>
+                        <Select value={selectedBatchFee} onChange={e => setSelectedBatchFee(e.target.value)}>
+                          <option value="">Select Batch</option>
+                          {batches.map(b => (
+                            <option key={b} value={b}>{`Batch ${b}`}</option>
+                          ))}
+                        </Select>
+                      </FormRow>
+                      <FormRow>
+                        <Label>Course</Label>
+                        <Select value={selectedCourseFee} onChange={e => setSelectedCourseFee(e.target.value)}>
+                          <option value="">Select Course</option>
+                          {courses.map(c => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </Select>
+                      </FormRow>
+                      <FormRow>
+                        <Label>Training Mode</Label>
+                        {trainingModes.map(mode => (
+                          <label key={mode} style={{ marginRight: '12px' }}>
+                            <input
+                              type="radio"
+                              name="feeTrainingMode"
+                              value={mode}
+                              checked={selectedTrainingModeFee === mode}
+                              onChange={e => setSelectedTrainingModeFee(e.target.value)}
+                            />
+                            {mode}
+                          </label>
+                        ))}
+                      </FormRow>
+
+                      {/* Preview count */}
+                      {selectedBatchFee && selectedCourseFee && selectedTrainingModeFee && (
+                        <p style={{ margin: '8px 0', color: '#555' }}>
+                          {filteredFeeCandidates.length} candidate(s) will be affected.
+                        </p>
+                      )}
+                      {(!selectedBatchFee || !selectedCourseFee || !selectedTrainingModeFee) && (
+                        <p style={{ color: '#888' }}>Select Batch, Course, and Training Mode.</p>
+                      )}
+
+                      {/* Term II amount and dates */}
+                      <FormRow>
+                        <Label>Term II Payment Amount (₹)</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={termIIAmount}
+                          onChange={e => setTermIIAmount(e.target.value)}
+                          placeholder="e.g., 5000"
+                        />
+                      </FormRow>
+                      <FormRow>
+                        <Label>Start Date</Label>
+                        <Input
+                          type="date"
+                          value={startDateFee}
+                          onChange={e => setStartDateFee(e.target.value)}
+                        />
+                      </FormRow>
+                      <FormRow>
+                        <Label>End Date</Label>
+                        <Input
+                          type="date"
+                          value={endDateFee}
+                          onChange={e => setEndDateFee(e.target.value)}
+                        />
+                      </FormRow>
+
+                      {/* Submit */}
+                      <Btn
+                        onClick={submitFeeSettings}
+                        disabled={
+                          !selectedBatchFee || !selectedCourseFee || !selectedTrainingModeFee
+                          || !termIIAmount || !startDateFee || !endDateFee
+                        }
+                        style={{ marginTop: '12px' }}
+                      >
+                        Save Fee Settings
+                      </Btn>
+                    </Section>
+                  )}
+
+
+
 
               {/* Review Feedback */}
               {modalType==='ReviewFeedback' && !loading && (
@@ -1045,33 +1222,248 @@ const gradientBG = keyframes`
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 `;
-const Overlay = styled.div`position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;justify-content:center;align-items:center;padding:16px;`;
-const Dialog = styled.div`background:#fff;border-radius:12px;max-width:90%;width:600px;max-height:90%;overflow:auto;`;
-const Header = styled.div`display:flex;justify-content:space-between;align-items:center;padding:16px;border-bottom:1px solid #eee;`;
-const Close = styled.button`background:none;border:none;font-size:1.5rem;cursor:pointer;`;
-const Body = styled.div`padding:16px;position:relative;`;
-const SpinnerOverlay = styled.div`position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.8);display:flex;justify-content:center;align-items:center;`;
+const Overlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+`;
+const Dialog = styled.div`
+  background: #fff;
+  border-radius: 12px;
+  max-width: 90%;
+  width: 600px;
+  max-height: 75%;
+  overflow: auto;
+   @media ${device.desktop} {
+    width: 80%;
+    max-width: 600px;
+  }
+  @media ${device.tablet} {
+    width: 90%;
+    max-width: 500px;
+  }
+  @media ${device.mobile} {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    max-width: 100%;
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+`;
+const Header = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #eee;
+`;
+const Close = styled.button`
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+`;
+const Body = styled.div`
+  padding: 16px;
+  position: relative;
+`;
+const SpinnerOverlay = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+`;
 const spin = keyframes`0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}`;
-const Spinner = styled.div`border:4px solid #f3f3f3;border-top:4px solid #7620ff;border-radius:50%;width:40px;height:40px;animation:${spin} 1s linear infinite;`;
+const Spinner = styled.div`
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #7620ff;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: ${spin} 1s linear infinite;
+`;
 
-const PageWrapper = styled.section`display:flex;flex-direction:column;min-height:100vh;background:linear-gradient(270deg,#f7f7f7,#eaeaea,#f7f7f7);background-size:600% 600%;animation:${gradientBG} 15s ease infinite;`;
-const MainContent = styled.div`flex:1;display:flex;flex-direction:column;align-items:center;padding:80px 20px;`;
-const PageTitle = styled.h1`font-size:clamp(1.5rem,4vw,2.5rem);font-weight:800;margin-bottom:24px;background:linear-gradient(90deg,#7620ff,#ff9900);-webkit-background-clip:text;color:transparent;text-align:center;`;
-const MenuGrid = styled.div`display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:16px;width:100%;max-width:1200px;`;
-const MenuCard = styled.div`background:#fff;border-radius:16px;padding:16px;display:flex;flex-direction:column;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,0.1);cursor:pointer;transition:transform .2s;&:hover{transform:translateY(-4px);}`;
-const CardIcon = styled.div`font-size:2rem;margin-bottom:8px;`;
-const CardLabel = styled.div`font-weight:600;text-align:center;`;
+const PageWrapper = styled.section`
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: linear-gradient(270deg, #f7f7f7, #eaeaea, #f7f7f7);
+  background-size: 600% 600%;
+  animation: ${gradientBG} 15s ease infinite;
+`;
+const MainContent = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80px 20px;
 
-const List = styled.ul`list-style:none;padding:0;margin:0;max-height:200px;overflow-y:auto;`;
-const Item = styled.li`padding:8px;border-bottom:1px solid #ddd;background:${p=>p.selected?'#e6f7ff':'transparent'};cursor:pointer;&:hover{background:#f0f0f0;}`;
-const Grid = styled.div`display:grid;grid-template-columns:1fr 2fr;gap:16px;@media(max-width:768px){grid-template-columns:1fr;}`;
-const Detail = styled.div`display:flex;flex-direction:column;`;
-const Row = styled.div`display:flex;justify-content:space-between;margin-bottom:8px;`;
-const Label = styled.label`font-weight:600;`;
+  @media ${device.desktopOnly} {
+    padding: 60px 16px;
+  }
+  @media ${device.tablet} {
+    padding: 40px 12px;
+  }
+  @media ${device.mobile} {
+    padding: 20px 8px;
+  }
+`;
+const PageTitle = styled.h1`
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  font-weight: 800;
+  margin-bottom: 24px;
+  margin-top: 45px;
+  background: linear-gradient(90deg, #7620ff, #ff9900);
+  -webkit-background-clip: text;
+  color: transparent;
+  text-align: center;
+
+  @media ${device.mobile} {
+    font-size: clamp(1.2rem, 5vw, 2rem);
+    margin-bottom: 16px;
+  }
+`;
+const MenuGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+  width: 100%;
+  max-width: 1200px;
+
+  @media ${device.tablet} {
+    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+  @media ${device.mobile} {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0 8px;
+    gap: 8px;
+  }
+`;
+
+const MenuCard = styled.div`
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: transform 0.2s;
+  &:hover {
+    transform: translateY(-4px);
+  }
+  @media ${device.desktop} {
+    padding: 14px;
+  }
+  @media ${device.tablet} {
+    padding: 12px;
+  }
+  @media ${device.mobile} {
+    flex-direction: row;
+    align-items: center;
+    padding: 10px;
+  }
+`;
+const CardIcon = styled.div`
+  font-size: 2rem;
+  margin-bottom: 8px;
+
+  @media ${device.tablet} {
+    font-size: 1.8rem;
+  }
+  @media ${device.mobile} {
+    font-size: 1.6rem;
+    margin-bottom: 0;
+    margin-right: 8px;
+  }
+`;
+const CardLabel = styled.div`
+  font-weight: 600;
+  text-align: center;
+
+  @media ${device.mobile} {
+    flex: 1;
+    text-align: left;
+  }
+`;
+
+const List = styled.ul`
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  @media ${device.mobile} {
+    max-height: 150px;
+  }
+`;
+const Item = styled.li`
+  padding: 8px;
+  border-bottom: 1px solid #ddd;
+  background: ${(p) => (p.selected ? "#e6f7ff" : "transparent")};
+  cursor: pointer;
+  &:hover {
+    background: #f0f0f0;
+  }
+`;
+const Grid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 16px;
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+  
+`;
+const Detail = styled.div`
+  display: flex;
+  flex-direction: column;
+`;
+const Row = styled.div`
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+`;
+const Label = styled.label`
+  font-weight: 600;
+`;
 const Span = styled.span``;
 
-const Section = styled.div`display:flex;flex-direction:column;gap:12px;`;
-const Select = styled.select`padding:8px;border-radius:8px;border:1px solid #ccc;width:100%;max-width:300px;`;
+const Section = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  @media ${device.mobile} {
+    padding: 12px;
+  }
+`;
+const Select = styled.select`
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  width: 100%;
+  max-width: 300px;
+  @media ${device.mobile} {
+    max-width: 100%;
+    padding: 6px;
+  }
+`;
 
 const Table = styled.table`
     width: 100%;
@@ -1083,16 +1475,70 @@ const Table = styled.table`
 const Th = styled.th`padding:8px;border:1px solid #ddd;text-align:left;`;
 const Td = styled.td`padding:8px;border:1px solid #ddd;`;
 
-const File = styled.input`padding:4px;`;
-const Input = styled.input`padding:8px;margin-bottom:12px;border:1px solid #ccc;border-radius:6px;width:100%;max-width:300px;`;
-const Textarea = styled.textarea`width:100%;height:80px;padding:8px;border:1px solid #ccc;border-radius:6px;`;
-const Btn = styled.button`padding:8px 16px;background:#4caf50;color:#fff;border:none;border-radius:8px;cursor:pointer;align-self:flex-start;&:hover{background:#45a047;}`;
-const ActionBtn = styled(Btn)`margin-left:8px;background:#2196f3;&:hover{background:#1976d2;}`;
-const AssignList = styled.ul`list-style:none;padding:0;`;
-const AssignItem = styled.li`padding:8px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between;`;
-const FeedbackList = styled.ul`list-style:none;padding:0;`;
-const FeedbackItem = styled.li`padding:8px;border-bottom:1px solid #ddd;`;
-const Li=styled.li`padding:4px 0;`;
+const File = styled.input`
+  padding: 4px;
+`;
+const Input = styled.input`
+  padding: 8px;
+  margin-bottom: 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  width: 100%;
+  max-width: 300px;
+
+  @media ${device.mobile} {
+    max-width: 100%;
+    padding: 6px;
+  }
+`;
+const Textarea = styled.textarea`
+  width: 100%;
+  height: 80px;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+`;
+const Btn = styled.button`
+  padding: 8px 16px;
+  background: #4caf50;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  align-self: flex-start;
+  &:hover {
+    background: #45a047;
+  }
+`;
+const ActionBtn = styled(Btn)`
+  margin-left: 8px;
+  background: #2196f3;
+  &:hover {
+    background: #1976d2;
+  }
+`;
+const AssignList = styled.ul`
+  list-style: none;
+  padding: 0;
+`;
+const AssignItem = styled.li`
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+`;
+const FeedbackList = styled.ul`
+  list-style: none;
+  padding: 0;
+`;
+const FeedbackItem = styled.li`
+  padding: 8px;
+  border-bottom: 1px solid #ddd;
+`;
+const Li = styled.li`
+  padding: 4px 0;
+`;
 const FileInputWrapper = styled.div`
   margin-bottom: 12px;
 `;
@@ -1105,6 +1551,11 @@ const PDFPreview = styled.div`
   padding: 4px 8px;
   border-radius: 4px;
   margin-bottom: 12px;
+
+   @media ${device.mobile} {
+    width: 100%;
+    justify-content: space-between;
+  }
 `;
 const RemoveIcon = styled.span`
   cursor: pointer;

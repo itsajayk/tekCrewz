@@ -791,12 +791,15 @@ app.get('/api/admin/students/:studentId/quizzes/:quizId/result', async (req, res
 // ── NEW: Create or update FeeSetting ─────────────────────────────────
 app.post('/api/admin/fee-settings', async (req, res) => {
   try {
-    const { batch, course, trainingMode, termIIAmount, startDate, endDate } = req.body;
+    let { batch, course, trainingMode, termIIAmount, startDate, endDate } = req.body;
+    // Trim inputs
+    batch = String(batch).trim();
+    course = String(course).trim();
+    trainingMode = String(trainingMode).trim();
     // Validate presence
     if (!batch || !course || !trainingMode || termIIAmount == null || !startDate || !endDate) {
       return res.status(400).json({ error: 'All fields are required' });
     }
-    // Validate numeric and date logic
     const amount = Number(termIIAmount);
     if (isNaN(amount) || amount <= 0) {
       return res.status(400).json({ error: 'termIIAmount must be a positive number' });
@@ -804,31 +807,52 @@ app.post('/api/admin/fee-settings', async (req, res) => {
     const sDate = new Date(startDate);
     const eDate = new Date(endDate);
     if (isNaN(sDate.getTime()) || isNaN(eDate.getTime())) {
-      return res.status(400).json({ error: 'Invalid date format' });
+      return res.status(400).json({ error: 'Invalid dates' });
     }
-    if (sDate > eDate) {
-      return res.status(400).json({ error: 'startDate must be before or equal to endDate' });
+    if (eDate < sDate) {
+      return res.status(400).json({ error: 'endDate must be on or after startDate' });
     }
-    // Upsert based on unique combination
-    const filter = { batch, course, trainingMode };
-    const update = { termIIAmount: amount, startDate: sDate, endDate: eDate };
-    const opts = { upsert: true, new: true, setDefaultsOnInsert: true };
-    const feeSetting = await FeeSetting.findOneAndUpdate(filter, update, opts);
-    return res.status(201).json(feeSetting);
+    // Upsert or create: (existing code for saving)
+    const existing = await FeeSetting.findOne({ batch, course, trainingMode });
+    if (existing) {
+      existing.termIIAmount = amount;
+      existing.startDate = sDate;
+      existing.endDate = eDate;
+      await existing.save();
+      // ... broadcast or respond ...
+      return res.json({ message: 'FeeSetting updated', feeSetting: existing });
+    }
+    // Create new:
+    const newFS = new FeeSetting({ batch, course, trainingMode, termIIAmount: amount, startDate: sDate, endDate: eDate });
+    await newFS.save();
+    // ... respond ...
+    return res.status(201).json({ message: 'FeeSetting created', feeSetting: newFS });
   } catch (err) {
     console.error('FeeSettings POST error:', err);
     return res.status(500).json({ error: err.message });
   }
 });
 
+
 // ── NEW: Get FeeSetting by batch/course/trainingMode ────────────────────
 app.get('/api/admin/fee-settings', async (req, res) => {
   try {
-    const { batch, course, trainingMode } = req.query;
+    let { batch, course, trainingMode } = req.query;
     if (!batch || !course || !trainingMode) {
       return res.status(400).json({ error: 'batch, course, and trainingMode query params are required' });
     }
-    const feeSetting = await FeeSetting.findOne({ batch, course, trainingMode }).lean();
+    // Trim whitespace
+    batch = String(batch).trim();
+    course = String(course).trim();
+    trainingMode = String(trainingMode).trim();
+
+    // Use case-insensitive match for course and trainingMode
+    const feeSetting = await FeeSetting.findOne({
+      batch,
+      course: new RegExp(`^${course}$`, 'i'),           // <<< CHANGED
+      trainingMode: new RegExp(`^${trainingMode}$`, 'i') // <<< CHANGED
+    }).lean();
+
     if (!feeSetting) {
       return res.status(404).json({ error: 'No fee setting found' });
     }
@@ -838,6 +862,7 @@ app.get('/api/admin/fee-settings', async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 });
+
 
 
 

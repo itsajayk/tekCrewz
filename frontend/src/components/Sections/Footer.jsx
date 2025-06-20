@@ -11,10 +11,15 @@ export default function Contact() {
   const getCurrentYear = () => new Date().getFullYear();
   const { currentUser } = useContext(AuthContext);
   // Fallback to localStorage if needed
-  const userId = currentUser?.displayName || localStorage.getItem('userId') || '';
-  const isEmployee = /^(EMPDT|EMPTR|EMPDV|EMPAD|REFSD|BT1FS)/.test(userId);
+  const userId =
+    currentUser?.displayName ||
+    localStorage.getItem('userId') ||
+    localStorage.getItem('studentRegID') ||
+    "";
+  const isEmployee = /^(EMPDT|EMPTR|EMPDV|EMPAD|REFSD|BT1FS|BT7FS|BT\d+FS)/.test(userId);
+  const studentPattern = /^BT\d+/.test(userId);
 
-if (isEmployee) {
+if (isEmployee || studentPattern) {
     return (
       <MinimalWrapper>
         <MinimalText>© Copyrights {getCurrentYear()} TekCrewz Infotech All rights reserved</MinimalText>

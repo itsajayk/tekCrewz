@@ -163,6 +163,7 @@ export default function StudentDashboard() {
   const [submitError, setSubmitError] = useState(null);
   const [submitSuccess, setSubmitSuccess] = useState(null);
 
+  const [feeSetting, setFeeSetting] = useState(null);
 
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
   const closeModal = () => setShowModal(false);
@@ -173,6 +174,7 @@ export default function StudentDashboard() {
   );
   const [submitStatus, setSubmitStatus] = useState(null);
   const [quizResult, setQuizResult] = useState(null);
+
 
    // NEW: load prior result
   useEffect(() => {
@@ -336,6 +338,8 @@ export default function StudentDashboard() {
         studentId: prof.studentId || "",
         paidAmount: prof.paidAmount || "Not Paid",
         candidatePic: prof.candidatePic || prof.photoUrl || "",
+        trainingMode: prof.trainingMode || "",
+        courseRegistered: prof.courseRegistered || [],
         paidDate: prof.paidDate || "",
         attendance,
         assignments,
@@ -374,6 +378,50 @@ export default function StudentDashboard() {
       if (typeof unsubAttendance === 'function') unsubAttendance();
     };
   }, [authUid, navigate, fetchAll]);
+
+      useEffect(() => {
+  if (!data) {
+    setFeeSetting(null);
+    return;
+  }
+  const dbId = data.dbId;
+  // Extract batch number
+  let batch = null;
+  const m = String(dbId).match(/BT(\d+)FS/);
+  if (m) batch = m[1].trim();
+  // Derive course: take first registered course or candidateCourseName
+  let course = '';
+  if (data.candidateCourseName) {
+    course = String(data.candidateCourseName).trim();
+  } else if (Array.isArray(data.courseRegistered) && data.courseRegistered.length > 0) {
+    course = String(data.courseRegistered[0]).trim();
+  }
+  let trainingMode = data.trainingMode ? String(data.trainingMode).trim() : '';
+  console.log('[FeeFetch] params:', { batch, course, trainingMode }); // <<< ADDED: debug
+
+  if (batch && course && trainingMode) {
+    axios.get(`${API_BASE_URL}/api/admin/fee-settings`, {
+      params: { batch, course, trainingMode }
+    })
+    .then(res => {
+      console.log('[FeeFetch] success:', res.data); // <<< ADDED: debug
+      setFeeSetting(res.data);
+    })
+    .catch(err => {
+      if (err.response?.status === 404) {
+        console.warn('[FeeFetch] 404 No fee setting found for', { batch, course, trainingMode }); // <<< ADDED
+        setFeeSetting(null);
+      } else {
+        console.error('Error fetching fee setting:', err);
+      }
+    });
+  } else {
+    console.warn('[FeeFetch] missing param, skipping fetch:', { batch, course, trainingMode }); // <<< ADDED
+    setFeeSetting(null);
+  }
+}, [data]);
+
+
 
     // new: effect to fetch quiz data when activeTab unit changes and assignment is submitted
   useEffect(() => {
@@ -653,36 +701,43 @@ export default function StudentDashboard() {
 const { candidateName, email, mobile, paidAmount, paidDate, paymentTerm, studentId, candidateCourseName, programme, candidatePic, attendance, courseDocs: docs, assignments } = data;
 
 // 2. Helper to detect Full Term (case-insensitive)
+   // Helper to detect Full Term
   const isFullTermPaid = () => {
-    return typeof paymentTerm === 'string' && paymentTerm.trim().toLowerCase() === 'full term';
+    return typeof paymentTerm === 'string' 
+          && paymentTerm.trim().toLowerCase() === 'full term';
   };
 
-  // 3. Build the timer element or null
-  const renderTermIITimer = () => {
-    if (isFullTermPaid()) {
-      return null;
-    }
-    if (!paidDate) {
+  // 3️⃣ Build dynamic fee summary:
+  const renderDynamicFeeSummary = () => {
+    if (isFullTermPaid()) return null;
+    if (!feeSetting) return null;
+    const now = new Date();
+    const sDate = new Date(feeSetting.startDate);
+    const eDate = new Date(feeSetting.endDate);
+    if (isNaN(sDate.getTime()) || isNaN(eDate.getTime())) return null;
+    if (now < sDate) {
+      const days = Math.ceil((sDate - now) / (1000 * 60 * 60 * 24));
       return (
         <IconTextAnimated delay={0.7}>
           <FiClock />
-          {" Date unavailable"}
+          {` Window starts in ${days} day${days!==1?'s':''}`}
         </IconTextAnimated>
       );
     }
-    const daysLeft = calculateDaysUntilTermIIDue(paidDate);
-    if (daysLeft === null) {
+    if (now > eDate) {
+      const daysOver = Math.ceil((now - eDate) / (1000 * 60 * 60 * 24));
       return (
         <IconTextAnimated delay={0.7}>
           <FiClock />
-          {" Date unavailable"}
+          {` Overdue by ${daysOver} day${daysOver!==1?'s':''}: ₹${feeSetting.termIIAmount}`}
         </IconTextAnimated>
       );
     }
+    const daysLeft = Math.ceil((eDate - now) / (1000 * 60 * 60 * 24));
     return (
       <IconTextAnimated delay={0.7}>
         <FiClock />
-        {` ${daysLeft} Days left for Term II Payment`}
+        {` ${daysLeft} day${daysLeft!==1?'s':''} left to pay ₹${feeSetting.termIIAmount}`}
       </IconTextAnimated>
     );
   };
@@ -737,7 +792,7 @@ const { candidateName, email, mobile, paidAmount, paidDate, paymentTerm, student
                 </InfoTextAnimated>
 
                 {/* NEW: Timer for Term II payment due */}
-                {renderTermIITimer()}
+                {renderDynamicFeeSummary()}
               </InfoLine>
             </InfoBlock>
 
