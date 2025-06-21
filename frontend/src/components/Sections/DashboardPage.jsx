@@ -24,6 +24,16 @@ import Footer from './Footer';
 import { AuthContext } from '../../contexts/AuthContext';
 import QuizEditor from './QuizEditor'; // NEW
 
+const slideDown = keyframes`
+  from { opacity: 0; transform: translateY(-20px); }
+  to   { opacity: 1; transform: translateY(0); }
+`;
+
+const fadeIn = keyframes`
+  from { opacity: 0; }
+  to { opacity: 1; }
+`;
+
 // Helper to format YYYY-MM to "Month YYYY"
 const formatMonth = (ym) => {
   const [year, month] = ym.split('-');
@@ -102,6 +112,19 @@ const [showWarningModal, setShowWarningModal] = useState(false);
 
 
   const [toasts, setToasts] = useState([]);
+
+const [pendingLeaveRequests, setPendingLeaveRequests] = useState([]);
+const [leaveActionLoading, setLeaveActionLoading] = useState(false);
+
+// Fetch pending leave requests for tutor/admin
+useEffect(() => {
+  if (!isTutor) return;
+  // Whenever the tutor dashboard loads or when desired (e.g., on opening a Leave Approvals modal)
+  axios.get(`${API_BASE_URL}/api/admin/leave-requests?status=pending`)
+    .then(res => setPendingLeaveRequests(res.data))
+    .catch(err => console.error('Error fetching pending leave requests:', err));
+}, [isTutor]);
+
   
 
   const [newAssignment, setNewAssignment] = useState({
@@ -793,6 +816,80 @@ useEffect(() => {
           </>
         )}
 
+        {/* Leave Approval Section (Tutor only) */}
+{isTutor && (
+  <SectionWrapper>
+    <SectionHeader>Pending Leave Approvals</SectionHeader>
+    {pendingLeaveRequests.length === 0 ? (
+      <p>No pending leave requests.</p>
+    ) : (
+      <table>
+        <thead>
+          <tr>
+            <th>Student ID</th>
+            <th>Date</th>
+            <th>Reason</th>
+            <th>Submitted At</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {pendingLeaveRequests.map(lr => (
+            <tr key={lr._id}>
+              <td>{lr.studentId}</td>
+              <td>{new Date(lr.date).toLocaleDateString()}</td>
+              <td style={{ maxWidth: '200px', wordBreak: 'break-word' }}>{lr.reason}</td>
+              <td>{new Date(lr.submittedAt).toLocaleString()}</td>
+              <td>
+                <Button
+                  disabled={leaveActionLoading}
+                  onClick={async () => {
+                    try {
+                      setLeaveActionLoading(true);
+                      await axios.post(`${API_BASE_URL}/api/admin/leave-requests/${lr._id}/approve`);
+                      pushToast(`Approved leave for ${lr.studentId} on ${new Date(lr.date).toLocaleDateString()}`);
+                      // Refresh list
+                      setPendingLeaveRequests(prev => prev.filter(x => x._id !== lr._id));
+                    } catch (err) {
+                      console.error('Approve leave error:', err);
+                      pushToast('Error approving leave', 'error');
+                    } finally {
+                      setLeaveActionLoading(false);
+                    }
+                  }}
+                >
+                  Approve
+                </Button>
+                <Button
+                  variant="danger"
+                  disabled={leaveActionLoading}
+                  onClick={async () => {
+                    try {
+                      setLeaveActionLoading(true);
+                      await axios.post(`${API_BASE_URL}/api/admin/leave-requests/${lr._id}/reject`);
+                      pushToast(`Rejected leave for ${lr.studentId} on ${new Date(lr.date).toLocaleDateString()}`);
+                      setPendingLeaveRequests(prev => prev.filter(x => x._id !== lr._id));
+                    } catch (err) {
+                      console.error('Reject leave error:', err);
+                      pushToast('Error rejecting leave', 'error');
+                    } finally {
+                      setLeaveActionLoading(false);
+                    }
+                  }}
+                  style={{ marginLeft: '8px' }}
+                >
+                  Reject
+                </Button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+  </SectionWrapper>
+)}
+
+
         {/* AI Modal */}
         {showAiModal && (
           <ModalOverlay>
@@ -1435,4 +1532,23 @@ const ResultTh = styled.th`
 const ResultTd = styled.td`
   padding: 8px;
   border-bottom: 1px solid #ddd;
+`;
+
+const SectionWrapper = styled.div`
+  width: 100%;
+  background: ${p => p.theme.background};
+  color: ${p => p.theme.text};
+  border-radius: 5px;
+  overflow: hidden;
+`;
+
+const SectionHeader = styled.h3`
+  margin: 0 0 16px;
+  font-size: 1.3rem;
+  border-left: 4px solid ${(p) => p.theme.buttonBg};
+  padding-left: 8px;
+  opacity: 0;
+  transform: translateX(-20px);
+  animation: ${slideDown} 0.6s ease-out forwards;
+  @media (max-width: 480px) { font-size: 1.1rem; margin-bottom: 12px; }
 `;

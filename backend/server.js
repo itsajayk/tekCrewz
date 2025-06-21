@@ -648,6 +648,25 @@ const StudentQuizSchema = new mongoose.Schema({
 }, { timestamps: true });
 const StudentQuiz = mongoose.model('StudentQuiz', StudentQuizSchema);
 
+// After: const Attendance = mongoose.model('Attendance', attendanceSchema);
+const leaveRequestSchema = new mongoose.Schema({
+  studentId:  { type: String, required: true },
+  date:       { type: Date, required: true },
+  reason:     { type: String, required: true },
+  status:     { type: String, enum: ['pending','approved','rejected'], default: 'pending' },
+  submittedAt:{ type: Date, default: Date.now }
+});
+const LeaveRequest = mongoose.model('LeaveRequest', leaveRequestSchema);
+
+const absenceReasonSchema = new mongoose.Schema({
+  studentId:   { type: String, required: true },
+  date:        { type: Date, required: true },
+  reason:      { type: String, required: true },
+  submittedAt: { type: Date, default: Date.now }
+});
+const AbsenceReason = mongoose.model('AbsenceReason', absenceReasonSchema);
+
+
 // ── Quiz Routes ───────────────────────────────────────────────────────────
 
 // Admin: Create or update a quiz
@@ -863,7 +882,156 @@ app.get('/api/admin/fee-settings', async (req, res) => {
   }
 });
 
+// POST leave request
+app.post('/api/leave-request', async (req, res) => {
+  try {
+    const { studentId, date, reason } = req.body;
+    if (!studentId || !date || !reason) {
+      return res.status(400).json({ error: 'studentId, date, and reason are required' });
+    }
+    const reqDate = new Date(date);
+    if (isNaN(reqDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format' });
+    }
+    // Disallow past dates (date must be strictly > today)
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    if (reqDate < today) {
+      return res.status(400).json({ error: 'Leave date cannot be in the past' });
+    }
+    if (reason.trim().length < 10 || reason.trim().length > 300) {
+      return res.status(400).json({ error: 'Reason must be 10–300 characters' });
+    }
+    // Prevent duplicate requests for same date by same student
+    const existing = await LeaveRequest.findOne({ studentId, date: reqDate });
+    if (existing) {
+      return res.status(400).json({ error: 'Leave request for this date already submitted' });
+    }
+    const lr = new LeaveRequest({ studentId, date: reqDate, reason: reason.trim() });
+    await lr.save();
+    res.status(201).json({ message: 'Leave request submitted', leaveRequest: lr });
+  } catch (err) {
+    console.error('Leave request error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
+// POST absence reason
+app.post('/api/absence-reason', async (req, res) => {
+  try {
+    const { studentId, date, reason } = req.body;
+    if (!studentId || !date || !reason) {
+      return res.status(400).json({ error: 'studentId, date, and reason are required' });
+    }
+    const absDate = new Date(date);
+    if (isNaN(absDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format' });
+    }
+    // Check if attendance exists and status was absent
+    const att = await Attendance.findOne({ studentId, date: absDate });
+    if (!att) {
+      return res.status(404).json({ error: 'No attendance record found for this date' });
+    }
+    if (att.status.toLowerCase() !== 'absent') {
+      return res.status(400).json({ error: 'Cannot submit reason: status is not Absent' });
+    }
+    // Prevent duplicate submission
+    const existing = await AbsenceReason.findOne({ studentId, date: absDate });
+    if (existing) {
+      return res.status(400).json({ error: 'Reason for this absence already submitted' });
+    }
+    if (reason.trim().length < 10 || reason.trim().length > 300) {
+      return res.status(400).json({ error: 'Reason must be 10–300 characters' });
+    }
+    const ar = new AbsenceReason({ studentId, date: absDate, reason: reason.trim() });
+    await ar.save();
+    res.status(201).json({ message: 'Absence reason submitted', absenceReason: ar });
+  } catch (err) {
+    console.error('Absence reason error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET leave request history/status
+app.get('/api/student/leave-status', async (req, res) => {
+  try {
+    const { studentId } = req.query;
+    if (!studentId) {
+      return res.status(400).json({ error: 'studentId query param is required' });
+    }
+    const list = await LeaveRequest.find({ studentId }).sort({ date: -1 });
+    res.json(list);
+  } catch (err) {
+    console.error('Fetching leave status error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// GET pending leave requests for admin/tutor view
+app.get('/api/admin/leave-requests', async (req, res) => {
+  try {
+    // Optionally allow query param status=pending/approved/rejected
+    const { status } = req.query;
+    const filter = {};
+    if (status) filter.status = status;
+    else filter.status = 'pending';
+    const pending = await LeaveRequest.find(filter).sort({ submittedAt: 1 });
+    res.json(pending);
+  } catch (err) {
+    console.error('Fetching admin leave requests error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST approve a leave request
+app.post('/api/admin/leave-requests/:id/approve', async (req, res) => {
+  try {
+    const lr = await LeaveRequest.findById(req.params.id);
+    if (!lr) return res.status(404).json({ error: 'Leave request not found' });
+    if (lr.status !== 'pending') {
+      return res.status(400).json({ error: 'Cannot approve: not pending' });
+    }
+    lr.status = 'approved';
+    await lr.save();
+    res.json({ message: 'Leave approved', leaveRequest: lr });
+  } catch (err) {
+    console.error('Approve leave error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST reject a leave request
+app.post('/api/admin/leave-requests/:id/reject', async (req, res) => {
+  try {
+    const lr = await LeaveRequest.findById(req.params.id);
+    if (!lr) return res.status(404).json({ error: 'Leave request not found' });
+    if (lr.status !== 'pending') {
+      return res.status(400).json({ error: 'Cannot reject: not pending' });
+    }
+    lr.status = 'rejected';
+    await lr.save();
+    res.json({ message: 'Leave rejected', leaveRequest: lr });
+  } catch (err) {
+    console.error('Reject leave error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET absence reasons for a student
+app.get('/api/admin/absence-reasons', async (req, res) => {
+  try {
+    const { studentId } = req.query;
+    if (!studentId) {
+      return res.status(400).json({ error: 'studentId query param required' });
+    }
+    const arr = await AbsenceReason.find({ studentId }).sort({ date: -1 });
+    res.json(arr);
+  } catch (err) {
+    console.error('Fetching absence reasons error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 
 

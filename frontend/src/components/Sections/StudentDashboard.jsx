@@ -149,6 +149,9 @@ export default function StudentDashboard() {
   const [toastMsg, setToastMsg] = useState('');                 // new: message for toast
   const [showToast, setShowToast] = useState(false);            // new: control toast visibility
 
+  const [toasts, setToasts] = useState([]);
+  
+
   // new states for quiz fetching
   const [quizLoading, setQuizLoading] = useState(false);        // loading state for quiz fetch
   const [quizError, setQuizError] = useState(null);             // error fetching quiz
@@ -165,15 +168,36 @@ export default function StudentDashboard() {
 
   const [feeSetting, setFeeSetting] = useState(null);
 
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+const [leaveDate, setLeaveDate] = useState(() => {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow.toISOString().substr(0,10);
+});
+const [leaveReason, setLeaveReason] = useState('');
+const [leaveRequests, setLeaveRequests] = useState([]);
+
+const [showReasonModal, setShowReasonModal] = useState(false);
+const [selectedAbsentDate, setSelectedAbsentDate] = useState(null);
+const [absenceReasonInput, setAbsenceReasonInput] = useState('');
+const [absenceReasonsMap, setAbsenceReasonsMap] = useState({}); // { 'YYYY-MM-DD': true }
+
+
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
   const closeModal = () => setShowModal(false);
 
-  function QuizComponent({ quizData, studentId, unit }) {
-  const [answers, setAnswers] = useState(() =>
-    quizData.questions.map(() => null)
-  );
-  const [submitStatus, setSubmitStatus] = useState(null);
-  const [quizResult, setQuizResult] = useState(null);
+  const pushToast = (message, type='success') => {
+    const id = Date.now();
+    setToasts(t => [...t, { id, message, type }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
+  };
+
+    function QuizComponent({ quizData, studentId, unit }) {
+      const [answers, setAnswers] = useState(() =>
+        quizData.questions.map(() => null)
+      );
+      const [submitStatus, setSubmitStatus] = useState(null);
+      const [quizResult, setQuizResult] = useState(null);
 
 
    // NEW: load prior result
@@ -273,99 +297,101 @@ export default function StudentDashboard() {
 }
 
     const fetchAll = useCallback(async () => {
-    setLoading(true);
-    try {
-      // 1️⃣ candidates → prof → dbId
-      const candRes = await fetch(`${API_BASE_URL}/api/candidates`);
-      const candidates = candRes.ok ? await candRes.json() : [];
-      const myEmail = auth.currentUser?.email?.toLowerCase();
-      const prof = candidates.find(c => c.email?.toLowerCase() === myEmail) || {};
-      const dbId = prof.studentId;
-      if (!dbId) {
-        setError("Unable to find your student record.");
-        return;
-      }
+  setLoading(true);
+  try {
+    const myEmail = auth.currentUser?.email?.toLowerCase();
 
-      // 2️⃣ attendance
-      const attRes = await fetch(`${API_BASE_URL}/api/students/${dbId}/attendance`);
-      const attendance = attRes.ok ? await attRes.json() : [];
+    // 1️⃣ Fetch candidates and find current user's profile
+    const candRes = await fetch(`${API_BASE_URL}/api/candidates`);
+    const candidates = candRes.ok ? await candRes.json() : [];
+    const prof = candidates.find(c => c.email?.toLowerCase() === myEmail) || {};
+    const dbId = prof.studentId;
 
-      // 3️⃣ course docs
-      const registeredCourses = Array.isArray(prof.courseRegistered) 
-        ? prof.courseRegistered 
-        : (typeof prof.courseRegistered === 'string' && prof.courseRegistered.trim() 
-            ? [prof.courseRegistered] 
-            : []);                                          // CHANGED
-
-       const docsArray = [];                                             // CHANGED :contentReference[oaicite:1]{index=1}
-      for (const courseId of registeredCourses) {                       // CHANGED :contentReference[oaicite:2]{index=2}
-        const res = await fetch(`${API_BASE_URL}/api/courses/${encodeURIComponent(courseId)}/docs`); // CHANGED :contentReference[oaicite:3]{index=3}
-        if (res.ok) {
-          const obj = await res.json();
-          const docEntries = Object.entries(obj).map(([type, url]) => ({ type, url }));
-          docsArray.push({ courseId, docs: docEntries });               // CHANGED :contentReference[oaicite:4]{index=4}
-        }
-      }
-      // ────────────────────────────────────────────────────────────────────────────────
-
-      // 3️⃣ assignments
-      const asnRes = await fetch(`${API_BASE_URL}/api/assignments/${dbId}`);
-      let assignments = asnRes.ok ? await asnRes.json() : [];
-
-      // closed/unlocked flags
-      const now = new Date();
-        assignments = assignments.map(a => {
-          // closedAt comes from server as `closed: Boolean(a.closedAt && now > a.closedAt)`
-          const closedByTime = a.closedAt ? now > new Date(a.closedAt) : false;
-          const unlockedUntil = a.unlockedUntil ? new Date(a.unlockedUntil) : null;
-          const isUnlocked = unlockedUntil && unlockedUntil > now;
-          return {
-            ...a,
-            closed: closedByTime && !isUnlocked,
-            unlocked: Boolean(isUnlocked)
-          };
-        });
-
-
-      setData({
-        dbId,
-        candidateName: prof.candidateName || "New Student",
-        email: prof.email || "",
-        mobile: prof.mobile || "",
-        programme: prof.programme || "",
-        candidateCourseName: prof.candidateCourseName || "",
-        paymentTerm: prof.paymentTerm || "",
-        studentId: prof.studentId || "",
-        paidAmount: prof.paidAmount || "Not Paid",
-        candidatePic: prof.candidatePic || prof.photoUrl || "",
-        trainingMode: prof.trainingMode || "",
-        courseRegistered: prof.courseRegistered || [],
-        paidDate: prof.paidDate || "",
-        attendance,
-        assignments,
-        courseDocs: docsArray
-      });
-      // 4️⃣ subscribe to Firestore attendance
-      const q = query(
-        collection(db, 'attendance'),
-        where('studentId', '==', dbId)
-      );
-      return onSnapshot(q, snap => {
-        const recs = snap.docs.map(d => ({
-          date: d.data().date.toDate ? d.data().date.toDate() : new Date(d.data().date),
-          status: d.data().status
-        }));
-        setAttendanceRecords(
-          recs.sort((a, b) => b.date - a.date)
-        );
-      });
-    } catch (err) {
-      console.error(err);
-      setError("Failed to load dashboard data");
-    } finally {
-      setLoading(false);
+    if (!dbId) {
+      setError("Unable to find your student record.");
+      return;
     }
-  }, [API_BASE_URL, authUid]);
+
+    // 2️⃣ Fetch attendance
+    const [attRes, asnRes] = await Promise.all([
+      fetch(`${API_BASE_URL}/api/students/${dbId}/attendance`),
+      fetch(`${API_BASE_URL}/api/assignments/${dbId}`)
+    ]);
+
+    const attendance = attRes.ok ? await attRes.json() : [];
+    let assignments = asnRes.ok ? await asnRes.json() : [];
+
+    // 3️⃣ Fetch course documents in parallel
+    const registeredCourses = Array.isArray(prof.courseRegistered)
+      ? prof.courseRegistered
+      : (typeof prof.courseRegistered === 'string' && prof.courseRegistered.trim()
+          ? [prof.courseRegistered]
+          : []);
+
+    const docsArray = await Promise.all(registeredCourses.map(async courseId => {
+      const res = await fetch(`${API_BASE_URL}/api/courses/${encodeURIComponent(courseId)}/docs`);
+      if (!res.ok) return null;
+      const obj = await res.json();
+      const docEntries = Object.entries(obj).map(([type, url]) => ({ type, url }));
+      return { courseId, docs: docEntries };
+    }));
+
+    // Filter out nulls in case of failed fetches
+    const courseDocs = docsArray.filter(Boolean);
+
+    // 4️⃣ Process assignments: add `closed` and `unlocked` flags
+    const now = new Date();
+    assignments = assignments.map(a => {
+      const closedByTime = a.closedAt ? now > new Date(a.closedAt) : false;
+      const unlockedUntil = a.unlockedUntil ? new Date(a.unlockedUntil) : null;
+      const isUnlocked = unlockedUntil && unlockedUntil > now;
+      return {
+        ...a,
+        closed: closedByTime && !isUnlocked,
+        unlocked: Boolean(isUnlocked)
+      };
+    });
+
+    // ✅ Set all profile & fetched data
+    setData({
+      dbId,
+      candidateName: prof.candidateName || "New Student",
+      email: prof.email || "",
+      mobile: prof.mobile || "",
+      programme: prof.programme || "",
+      candidateCourseName: prof.candidateCourseName || "",
+      paymentTerm: prof.paymentTerm || "",
+      studentId: prof.studentId || "",
+      paidAmount: prof.paidAmount || "Not Paid",
+      candidatePic: prof.candidatePic || prof.photoUrl || "",
+      trainingMode: prof.trainingMode || "",
+      courseRegistered: prof.courseRegistered || [],
+      paidDate: prof.paidDate || "",
+      attendance,
+      assignments,
+      courseDocs
+    });
+
+    // 5️⃣ Real-time Firestore attendance listener
+    const q = query(
+      collection(db, 'attendance'),
+      where('studentId', '==', dbId)
+    );
+    return onSnapshot(q, snap => {
+      const recs = snap.docs.map(d => ({
+        date: d.data().date.toDate ? d.data().date.toDate() : new Date(d.data().date),
+        status: d.data().status
+      }));
+      setAttendanceRecords(recs.sort((a, b) => b.date - a.date));
+    });
+  } catch (err) {
+    console.error(err);
+    setError("Failed to load dashboard data");
+  } finally {
+    setLoading(false);
+  }
+}, [API_BASE_URL, authUid]);
+
 
     // ② run once on mount
       useEffect(() => {
@@ -379,48 +405,112 @@ export default function StudentDashboard() {
     };
   }, [authUid, navigate, fetchAll]);
 
-      useEffect(() => {
+  useEffect(() => {
+  if (!data?.dbId) return;
+  // GET leave status/history
+  fetch(`${API_BASE_URL}/api/student/leave-status?studentId=${encodeURIComponent(data.dbId)}`)
+    .then(res => res.ok ? res.json() : Promise.reject('Failed to fetch leave history'))
+    .then(list => {
+      setLeaveRequests(list);
+    })
+    .catch(err => console.error('Error fetching leave history:', err));
+  // Also fetch existing absence reasons to disable duplicate submissions:
+  // Optionally: GET all absence reasons for this student
+  fetch(`${API_BASE_URL}/api/admin/absence-reasons?studentId=${encodeURIComponent(data.dbId)}`)
+    .then(res => {
+      if (!res.ok) return [];
+      return res.json();
+    })
+    .then(arr => {
+      // arr: array of { date, ... }
+      const map = {};
+      arr.forEach(item => {
+        const key = new Date(item.date).toISOString().substr(0,10);
+        map[key] = true;
+      });
+      setAbsenceReasonsMap(map);
+    })
+    .catch(err => {
+      // If no such endpoint, skip
+      console.warn('No absence reasons endpoint or error:', err);
+    });
+}, [data?.dbId]);
+
+
+    useEffect(() => {
   if (!data) {
     setFeeSetting(null);
     return;
   }
   const dbId = data.dbId;
-  // Extract batch number
+  // Extract batch from studentId (e.g., BT07FS -> 7)
   let batch = null;
-  const m = String(dbId).match(/BT(\d+)FS/);
-  if (m) batch = m[1].trim();
-  // Derive course: take first registered course or candidateCourseName
-  let course = '';
-  if (data.candidateCourseName) {
-    course = String(data.candidateCourseName).trim();
-  } else if (Array.isArray(data.courseRegistered) && data.courseRegistered.length > 0) {
-    course = String(data.courseRegistered[0]).trim();
-  }
-  let trainingMode = data.trainingMode ? String(data.trainingMode).trim() : '';
-  console.log('[FeeFetch] params:', { batch, course, trainingMode }); // <<< ADDED: debug
+  const m = String(dbId).match(/BT0*(\d+)FS/);
+  if (m) batch = String(parseInt(m[1], 10));
 
-  if (batch && course && trainingMode) {
-    axios.get(`${API_BASE_URL}/api/admin/fee-settings`, {
-      params: { batch, course, trainingMode }
-    })
-    .then(res => {
-      console.log('[FeeFetch] success:', res.data); // <<< ADDED: debug
-      setFeeSetting(res.data);
-    })
-    .catch(err => {
-      if (err.response?.status === 404) {
-        console.warn('[FeeFetch] 404 No fee setting found for', { batch, course, trainingMode }); // <<< ADDED
-        setFeeSetting(null);
-      } else {
-        console.error('Error fetching fee setting:', err);
-      }
-    });
-  } else {
-    console.warn('[FeeFetch] missing param, skipping fetch:', { batch, course, trainingMode }); // <<< ADDED
+  const trainingMode = data.trainingMode ? String(data.trainingMode).trim() : '';
+  console.log('[FeeFetch] batch:', batch, 'trainingMode:', trainingMode);
+
+  if (!batch || !trainingMode) {
+    console.warn('[FeeFetch] missing batch or trainingMode, skipping fee fetch');
     setFeeSetting(null);
+    return;
   }
-}, [data]);
 
+  // Build list of unique, trimmed course names to try
+  const coursesToTry = [];
+  if (Array.isArray(data.courseRegistered)) {
+    for (let cr of data.courseRegistered) {
+      if (cr && typeof cr === 'string') {
+        const trimmed = cr.trim();
+        if (trimmed && !coursesToTry.includes(trimmed)) {
+          coursesToTry.push(trimmed);
+        }
+      }
+    }
+  }
+  if (data.candidateCourseName && typeof data.candidateCourseName === 'string') {
+    const cc = data.candidateCourseName.trim();
+    if (cc && !coursesToTry.includes(cc)) {
+      coursesToTry.push(cc);
+    }
+  }
+
+  if (coursesToTry.length === 0) {
+    console.warn('[FeeFetch] no courses to try, skipping fee fetch');
+    setFeeSetting(null);
+    return;
+  }
+
+  let didSet = false;
+
+  (async () => {
+    for (const courseRaw of coursesToTry) {
+      const course = String(courseRaw).trim();
+      console.log('[FeeFetch] trying course:', course);
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/admin/fee-settings`, {
+          params: { batch, course, trainingMode }
+        });
+        console.log('[FeeFetch] success for course:', course, res.data);
+        setFeeSetting(res.data);
+        didSet = true;
+        break;
+      } catch (err) {
+        if (err.response?.status === 404) {
+          console.log(`[FeeFetch] 404 for course: ${course}`);
+        } else {
+          console.error('[FeeFetch] error fetching fee setting for course:', course, err);
+        }
+      }
+    }
+
+    if (!didSet) {
+      console.warn('[FeeFetch] no fee setting found for any course in list:', coursesToTry);
+      setFeeSetting(null);
+    }
+  })();
+}, [data]);
 
 
     // new: effect to fetch quiz data when activeTab unit changes and assignment is submitted
@@ -709,40 +799,44 @@ const { candidateName, email, mobile, paidAmount, paidDate, paymentTerm, student
 
   // 3️⃣ Build dynamic fee summary:
   const renderDynamicFeeSummary = () => {
-    if (isFullTermPaid()) return null;
-    if (!feeSetting) return null;
-    const now = new Date();
-    const sDate = new Date(feeSetting.startDate);
-    const eDate = new Date(feeSetting.endDate);
-    if (isNaN(sDate.getTime()) || isNaN(eDate.getTime())) return null;
-    if (now < sDate) {
-      const days = Math.ceil((sDate - now) / (1000 * 60 * 60 * 24));
-      return (
-        <IconTextAnimated delay={0.7}>
-          <FiClock />
-          {` Window starts in ${days} day${days!==1?'s':''}`}
-        </IconTextAnimated>
-      );
-    }
-    if (now > eDate) {
-      const daysOver = Math.ceil((now - eDate) / (1000 * 60 * 60 * 24));
-      return (
-        <IconTextAnimated delay={0.7}>
-          <FiClock />
-          {` Overdue by ${daysOver} day${daysOver!==1?'s':''}: ₹${feeSetting.termIIAmount}`}
-        </IconTextAnimated>
-      );
-    }
-    const daysLeft = Math.ceil((eDate - now) / (1000 * 60 * 60 * 24));
-    return (
-      <IconTextAnimated delay={0.7}>
-        <FiClock />
-        {` ${daysLeft} day${daysLeft!==1?'s':''} left to pay ₹${feeSetting.termIIAmount}`}
-      </IconTextAnimated>
-    );
-  };
+  if (isFullTermPaid() || !feeSetting) return null;
 
- const renderProfileCard = () => {
+  const now = new Date();
+  const sDate = new Date(feeSetting.startDate);
+  const eDate = new Date(feeSetting.endDate);
+  if (isNaN(sDate.getTime()) || isNaN(eDate.getTime())) return null;
+
+  if (now < sDate) {
+    const days = Math.ceil((sDate - now) / (1000 * 60 * 60 * 24));
+    return (
+      <FeeTimerWrapper>
+        <FiClock />
+        Window starts in {days} day{days !== 1 ? 's' : ''}
+      </FeeTimerWrapper>
+    );
+  }
+
+  if (now > eDate) {
+    const daysOver = Math.ceil((now - eDate) / (1000 * 60 * 60 * 24));
+    return (
+      <FeeTimerWrapper style={{ borderLeftColor: '#e74c3c', background: 'linear-gradient(90deg, rgba(255,0,0,0.1), transparent)' }}>
+        <FiClock />
+        Overdue by {daysOver} day{daysOver !== 1 ? 's' : ''}: ₹{feeSetting.termIIAmount}
+      </FeeTimerWrapper>
+    );
+  }
+
+  const daysLeft = Math.ceil((eDate - now) / (1000 * 60 * 60 * 24));
+  return (
+    <FeeTimerWrapper>
+      <FiClock />
+      {daysLeft} day{daysLeft !== 1 ? 's' : ''} left to pay ₹{feeSetting.termIIAmount}
+    </FeeTimerWrapper>
+  );
+};
+
+
+  const renderProfileCard = () => {
   // Calculate assignment completion
   const total = assignments.length;
   const done = assignments.filter(a => a.results || a.submissionCode).length;
@@ -889,8 +983,7 @@ const { candidateName, email, mobile, paidAmount, paidDate, paymentTerm, student
 
   // ── UPDATED renderAttendance() ────────────────────────────────────────────────────────
 const renderAttendance = () => {
-  // If no attendance data yet, show a loading animation or message
-  if (!attendanceRecords || attendanceRecords.length === 0) {
+  if (!attendanceRecords) {
     return (
       <AttendanceWrapper>
         <AttendanceHeaderAnimated>Attendance Records</AttendanceHeaderAnimated>
@@ -899,13 +992,31 @@ const renderAttendance = () => {
     );
   }
 
-  // Otherwise, display the attendance in a modern, card‑style list
+  // Format leaveRequests for display
+  const leavePreview = leaveRequests.map(lr => ({
+    date: new Date(lr.date).toLocaleDateString(),
+    status: lr.status,
+    reason: lr.reason
+  }));
+
   return (
     <AttendanceWrapper>
-      {/* SECTION HEADER: slides in from left */}
-      <AttendanceHeaderAnimated>Attendance Records</AttendanceHeaderAnimated>
+      {/* Header + Request Leave button */}
+      <AttendanceHeaderAnimated>
+        Attendance Records
+        <Button style={{ float: 'right' }} onClick={() => {
+          // reset inputs
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          setLeaveDate(tomorrow.toISOString().substr(0,10));
+          setLeaveReason('');
+          setShowLeaveModal(true);
+        }}>
+          Request Leave
+        </Button>
+      </AttendanceHeaderAnimated>
 
-      {/* SUBHEADER: summary of total days and present count */}
+      {/* Summary */}
       <AttendanceSummaryAnimated delay={0.3}>
         {(() => {
           const totalDays = attendanceRecords.length;
@@ -915,20 +1026,179 @@ const renderAttendance = () => {
         })()}
       </AttendanceSummaryAnimated>
 
-      {/* ATTENDANCE CARD LIST (fades in) */}
+      {/* Leave Requests Preview */}
+      {leavePreview.length > 0 && (
+        <LeavePreviewWrapperAnimated delay={0.5}>
+          <h4>Your Leave Requests</h4>
+          <table>
+            <thead>
+              <tr><th>Date</th><th>Status</th><th>Reason</th></tr>
+            </thead>
+            <tbody>
+              {leavePreview.map((lr, idx) => (
+                <tr key={idx}>
+                  <td>{lr.date}</td>
+                  <td>{lr.status}</td>
+                  <td style={{ maxWidth: '200px', wordBreak: 'break-word' }}>{lr.reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </LeavePreviewWrapperAnimated>
+      )}
+
+      {/* Attendance List: date, status, and maybe Submit Reason button */}
       <AttendanceListAnimated delay={0.6}>
-        {attendanceRecords.map((r, i) => (
-          <AttendanceCardAnimated key={i} delay={0.7  + i * 0.05}>
-            <DateDisplay>{r.date.toLocaleDateString()}</DateDisplay>
-            <StatusBadge status={r.status}>{r.status}</StatusBadge>
-          </AttendanceCardAnimated>
-        ))}
+        {attendanceRecords.map((r, i) => {
+          const dateKey = r.date.toISOString().substr(0,10);
+          const isAbsent = r.status.toLowerCase() === 'absent';
+          const alreadySubmitted = Boolean(absenceReasonsMap[dateKey]);
+          return (
+            <AttendanceCardAnimated key={i} delay={0.7 + i * 0.05}>
+              <DateDisplay>{r.date.toLocaleDateString()}</DateDisplay>
+              <StatusBadge status={r.status}>{r.status}</StatusBadge>
+              {isAbsent && (
+                alreadySubmitted ? (
+                  <SmallBadge style={{ marginLeft: '8px' }}>Submitted</SmallBadge>
+                ) : (
+                  <SmallButton 
+                    style={{ marginLeft: '8px' }} 
+                    onClick={() => {
+                      setSelectedAbsentDate(dateKey);
+                      setAbsenceReasonInput('');
+                      setShowReasonModal(true);
+                    }}
+                  >
+                    Submit a Reason ?
+                  </SmallButton>
+                )
+              )}
+            </AttendanceCardAnimated>
+          );
+        })}
       </AttendanceListAnimated>
 
-      {/* REQUEST CHANGE BUTTON (slides up & fades in) */}
-      <RequestButtonAnimated onClick={() => mailRequest('Attendance')} delay={0.7  + attendanceRecords.length * 0.05 +  0.2}>
-        <FiMail style={{ marginRight: "6px" }} /> Request Change
-      </RequestButtonAnimated>
+      {/* Optionally keep the mailRequest fallback */}
+      {/* <RequestButtonAnimated onClick={() => mailRequest('Attendance')} ...>Request Change</RequestButtonAnimated> */}
+
+      {/* Leave Request Modal */}
+      {showLeaveModal && (
+        <ModalOverlay>
+          <ModalContent>
+            <h3>Request Leave</h3>
+            <label>
+              Date:
+              <input 
+                type="date" 
+                value={leaveDate} 
+                onChange={e => setLeaveDate(e.target.value)} 
+                min={new Date().toISOString().substr(0,10)} 
+              />
+            </label>
+            <label>
+              Reason:
+              <textarea
+                rows={4}
+                value={leaveReason}
+                onChange={e => setLeaveReason(e.target.value)}
+                placeholder="Enter reason (10–300 characters)"
+              />
+            </label>
+            <CharacterCount>
+              {leaveReason.length} / 300
+            </CharacterCount>
+            <Button
+              disabled={
+                leaveReason.trim().length < 10 ||
+                leaveReason.trim().length > 300 ||
+                !leaveDate
+              }
+              onClick={async () => {
+                // Submit leave request
+                try {
+                  const body = {
+                    studentId: data.dbId,
+                    date: leaveDate,
+                    reason: leaveReason.trim()
+                  };
+                  const res = await fetch(`${API_BASE_URL}/api/leave-request`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                  });
+                  const json = await res.json();
+                  if (!res.ok) throw new Error(json.error || 'Error');
+                  // Update local state: prepend new request
+                  setLeaveRequests(prev => [json.leaveRequest, ...prev]);
+                  setShowLeaveModal(false);
+                  pushToast('Leave request sent for approval.');
+                } catch (err) {
+                  console.error('Leave request failed:', err);
+                  pushToast(err.message || 'Failed to send leave request', 'error');
+                }
+              }}
+            >
+              Submit
+            </Button>
+            <Button variant="secondary" onClick={() => setShowLeaveModal(false)}>
+              Cancel
+            </Button>
+          </ModalContent>
+        </ModalOverlay>
+      )}
+
+      {/* Absence Reason Modal */}
+      {showReasonModal && (
+        <ModalOverlay>
+          <ModalContent>
+            <h3>Submit Absence Reason</h3>
+            <p>Date: {new Date(selectedAbsentDate).toLocaleDateString()}</p>
+            <textarea
+              rows={4}
+              value={absenceReasonInput}
+              onChange={e => setAbsenceReasonInput(e.target.value)}
+              placeholder="Why were you absent? (10–300 characters)"
+            />
+            <CharacterCount>
+              {absenceReasonInput.length} / 300
+            </CharacterCount>
+            <Button
+              disabled={
+                absenceReasonInput.trim().length < 10 ||
+                absenceReasonInput.trim().length > 300
+              }
+              onClick={async () => {
+                try {
+                  const body = {
+                    studentId: data.dbId,
+                    date: selectedAbsentDate,
+                    reason: absenceReasonInput.trim()
+                  };
+                  const res = await fetch(`${API_BASE_URL}/api/absence-reason`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                  });
+                  const json = await res.json();
+                  if (!res.ok) throw new Error(json.error || 'Error');
+                  // Mark as submitted
+                  setAbsenceReasonsMap(prev => ({ ...prev, [selectedAbsentDate]: true }));
+                  setShowReasonModal(false);
+                  pushToast('Absence reason submitted.');
+                } catch (err) {
+                  console.error('Submit absence reason failed:', err);
+                  pushToast(err.message || 'Failed to submit reason', 'error');
+                }
+              }}
+            >
+              Submit
+            </Button>
+            <Button variant="secondary" onClick={() => setShowReasonModal(false)}>
+              Cancel
+            </Button>
+          </ModalContent>
+        </ModalOverlay>
+      )}
     </AttendanceWrapper>
   );
 };
@@ -1541,6 +1811,24 @@ const Button = styled.button`
     cursor: not-allowed;
   }
 `;
+const SmallButton = styled.button`
+  padding: 6px 12px;
+  background: transparent;
+  color: #dc3545;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 8px;
+  font-size: .8rem;
+  &:hover {
+    color: #ff3d43;
+    border: none;
+  }
+  &:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+`;
 
 const SwitchLink = styled.p`
   margin-top: 15px;
@@ -1712,6 +2000,7 @@ const InfoLine = styled.div`
   font-size: 0.95rem;
   color: ${(p) => p.theme.subText};
   @media (max-width: 768px) { gap: 8px; font-size: 0.9rem; }
+  align-items: center;
 `;
 
 const IconTextAnimated = styled.span`
@@ -2630,4 +2919,69 @@ const QuizResultWrapper = styled.div`
   border-radius: 8px;
   font-size: 14px;
   line-height: 1.6;
+`;
+
+const FeeTimerWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: ${p => p.theme.text};
+  animation: ${slideInRight} 0.6s ease-out forwards;
+  background: linear-gradient(90deg, rgba(255,229,100,0.1), rgba(255,229,100,0));
+  padding: 8px 12px;
+  border-left: 4px solid #ffc107;
+  border-radius: 6px;
+  margin-top: 6px;
+
+  svg {
+    color: #ff9800;
+    animation: ${spin} 1.2s linear infinite;
+    font-size: 1.1rem;
+  }
+`;
+
+const ModalContent = styled.div`
+  background: #fff;
+  padding: 50px;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
+`;
+
+const LeavePreviewWrapperAnimated = styled.div`
+  animation: ${fadeIn} 0.5s ease;
+  margin-top: 1rem;
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    th, td {
+      padding: 0.5rem;
+      border: 1px solid #ccc;
+      text-align: left;
+    }
+    th {
+      background: #f8f8f8;
+    }
+  }
+`;
+
+const SmallBadge = styled.span`
+  display: inline-block;
+  background: #d4edda;
+  color: #155724;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+`;
+
+const CharacterCount = styled.div`
+  text-align: right;
+  font-size: 12px;
+  color: #888;
+  margin-top: 4px;
 `;

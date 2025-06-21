@@ -102,50 +102,51 @@ const CandidatesList = () => {
 
    // ── FETCH CANDIDATES ───────────────────────────────────────────────────────────────
   const fetchCandidates = async () => {
-    setIsLoading(true);
-    try {
-      let params = {
-        status: filters.status,
-        sortOrder: filters.sortOrder
-      };
-      if (filters.date) {
-        const year = filters.date.getFullYear();
-        const month = String(filters.date.getMonth() + 1).padStart(2, '0');
-        params.date = `${year}-${month}`;
-      }
-      if (filters.referrerId) params.referrerId = filters.referrerId;
+  setIsLoading(true);
+  try {
+    // Construct query params
+    const params = {
+      status: filters.status,
+      sortOrder: filters.sortOrder,
+      ...(filters.date && {
+        date: `${filters.date.getFullYear()}-${String(filters.date.getMonth() + 1).padStart(2, '0')}`
+      }),
+      ...(filters.referrerId && { referrerId: filters.referrerId })
+    };
 
-      const response = await axios.get(`${API_BASE_URL}/api/candidates`, { params });
-      setCandidates(response.data);
+    const { data } = await axios.get(`${API_BASE_URL}/api/candidates`, { params });
+    setCandidates(data);
 
-      // Initialize inline edit state.
-      const initialEdits = {};
-      response.data.forEach(c => {
-        // ── NORMALIZE courseRegistered TO ARRAY ───────────────────────────────────
-        let coursesArray = [];
-        if (Array.isArray(c.courseRegistered)) {
-          coursesArray = c.courseRegistered;
-        } else if (typeof c.courseRegistered === 'string' && c.courseRegistered.trim()) {
-          coursesArray = [c.courseRegistered];
-        }
-        // ── ──────────────────────────────────────────────────────────────────────
+    // Normalize and initialize inline edits
+    const initialEdits = Object.fromEntries(
+      data.map(c => {
+        const coursesArray = Array.isArray(c.courseRegistered)
+          ? c.courseRegistered
+          : (typeof c.courseRegistered === 'string' && c.courseRegistered.trim()
+              ? [c.courseRegistered]
+              : []);
+        return [
+          c._id,
+          {
+            paidAmount: c.paidAmount || 0,
+            paidDate: c.paidDate?.split('T')[0] || '',
+            paymentTerm: c.paymentTerm || '',
+            status: c.status || 'Registered',
+            remarks: c.remarks || '',
+            courseRegistered: coursesArray
+          }
+        ];
+      })
+    );
 
-        initialEdits[c._id] = {
-          paidAmount: c.paidAmount || 0,
-          paidDate: c.paidDate ? c.paidDate.split('T')[0] : '',
-          paymentTerm: c.paymentTerm || '',
-          status: c.status || 'Registered',
-          remarks: c.remarks || '',
-          courseRegistered: coursesArray  // CHANGED: now an array
-        };
-      });
-      setEditedCandidates(initialEdits);
-    } catch (err) {
-      console.error('Error fetching candidates:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    setEditedCandidates(initialEdits);
+  } catch (err) {
+    console.error('Error fetching candidates:', err);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   useEffect(() => {
     fetchCandidates();

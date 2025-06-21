@@ -210,9 +210,9 @@ useEffect(() => {
       }
       try {
         const payload = {
-          batch: selectedBatchFee,
-          course: selectedCourseFee,
-          trainingMode: selectedTrainingModeFee,
+          batch: String(selectedBatchFee).trim(),                   // <<< CHANGED
+          course: String(selectedCourseFee).trim(),                 // <<< CHANGED
+          trainingMode: String(selectedTrainingModeFee).trim(),     // <<< CHANGED
           termIIAmount: amount,
           startDate: startDateFee,
           endDate: endDateFee

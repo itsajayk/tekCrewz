@@ -489,12 +489,18 @@ export default function AddCandidate() {
             {/* Courses Enquired */}
             <InputGroup>
               <Label>Courses Enquired</Label>
-              <Input
+              <Select
                 name="coursesEnquired"
                 value={formData.coursesEnquired}
                 onChange={handleChange}
-                placeholder="Enter courses enquired"
-              />
+              >
+                <option value="">Select Course</option>
+                {Object.entries(COURSE_CODES).map(([name, code]) => (
+                  <option key={code} value={name}>
+                    {name.charAt(0).toUpperCase() + name.slice(1)}
+                  </option>
+                ))}
+              </Select>
               {errors.coursesEnquired && <ErrorText>{errors.coursesEnquired}</ErrorText>}
             </InputGroup>
 
