@@ -816,80 +816,6 @@ useEffect(() => {
           </>
         )}
 
-        {/* Leave Approval Section (Tutor only) */}
-{isTutor && (
-  <SectionWrapper>
-    <SectionHeader>Pending Leave Approvals</SectionHeader>
-    {pendingLeaveRequests.length === 0 ? (
-      <p>No pending leave requests.</p>
-    ) : (
-      <table>
-        <thead>
-          <tr>
-            <th>Student ID</th>
-            <th>Date</th>
-            <th>Reason</th>
-            <th>Submitted At</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pendingLeaveRequests.map(lr => (
-            <tr key={lr._id}>
-              <td>{lr.studentId}</td>
-              <td>{new Date(lr.date).toLocaleDateString()}</td>
-              <td style={{ maxWidth: '200px', wordBreak: 'break-word' }}>{lr.reason}</td>
-              <td>{new Date(lr.submittedAt).toLocaleString()}</td>
-              <td>
-                <Button
-                  disabled={leaveActionLoading}
-                  onClick={async () => {
-                    try {
-                      setLeaveActionLoading(true);
-                      await axios.post(`${API_BASE_URL}/api/admin/leave-requests/${lr._id}/approve`);
-                      pushToast(`Approved leave for ${lr.studentId} on ${new Date(lr.date).toLocaleDateString()}`);
-                      // Refresh list
-                      setPendingLeaveRequests(prev => prev.filter(x => x._id !== lr._id));
-                    } catch (err) {
-                      console.error('Approve leave error:', err);
-                      pushToast('Error approving leave', 'error');
-                    } finally {
-                      setLeaveActionLoading(false);
-                    }
-                  }}
-                >
-                  Approve
-                </Button>
-                <Button
-                  variant="danger"
-                  disabled={leaveActionLoading}
-                  onClick={async () => {
-                    try {
-                      setLeaveActionLoading(true);
-                      await axios.post(`${API_BASE_URL}/api/admin/leave-requests/${lr._id}/reject`);
-                      pushToast(`Rejected leave for ${lr.studentId} on ${new Date(lr.date).toLocaleDateString()}`);
-                      setPendingLeaveRequests(prev => prev.filter(x => x._id !== lr._id));
-                    } catch (err) {
-                      console.error('Reject leave error:', err);
-                      pushToast('Error rejecting leave', 'error');
-                    } finally {
-                      setLeaveActionLoading(false);
-                    }
-                  }}
-                  style={{ marginLeft: '8px' }}
-                >
-                  Reject
-                </Button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    )}
-  </SectionWrapper>
-)}
-
-
         {/* AI Modal */}
         {showAiModal && (
           <ModalOverlay>
@@ -1037,6 +963,80 @@ useEffect(() => {
                   </ModalContent>
                 </ModalOverlay>
               )}
+
+              {/* Leave Approval Section (Tutor only) */}
+{isTutor && (
+  <SectionWrapper>
+    <SectionHeader>Pending Leave Approvals</SectionHeader>
+    {pendingLeaveRequests.length === 0 ? (
+      <p>No pending leave requests.</p>
+    ) : (
+      <table>
+        <thead>
+          <tr>
+            <th>Student ID</th>
+            <th>Date</th>
+            <th>Reason</th>
+            <th>Submitted At</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {pendingLeaveRequests.map(lr => (
+            <tr key={lr._id}>
+              <td>{lr.studentId}</td>
+              <td>{new Date(lr.date).toLocaleDateString()}</td>
+              <td style={{ maxWidth: '200px', wordBreak: 'break-word' }}>{lr.reason}</td>
+              <td>{new Date(lr.submittedAt).toLocaleString()}</td>
+              <td>
+                <Button
+                  disabled={leaveActionLoading}
+                  onClick={async () => {
+                    try {
+                      setLeaveActionLoading(true);
+                      await axios.post(`${API_BASE_URL}/api/admin/leave-requests/${lr._id}/approve`);
+                      pushToast(`Approved leave for ${lr.studentId} on ${new Date(lr.date).toLocaleDateString()}`);
+                      // Refresh list
+                      setPendingLeaveRequests(prev => prev.filter(x => x._id !== lr._id));
+                    } catch (err) {
+                      console.error('Approve leave error:', err);
+                      pushToast('Error approving leave', 'error');
+                    } finally {
+                      setLeaveActionLoading(false);
+                    }
+                  }}
+                >
+                  Approve
+                </Button>
+                <Button
+                  variant="danger"
+                  disabled={leaveActionLoading}
+                  onClick={async () => {
+                    try {
+                      setLeaveActionLoading(true);
+                      await axios.post(`${API_BASE_URL}/api/admin/leave-requests/${lr._id}/reject`);
+                      pushToast(`Rejected leave for ${lr.studentId} on ${new Date(lr.date).toLocaleDateString()}`);
+                      setPendingLeaveRequests(prev => prev.filter(x => x._id !== lr._id));
+                    } catch (err) {
+                      console.error('Reject leave error:', err);
+                      pushToast('Error rejecting leave', 'error');
+                    } finally {
+                      setLeaveActionLoading(false);
+                    }
+                  }}
+                  style={{ marginLeft: '8px' }}
+                >
+                  Reject
+                </Button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+  </SectionWrapper>
+)}
+
 
             </ModalContent>
           </ModalOverlay>

@@ -1153,7 +1153,7 @@ const renderAttendance = () => {
           <ModalContent>
             <h3>Submit Absence Reason</h3>
             <p>Date: {new Date(selectedAbsentDate).toLocaleDateString()}</p>
-            <textarea
+            <Textarea
               rows={4}
               value={absenceReasonInput}
               onChange={e => setAbsenceReasonInput(e.target.value)}
@@ -2945,11 +2945,19 @@ const FeeTimerWrapper = styled.div`
 const ModalContent = styled.div`
   background: #fff;
   padding: 50px;
-  border-radius: 8px;
-  width: 100%;
+  border-radius: 10px;
+  // width: 100%;
   max-width: 700px;
   max-height: 90vh;
   overflow-y: auto;
+`;
+
+const Textarea = styled.textarea`
+  width: 100%;
+  height: 80px;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
 `;
 
 const LeavePreviewWrapperAnimated = styled.div`
